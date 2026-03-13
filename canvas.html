@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Easy Company</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="canvas.css">
+    <link rel="stylesheet" href="agent-training.css">
+</head>
+
+<body class="canvas-mode">
+    <div id="agent-canvas">
+        <div class="grid-layer"></div>
+        <svg class="connections-layer"></svg>
+        <div id="nodes-layer"></div>
+    </div>
+
+    <!-- Sliding Sidebar Overlay for Training -->
+    <div id="training-overlay" class="training-side-panel">
+        <!-- Main panel resizer (left edge) -->
+        <div id="panel-resizer" class="resizer resizer-left"></div>
+
+        <div class="training-container">
+            <header class="chat-header">
+                <button id="close-training-btn">← Close</button>
+                <h2 id="agent-name">Agent</h2>
+                <div class="header-actions">
+                    <button id="clear-chat-btn" title="Clear chat history">🗑 Clear Chat</button>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <aside class="details-sidebar" id="details-sidebar">
+                    <div class="sidebar-header">
+                        <span>Configuration</span>
+                        <span id="auto-save-status"
+                            style="font-size: 10px; opacity: 0.6; font-weight: normal; margin-left: auto; transition: opacity 0.3s;">Saved</span>
+                    </div>
+                    <!-- Sidebar content follows... -->
+
+                    <div class="sidebar-section">
+                        <div class="section-title">Identity</div>
+                        <div class="detail-item">
+                            <label>Name</label>
+                            <input type="text" id="detail-name" class="sidebar-input">
+                        </div>
+                        <div class="detail-item">
+                            <label>Description</label>
+                            <textarea id="detail-description" class="sidebar-textarea" rows="3"></textarea>
+                        </div>
+                        <div class="detail-item">
+                            <label>Main Responsibility</label>
+                            <input type="text" id="detail-responsibility" class="sidebar-input"
+                                placeholder="What is their main task?">
+                        </div>
+                        <div class="detail-item">
+                            <label>Tools</label>
+                            <select id="detail-tools" class="sidebar-select">
+                                <option>Gmail</option>
+                                <option>Google Meet</option>
+                                <option>Zoom</option>
+                                <option>Google Calendar</option>
+                                <option>Microsoft Teams</option>
+                                <option>Google Docs</option>
+                                <option>Google Sheets</option>
+                                <option>Custom</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="section-title">Intelligence</div>
+                        <div class="detail-item">
+                            <label>Brain</label>
+                            <select id="detail-brain" class="sidebar-select">
+                                <option value="" disabled selected>Select Brain</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="gemini">Gemini</option>
+                                <option value="chatgpt">ChatGPT</option>
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="grok">Grok</option>
+                            </select>
+                        </div>
+                        <div id="api-key-wrapper" style="display: none;">
+                            <div id="api-key-status"
+                                style="font-size: 11px; color: #ff4d4d; margin-bottom: 4px; display: none;">API Key not
+                                found. Please enter it below:</div>
+                            <div class="detail-item">
+                                <label>API Key</label>
+                                <input type="password" id="detail-api-key" class="sidebar-input"
+                                    placeholder="••••••••••••••••">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="section-title">Communication</div>
+                        <div class="detail-item">
+                            <label>Channel</label>
+                            <select id="detail-channel" class="sidebar-select">
+                                <option value="Gmail">Gmail</option>
+                                <option value="telegram">Telegram</option>
+                                <option value="Discord">Discord</option>
+                                <option value="WhatsApp">WhatsApp</option>
+                                <option value="iMessage">iMessage</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="section-title">Environment</div>
+                        <div class="detail-item">
+                            <label>Working Dir</label>
+                            <div class="sidebar-file-input">
+                                <input type="text" id="detail-workdir" class="sidebar-input"
+                                    placeholder="Select folder..." readonly>
+                                <button id="browse-workdir-btn" class="sidebar-browse-btn">📂</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="section-title">Capabilities</div>
+                        <div id="capabilities-grid" class="capabilities-grid">
+                            <button class="cap-btn" data-cap="web search">web search</button>
+                            <button class="cap-btn" data-cap="thinking">thinking</button>
+                            <button class="cap-btn" data-cap="report generation">report generation</button>
+                            <button class="cap-btn" data-cap="scheduling">scheduling</button>
+                            <button class="cap-btn" data-cap="file access">file access</button>
+                        </div>
+                    </div>
+                </aside>
+                <div id="sidebar-resizer" class="resizer resizer-middle"></div>
+                <div class="chat-main-column">
+                    <div class="chat-area" id="chat-area">
+                        <div class="message agent-message">
+                            Hello! I am ready to be trained. You can upload documents or give me specific instructions
+                            here.
+                        </div>
+                    </div>
+                    <div class="input-area">
+                        <button class="attach-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path
+                                    d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48">
+                                </path>
+                            </svg>
+                        </button>
+                        <input type="text" id="message-input" placeholder="Type your instructions...">
+                        <button id="send-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="canvas.js"></script>
+    <script src="agent-training.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.agentCanvasInstance = new AgentCanvas('agent-canvas');
+        });
+    </script>
+</body>
+
+</html>

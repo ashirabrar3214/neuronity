@@ -1,0 +1,16 @@
+[
+  {
+    "id": "agent-NewAgent-1773431893483",
+    "name": "New b",
+    "description": "Agent description...",
+    "brain": "gemini",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [],
+    "tools": "Custom",
+    "responsibility": "",
+    "x": 524.0,
+    "y": 4.0,
+    "connections": []
+  }
+]
