@@ -29,7 +29,7 @@ def _ddgs_search_raw(query, agent_id):
     """
     Internal helper to fetch raw DuckDuckGo results.
     """
-    safe_log(f"[STATUS:{agent_id}] Searching Web")
+    safe_log(f"[STATUS:{agent_id}] DuckDuckGo: Searching '{query[:40]}...'")
     try:
         from ddgs import DDGS
         results = []
@@ -51,7 +51,7 @@ def filter_sources(query, search_results, api_key):
     Asks Gemini to pick only the most relevant sources from the full result set.
     Returns a filtered list[dict] (subset of search_results).
     """
-    safe_log(f"[STATUS] Filtering sources")
+    # Logic for source filtering
     
     if not search_results or not api_key:
         return search_results
@@ -160,7 +160,13 @@ def web_search(query, agent_id, api_key):
     results = _ddgs_search_raw(query, agent_id)
     if not results:
         return "No results found for the query."
-    return synthesize_fact_with_gemini(query, results, api_key)
+    
+    # Return raw JSON-like format so Researcher can see URLs
+    formatted_results = []
+    for r in results:
+        formatted_results.append(f"Title: {r['title']}\nURL: {r['href']}\nSnippet: {r['body']}")
+    
+    return "\n\n---\n\n".join(formatted_results)
 
 def deep_search(query, agent_id, api_key):
     """
@@ -176,8 +182,14 @@ def deep_search(query, agent_id, api_key):
     if not results:
         return "No results found for the query."
     
+    # Still filter but return the raw data of the filtered sources
     filtered = filter_sources(query, results, api_key)
-    return synthesize_with_gemini(query, filtered, api_key)
+    
+    formatted_results = []
+    for r in filtered:
+        formatted_results.append(f"Title: {r['title']}\nURL: {r['href']}\nSnippet: {r['body']}")
+    
+    return "\n\n---\n\n".join(formatted_results)
 
 
 def synthesize_with_gemini(query, search_results, api_key):
@@ -261,7 +273,7 @@ def thinking(agent_id, topic):
         topic = topic.split("=", 1)[-1].strip()
     topic = topic.strip("'").strip('"').strip("`")
 
-    safe_log(f"[STATUS:{agent_id}] Thinking")
+    safe_log(f"[STATUS:{agent_id}] Thinking: Analyzing '{topic[:40]}...'")
     time.sleep(3)
     return f"Thinking complete on '{topic}'. Ready to respond with deeper analysis."
 
@@ -275,7 +287,7 @@ def generate_report(agent_id, tool_input, working_dir):
     Generates a structured markdown report file in the agent's working directory.
     Usage: [TOOL: generate_report(Title|Content)]
     """
-    safe_log(f"[STATUS:{agent_id}] Generating Report")
+    safe_log(f"[STATUS:{agent_id}] Report: Draft for '{tool_input[:40]}...'")
     time.sleep(1)
     try:
         if not working_dir:
@@ -342,7 +354,7 @@ def report_generation(agent_id, tool_input, working_dir, api_key, agent_name="Ag
     Advanced tool for creating a detailed PDF research report in the working directory.
     Usage: [TOOL: report_generation(Topic | Context/Sources)]
     """
-    safe_log(f"[STATUS:{agent_id}] Creating Comprehensive Report")
+    safe_log(f"[STATUS:{agent_id}] PDF: Synthesis for '{tool_input[:40]}...'")
     
     try:
         if not working_dir:
@@ -444,7 +456,7 @@ def message_agent(target_id, message, sender_id, sender_name, api_key, target_pr
       - A snippet of the sender's recent conversation history for context
     Runs the HTTP call in a new daemon thread to avoid event-loop deadlocks.
     """
-    safe_log(f"[STATUS:{sender_id}] Contacting agent {target_id}...")
+    safe_log(f"[STATUS:{sender_id}] Messenger: Sending to '{target_id}'")
 
     # Build a rich, context-aware message envelope
     separator = "─" * 50
@@ -533,7 +545,7 @@ def _resolve_safe_path(working_dir, file_path):
 
 def scout_file(agent_id, file_path, working_dir):
     """Returns metadata about a file within the working directory."""
-    safe_log(f"[STATUS:{agent_id}] Scouting '{file_path}'")
+    safe_log(f"[STATUS:{agent_id}] FS: Scouting '{file_path}'")
     try:
         safe_path = _resolve_safe_path(working_dir, file_path)
         if not os.path.exists(safe_path):
@@ -575,7 +587,7 @@ def read_file(agent_id, input_str, working_dir):
     """
     Reads a file or a subset of lines. Input format: file_path OR file_path|start-end
     """
-    safe_log(f"[STATUS:{agent_id}] Reading '{input_str}'")
+    safe_log(f"[STATUS:{agent_id}] FS: Reading '{input_str[:40]}...'")
     try:
         parts = input_str.split("|", 1)
         file_path = parts[0].strip()
@@ -629,7 +641,7 @@ def write_file(agent_id, input_str, working_dir):
         file_path = parts[0].strip()
         content = parts[1]
         
-        safe_log(f"[STATUS:{agent_id}] Writing to '{file_path}'")
+        safe_log(f"[STATUS:{agent_id}] FS: Writing to '{file_path}'")
         
         safe_path = _resolve_safe_path(working_dir, file_path)
         

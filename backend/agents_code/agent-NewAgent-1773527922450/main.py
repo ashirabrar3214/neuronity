@@ -1,10 +1,10 @@
 
-class agent_NewAgent_1773499635175:
+class agent_NewAgent_1773527922450:
     def __init__(self):
-        self.id = "agent-NewAgent-1773499635175"
-        self.name = "Researcher"
-        self.working_dir = r"c:\Users\Asus\OneDrive\Desktop\Easy Company\backend\agents_code\agent-NewAgent-1773499635175"
-        self.permissions = ['web search', 'file access']
+        self.id = "agent-NewAgent-1773527922450"
+        self.name = "Reporter"
+        self.working_dir = r"D:\New folder"
+        self.permissions = ['report generation']
         self.tools = "Custom"
         
     def get_personality(self):
@@ -17,5 +17,5 @@ class agent_NewAgent_1773499635175:
             return {}
 
 if __name__ == "__main__":
-    agent = agent_NewAgent_1773499635175()
+    agent = agent_NewAgent_1773527922450()
     print(f"Agent {agent.name} initialized.")

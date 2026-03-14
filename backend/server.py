@@ -173,8 +173,10 @@ def refresh_conversation_summary(agent_id, history, api_key, provider, current_s
     for h in history:
         role = "Agent" if h["role"] == "assistant" else "User"
         # Truncate content for the summarizer itself to be safe
-        content = h["content"][:500] + "..." if len(h["content"]) > 500 else h["content"]
-        formatted_history += f"[{role}]: {content}\n"
+        content = h.get("content", "")
+        if content is None: content = "[No Content]"
+        content_preview = content[:500] + "..." if len(content) > 500 else content
+        formatted_history += f"[{role}]: {content_preview}\n"
 
     summary_prompt = f"""You are a memory management module for an AI agent. 
 Analyze the existing summary and the recent conversation history below. 
@@ -308,16 +310,16 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
                 try:
                     with open(sender_history_path, "r", encoding="utf-8") as f:
                         sender_history = json.load(f)
-                    # Take the last 15 exchanges (up to 15 messages) as context
-                    recent = sender_history[-15:] if len(sender_history) > 15 else sender_history
+                    # Take the last 50 exchanges (up to 50 messages) as context
+                    recent = sender_history[-50:] if len(sender_history) > 50 else sender_history
                     if recent:
                         lines = []
                         msg_count = len(recent)
                         for i, h in enumerate(recent):
                             role_label = sender_name if h["role"] == "assistant" else "User"
-                            # Weighting: 1 is oldest (15th), N is newest (1st)
+                            # Weighting: 1 is oldest (50th), N is newest (1st)
                             weight = i + 1
-                            priority = "LOW" if weight <= 5 else "MEDIUM" if weight <= 10 else "HIGH"
+                            priority = "LOW" if weight <= 20 else "MEDIUM" if weight <= 40 else "HIGH"
                             # Preserve more context (especially for search results with URLs)
                             content_limit = 2000 
                             lines.append(f"  [Msg {weight}/{msg_count} - Priority: {priority}] [{role_label}]: {h['content'][:content_limit]}")
@@ -505,7 +507,7 @@ Tools: {agent_data.get('tools', 'Custom')}
 
 ## MANDATORY: TASK MEMORY & CONTINUITY
 1. **Review History:** Before every response, review the entire chat history. Identify the current "Global Goal" and what step of the process you are currently in.
-2. **The "Wait" Rule:** When you output a `[TOOL: ...]` call, you must STOP. Do not generate any text or commentary after the tool call. Wait for the `SYSTEM TOOL RESULT`.
+2. **The "Wait" Rule:** You must output [TOOL: ...] and then STOP. Do not speak until the SYSTEM TOOL RESULT is provided.
 3. **Consistency Rule:** Never state that you lack an ability listed in your 'Capabilities' section. If a task fails, explain the specific technical error or missing information, not a lack of ability.
 
 ## SOURCE REQUIREMENT
@@ -517,7 +519,7 @@ If you attempt to contact another agent using [TOOL: message_agent(...)] and it 
 2. STOP. Do NOT attempt to complete the task yourself as a substitute.
 3. Do NOT silently re-route the work to a different agent.
 4. Do NOT pretend the task was completed.
-Your only allowed response after a failed agent message is to explain the failure and ask the user how to proceed.
+5. Your only allowed response after a failed agent message is to explain the failure and ask the user how to proceed.
 """
     with open(prompt_path, "w", encoding="utf-8") as f:
         f.write(prompt_content)
@@ -775,7 +777,7 @@ def chat_with_agent(request: ChatRequest):
     agents = load_data()
     agent_data = next((a for a in agents if a["id"] == request.agent_id), None)
     if not agent_data:
-         raise HTTPException(status_code=404, detail="Agent not found")
+        raise HTTPException(status_code=404, detail=f"Agent '{request.agent_id}' not found")
 
     import datetime
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -793,14 +795,27 @@ def chat_with_agent(request: ChatRequest):
     system_prompt = f"CURRENT_DATE: {now}\nASSIGNED_WORKING_DIRECTORY: {work_dir}\n\n" + system_prompt
 
     # ── USER IDENTITY ───────────────────────────────────────────
+    is_reporter = "report_generation" in agent_data.get('permissions', [])
+    
+    reporting_rules = ""
+    if is_reporter:
+        reporting_rules = (
+            f"1. **EXPLICIT REPORT TRIGGER (REPORTER)**: Since you have report generation capabilities, you MUST ONLY initiate the automated Research-to-PDF pipeline if the user's **CURRENT MESSAGE** explicitly asks for a 'report'. If they mention 'document', 'PDF', or 'file' without 'report', just answer them conversationally or ask for details. NEVER assume a report is wanted from vague hints. **CRITICAL**: If the user asks for a 'report' but no topic is present in the current history, you MUST ask the user for a topic instead of choosing one yourself. Do NOT hallucinate a topic.\n"
+            f"4. **SILENT EXECUTION**: ONLY for explicit 'report' requests, you stay silent during the tool pipeline. For all other questions, be conversational.\n"
+        )
+    else:
+        reporting_rules = (
+            f"1. **DELEGATE REPORT REQUESTS**: You do NOT have report generation tools. If the user asks for a 'report', you MUST check your 'Connected Agents' list for an agent with `report generation` capabilities. Use [TOOL: message_agent(AGENT_ID|Message)] to delegate the task to them. Do NOT claim the tool is missing; simply manage the collaboration.\n"
+            f"4. **NO SILENT MODE**: As you are not a reporter, you should always remain conversational while managing your tools.\n"
+        )
+
     system_prompt += (
         f"Keep your tone professional, efficient, and direct.\n"
         f"CRITICAL: All files you create or modify MUST be saved in the `ASSIGNED_WORKING_DIRECTORY`: {work_dir}. Never save files in your internal code directory.\n"
         f"ABSOLUTE RULE: MANDATORY PROACTIVITY & TOOL-FIRST RESPONSE\n"
-        f"1. **EXPLICIT REPORT TRIGGER**: You MUST ONLY initiate the automated Research-to-PDF pipeline if the user's **CURRENT MESSAGE** explicitly asks for a 'report'. If they mention 'document', 'PDF', or 'file' without 'report', just answer them conversationally or ask for details. NEVER assume a report is wanted from vague hints.\n"
+        f"{reporting_rules}"
         f"2. **CURRENT CONVERSATION VS OBJECTIVE**: The `global_objective` is your long-term background goal. However, you MUST prioritize the tone and context of the **IMMEDIATE CHAT**. If the user is just saying 'hello', 'how are you', or expressing confusion, respond naturally as a person. DO NOT use tools or search the web for social greetings.\n"
         f"3. **STOP ON CONFUSION/ANNOYANCE**: If the user says 'what?', 'stop', 'why?', 'did I tell you to?', or seems frustrated, IMMEIDATELY stop all tool use. Do NOT try to solve their confusion with more tools. Just explain yourself clearly in plain text.\n"
-        f"4. **SILENT EXECUTION**: ONLY for explicit 'report' requests, you stay silent during the tool pipeline. For all other questions, be conversational.\n"
         f"5. **SOCIAL & GENERAL INQUIRIES**: If the user asks general questions like 'How are you?', respond professionally and do NOT use tools.\n"
         f"6. **TOOL RESTRAINT**: Do NOT use `list_workspace`, `scout_file`, `web_search` or any other tools for social chat, greetings, or simple questions. Only use tools when a technical task is clearly required.\n"
         f"7. **NO HALLUCINATION OF CAPABILITIES**: If the user asks you to do something for which you do NOT have a corresponding tool in the 'TOOL MANUAL' below (e.g., 'delete a file', 'send a tweet'), you MUST NOT claim you can do it. You MUST NOT lie or pretend to have performed an action. Instead, say: 'Unfortunately, I don't have the ability to do that yet.'\n"
@@ -809,6 +824,8 @@ def chat_with_agent(request: ChatRequest):
         f"10. **RESEARCH HANDOFF PROTOCOL**: When sending data to another agent (e.g., Reporter), you MUST format facts as: 'Fact [Source: URL]'. Do NOT summarize URLs away.\n"
         f"11. **REPORTING COLLABORATION**: As a Reporter, you are REQUIRED to include sources as footnotes. If the Researcher sends you data without URLs, you MUST message them back and demand the URLs before generating the report. Do NOT refuse the task; demand the data.\n"
         f"12. **CONSISTENCY & ABILITY**: Never state that you lack an ability listed in your 'TOOL MANUAL'. If a task fails or data is missing, explain the technical requirement (e.g., 'Need source URLs for citations') rather than a lack of capability.\n\n"
+        f"13. **PROTOCOL FOR SEARCHING (RESEARCHER)**: 1. You must output [TOOL: web_search(query=\"...\")] and then STOP. Do not speak until the SYSTEM TOOL RESULT is provided. 2. You MUST extract the URLs from the search results. 3. When messaging the Reporter, you MUST format the info like this: 'Fact [Source: URL]'. If you don't provide the URL, the Reporter cannot do its job.\n\n"
+        f"14. **PROTOCOL FOR CITATIONS (REPORTER)**: 1. You will receive information from the Researcher agent that includes sources in the format [Source: URL]. 2. You are REQUIRED to include these sources as footnotes or in-text citations in every report you generate.\n\n"
     )
 
     # ── LONG-TERM MEMORY SUMMARY ────────────────────────────────
@@ -1045,41 +1062,52 @@ def chat_with_agent(request: ChatRequest):
     except:
         history = []
         
-    # --- REFUSAL LOOP BREAKER ---
-    # If the last thing the agent said was a refusal/hallucination about its abilities,
-    # we trim the history to 'forget' that error and allow a fresh attempt with the new instructions.
-    if len(history) >= 2:
-        last_assistant_msg = next((m["content"] for m in reversed(history) if m["role"] == "assistant"), "")
-        if "Unfortunately, I don't have the ability" in last_assistant_msg:
-             # Trim until the last user message before the refusal
-             refined_history = []
-             found_refusal = False
-             for msg in reversed(history):
-                 if "Unfortunately, I don't have the ability" in msg["content"] and msg["role"] == "assistant":
-                     found_refusal = True
-                     continue
-                 if found_refusal:
-                     # Keep everything BEFORE the refusal chain
-                     refined_history.insert(0, msg)
-             if found_refusal:
-                 history = refined_history
-                 print(f"[STATUS:{request.agent_id}] Refusal loop detected. Trimming history for fresh start.", flush=True)
+    # (Refusal Loop Breaker removed as it was accidentally wiping conversation context)
+    provider = request.provider.lower()
+    
+    # --- SUMMARIZATION-AS-MEMORY (PROACTIVE) ---
+    summary_path = os.path.join(agent_dir, "summary.json")
+    if len(history) > 50:
+        # If history is long, distill it before starting the loop to ensure recent context isn't lost
+        safe_log(f"[STATUS:{request.agent_id}] Distilling conversation history into memory...")
+        current_summary_data = {}
+        if os.path.exists(summary_path):
+            try:
+                with open(summary_path, "r", encoding="utf-8") as f:
+                    current_summary_data = json.load(f)
+            except: pass
+        
+        old_summary = current_summary_data.get("summary", "")
+        # Summarize older half, keep newer half
+        new_summary = refresh_conversation_summary(
+            request.agent_id, 
+            history[:-20], 
+            request.api_key, 
+            provider, 
+            old_summary
+        )
+        with open(summary_path, "w", encoding="utf-8") as f:
+            json.dump({"summary": new_summary, "updated_at": time.time()}, f, indent=2)
+        
+        # Inject the new summary into the prompt if not already there
+        if "## LONG-TERM CONVERSATION SUMMARY" not in system_prompt:
+            system_prompt += f"\n\n## LONG-TERM CONVERSATION SUMMARY\n{new_summary}\n"
+
     history.append({"role": "user", "content": request.message})
     
     # 5. Iterative LLM Call with Tool Handling (Max 15 turns)
-    provider = request.provider.lower()
     max_turns = 15
     iteration = 0
     final_response = ""
 
     while iteration < max_turns:
-        print(f"[STATUS:{request.agent_id}] Training", flush=True) # "Training" acts as "thinking/processing" in training mode
+        print(f"[STATUS:{request.agent_id}] Turn {iteration+1}/{max_turns}: Thinking...", flush=True)
         
         # ── SLIDING WINDOW CONTEXT ─────────────────────────────────
         # ── SLIDING WINDOW CONTEXT ─────────────────────────────────
-        # Only send the last 15 messages to the LLM to avoid context overflow,
+        # Only send the last 50 messages to the LLM to avoid context overflow,
         # while keeping the full history for the user's UI.
-        raw_context = history[-15:] if len(history) > 15 else history
+        raw_context = history[-50:] if len(history) > 50 else history
         
         llm_context = []
         for h in raw_context:
@@ -1096,11 +1124,19 @@ def chat_with_agent(request: ChatRequest):
                 "content-type": "application/json"
             }
             messages = [{"role": h["role"], "content": h["content"]} for h in llm_context]
+            # Determine temperature: collapsible probability distribution for researchers
+            agent_name_lower = agent_data.get("name", "").lower()
+            agent_resp_lower = agent_data.get("responsibility", "").lower()
+            is_researcher = any(word in agent_name_lower or word in agent_resp_lower 
+                                for word in ["research", "scout", "detective", "search", "analyst"])
+            temp = 0.1 if is_researcher else 0.7
+
             data = {
                 "model": "claude-3-5-sonnet-20240620",
                 "max_tokens": 4096,
                 "system": system_prompt,
-                "messages": messages
+                "messages": messages,
+                "temperature": temp
             }
             response = requests.post(url, headers=headers, json=data, timeout=120)
             if response.status_code == 200:
@@ -1124,9 +1160,17 @@ def chat_with_agent(request: ChatRequest):
             # Generate Native Tool Declarations for Gemini
             gemini_tools = get_gemini_tools_from_permissions(permissions, connections)
             
+            # Determine temperature: collapsible probability distribution for researchers
+            agent_name_lower = agent_data.get("name", "").lower()
+            agent_resp_lower = agent_data.get("responsibility", "").lower()
+            is_researcher = any(word in agent_name_lower or word in agent_resp_lower 
+                                for word in ["research", "scout", "detective", "search", "analyst"])
+            temp = 0.1 if is_researcher else 0.7
+
             data = {
                 "contents": gemini_history,
-                "systemInstruction": {"parts": [{"text": system_prompt}]}
+                "systemInstruction": {"parts": [{"text": system_prompt}]},
+                "generationConfig": {"temperature": temp}
             }
             if gemini_tools:
                 data["tools"] = gemini_tools
@@ -1135,7 +1179,29 @@ def chat_with_agent(request: ChatRequest):
             if response.status_code == 200:
                 try:
                     res_json = response.json()
-                    part = res_json["candidates"][0]["content"]["parts"][0]
+                    
+                    # Safer check for parts
+                    candidates = res_json.get("candidates", [])
+                    if not candidates:
+                        # Check for filter reasons
+                        prompt_feedback = res_json.get("promptFeedback", {})
+                        block_reason = prompt_feedback.get("blockReason")
+                        if block_reason:
+                            error_msg = f"Gemini API Blocked: {block_reason}. The model refused to generate content due to safety filters."
+                        else:
+                            error_msg = f"Gemini API parsing error: No candidates returned. Full Response: {json.dumps(res_json)}"
+                        raise ValueError(error_msg)
+
+                    candidate = candidates[0]
+                    content = candidate.get("content", {})
+                    parts = content.get("parts", [])
+                    
+                    if not parts:
+                        finish_reason = candidate.get("finishReason")
+                        error_msg = f"Gemini API parsing error: No parts in response content. Finish Reason: {finish_reason}. Full Response: {json.dumps(res_json)}"
+                        raise ValueError(error_msg)
+
+                    part = parts[0]
                     
                     if "text" in part:
                         response_text = part["text"]
@@ -1167,7 +1233,8 @@ def chat_with_agent(request: ChatRequest):
                     else:
                         response_text = "I am processing the results."
                 except Exception as e:
-                    error_msg = f"Gemini API parsing error: {e}"
+                    if not error_msg:
+                        error_msg = f"Gemini API parsing error: {str(e)}"
             else:
                 error_msg = f"Gemini API Error: {response.text}"
         else:
@@ -1224,10 +1291,18 @@ def chat_with_agent(request: ChatRequest):
             
             # 1. Provide intermediate feedback to UI
             friendly_action = tool_name.replace('_', ' ').title()
-            print(f"[STATUS:{request.agent_id}] {friendly_action} for {tool_input[:30]}...", flush=True)
+            # Clean and truncate tool input for one-line display
+            clean_input = tool_input.replace('\n', ' ').strip()
+            if len(clean_input) > 60: clean_input = clean_input[:57] + "..."
+            print(f"[STATUS:{request.agent_id}] Action: {friendly_action} | Input: {clean_input}", flush=True)
             
             # 2. Execute Tool from global basket
             tool_result = perform_tool_call(request.agent_id, tool_name, tool_input, agent_dir, api_key=request.api_key)
+            
+            # Report completion to terminal
+            res_summary = str(tool_result).replace('\n', ' ').strip()
+            if len(res_summary) > 60: res_summary = res_summary[:57] + "..."
+            print(f"[STATUS:{request.agent_id}] Finished: {friendly_action} | Result: {res_summary}", flush=True)
             
             # --- API PROTECTION: TRUNCATE HUGE TOOL RESULTS ---
             if isinstance(tool_result, str) and len(tool_result) > 10000:
@@ -1235,18 +1310,11 @@ def chat_with_agent(request: ChatRequest):
                                f"Truncated for API safety. Result head:\n{tool_result[:5000]}...\n\n"
                                f"STRICT INSTRUCTION: Do NOT try to read this much data again. Read it in smaller chunks.")
 
-            # 3. For web_search and report_generation: the tool result is injected but we DO NOT break.
-            #    This allows the reasoning loop to continue so the agent can act on the data.
-            if tool_name in ["web_search", "report_generation"]:
-                # IMPORTANT: Even for direct-return tools, we MUST update history 
-                # so the NEXT turn knows what was found (prevents hallucination).
-                history.append({"role": "assistant", "content": response_text})
-                history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {tool_result}"})
-                # final_response = tool_result # We don't set final_response here yet, let the loop continue
-            
-            # 4. For other tools: feed result back for another LLM turn
+            # 3. Add to history
             history.append({"role": "assistant", "content": response_text})
             history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {tool_result}"})
+            
+            # Injection: Warn the agent if they are about to run out of steps
             
             # Injection: Warn the agent if they are about to run out of steps
             if iteration == max_turns - 2:
@@ -1255,6 +1323,7 @@ def chat_with_agent(request: ChatRequest):
             iteration += 1
         else:
             final_response = response_text
+            print(f"[STATUS:{request.agent_id}] Finalizing response...", flush=True)
             break
     # 5b. Fallback if max turns reached without a direct conversational response
     if not final_response and history:
