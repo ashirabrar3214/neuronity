@@ -1,5 +1,6 @@
 [
   {
+<<<<<<< HEAD
     "id": "agent-NewAgent-1773499635175",
     "name": "Researcher",
     "description": "Agent description...",
@@ -33,6 +34,19 @@
     "responsibility": "",
     "x": -1604.0,
     "y": -311.0,
+=======
+    "id": "agent-NewAgent-1773431893483",
+    "name": "New b",
+    "description": "Agent description...",
+    "brain": "gemini",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [],
+    "tools": "Custom",
+    "responsibility": "",
+    "x": 524.0,
+    "y": 4.0,
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     "connections": []
   }
 ]

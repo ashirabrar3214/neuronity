@@ -3,6 +3,7 @@ let activeAgentData = {};
 let isTrainingPanelOpen = false;
 let isTrainingUIInitialized = false;
 
+<<<<<<< HEAD
 // ─── GLOBALS ────────────────────────────────────────────────────────────────
 window.activeTrainingAgentId = null;
 window.isTrainingPanelOpen = false;
@@ -17,6 +18,12 @@ window.copyToClipboard = (btn) => {
     });
 };
 
+=======
+// Expose these for other scripts (like canvas.js) to check state
+window.activeTrainingAgentId = null;
+window.isTrainingPanelOpen = false;
+
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 async function updateApiKeyVisibility(brainValue) {
     const wrapper = document.getElementById('api-key-wrapper');
     const status = document.getElementById('api-key-status');
@@ -45,16 +52,24 @@ async function updateApiKeyVisibility(brainValue) {
     }
 }
 
+<<<<<<< HEAD
 // ─── Module-level markdown renderer (Enhanced & Robust) ──────────────────────
 function _markdownToHtml(text) {
     if (!text) return "";
 
     // 1. Escaping and Triple-Backtick Code Blocks first (to preserve content)
+=======
+// ─── Module-level markdown renderer ───────────────────────────────────────────
+// Defined here so it can be called from openTrainingPanel (which runs before
+// initTrainingUI) when rendering saved history on panel open.
+function _markdownToHtml(text) {
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     let html = text
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
+<<<<<<< HEAD
     const codeBlocks = [];
     html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
         const id = `__CODE_BLOCK_${codeBlocks.length}__`;
@@ -88,17 +103,29 @@ function _markdownToHtml(text) {
     html = html.replace(/^---$/gm, '<hr>');
 
     // 6. Semantic Inline Styling
+=======
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
     html = html.replace(/`(.+?)`/g, '<code>$1</code>');
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="msg-link">$1</a>');
+<<<<<<< HEAD
     html = html.replace(/\(Source: (.+?)\)/g, '<span class="msg-citation">Source: $1</span>');
 
     // 7. Paragraph Wrapping
+=======
+    html = html.replace(/\(Source: (.+?)\)/g, '<span class="msg-citation">(Source: $1)</span>');
+    html = html.replace(/^[ \t]*-[ \t]+(.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>\n?)+/gs, '<ul>$&</ul>');
+
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     const blocks = html.split(/\n\n+/);
     html = blocks.map(block => {
         const trimmed = block.trim();
         if (!trimmed) return '';
+<<<<<<< HEAD
         // Don't wrap if it's already a structural tag
         if (/^<(h[2-4]|ul|ol|blockquote|pre|hr|__CODE_BLOCK)/.test(trimmed)) return trimmed;
         return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
@@ -111,6 +138,16 @@ function _markdownToHtml(text) {
 
     return html;
 }
+=======
+        if (trimmed.startsWith('<h2>') || trimmed.startsWith('<h3>') || trimmed.startsWith('<ul>')) return trimmed;
+        return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+    }).join('\n');
+
+    return html;
+}
+
+// Expose open function globally so canvas.js can trigger it
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 window.openTrainingPanel = async (agentId, agentName) => {
     activeAgentId = agentId;
     window.activeTrainingAgentId = agentId;
@@ -144,6 +181,10 @@ window.openTrainingPanel = async (agentId, agentName) => {
     document.getElementById('detail-workdir').value = agentData.workingDir || '';
     document.getElementById('detail-tools').value = agentData.tools || 'Gmail';
     document.getElementById('detail-api-key').value = ''; // Always clear on open for security/freshness
+<<<<<<< HEAD
+=======
+
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     await updateApiKeyVisibility(agentData.brain);
 
     // Sync capability buttons
@@ -188,6 +229,11 @@ window.openTrainingPanel = async (agentId, agentName) => {
                     if (isUser) {
                         msgDiv.textContent = h.content;
                     } else {
+<<<<<<< HEAD
+=======
+                        // Use the same markdown renderer (defined below in initTrainingUI scope,
+                        // but we mirror the logic here for panel-open rendering)
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
                         msgDiv.innerHTML = _markdownToHtml(h.content);
                     }
                     chatArea.appendChild(msgDiv);
@@ -213,7 +259,11 @@ window.openTrainingPanel = async (agentId, agentName) => {
 
     // After the panel transition, notify the canvas to resize/update elements
     if (window.agentCanvasInstance && typeof window.agentCanvasInstance.onResize === 'function') {
+<<<<<<< HEAD
         setTimeout(() => window.agentCanvasInstance.onResize(), 400);
+=======
+        setTimeout(() => window.agentCanvasInstance.onResize(), 400); // 400ms to match CSS transition
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     }
 
     // AUTO-FOCUS the input after sliding in to ensure its ready for typing
@@ -236,7 +286,11 @@ function initTrainingUI() {
     const messageInput = document.getElementById('message-input');
     const chatArea = document.getElementById('chat-area');
 
+<<<<<<< HEAD
     // ── INTERACTION HANDLERS ────────────────────────────────────────────────
+=======
+    // Open all source/citation links in the system default browser, not inside Electron
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     chatArea.addEventListener('click', (e) => {
         const link = e.target.closest('.msg-link');
         if (link) {
@@ -248,6 +302,10 @@ function initTrainingUI() {
         }
     });
 
+<<<<<<< HEAD
+=======
+    // UI Overlay Close
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     const closeTrainingPanel = () => {
         const panel = document.getElementById('training-overlay');
         if (!panel) return;
@@ -273,7 +331,11 @@ function initTrainingUI() {
 
         // After the panel transition, notify the canvas to resize/update elements
         if (window.agentCanvasInstance && typeof window.agentCanvasInstance.onResize === 'function') {
+<<<<<<< HEAD
             setTimeout(() => window.agentCanvasInstance.onResize(), 400);
+=======
+            setTimeout(() => window.agentCanvasInstance.onResize(), 400); // 400ms to match CSS transition
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         }
     };
 
@@ -292,6 +354,10 @@ function initTrainingUI() {
         });
     }
 
+<<<<<<< HEAD
+=======
+    // Capability button toggles
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     const capBtns = document.querySelectorAll('.cap-btn');
     capBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -300,17 +366,29 @@ function initTrainingUI() {
         });
     });
 
+<<<<<<< HEAD
+=======
+    // Brain selection change
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     const brainSelect = document.getElementById('detail-brain');
     brainSelect.addEventListener('change', async () => {
         await updateApiKeyVisibility(brainSelect.value);
     });
 
+<<<<<<< HEAD
     // ── AUTO-SAVE SYSTEM ────────────────────────────────────────────────────
+=======
+    // Auto-save debouncer
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     let saveTimeout = null;
     const autoSaveStatus = document.getElementById('auto-save-status');
 
     async function triggerSave() {
         if (!activeAgentId) return;
+<<<<<<< HEAD
+=======
+
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         if (autoSaveStatus) {
             autoSaveStatus.textContent = 'Saving...';
             autoSaveStatus.style.opacity = '1';
@@ -335,6 +413,10 @@ function initTrainingUI() {
         const apiKey = document.getElementById('detail-api-key').value.trim();
 
         try {
+<<<<<<< HEAD
+=======
+            // Save API Key if provided
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
             if (apiKey && updatedData.brain) {
                 await window.electronAPI.setApiKey({
                     provider: updatedData.brain.toLowerCase(),
@@ -373,10 +455,17 @@ function initTrainingUI() {
 
     function queueAutoSave() {
         if (saveTimeout) clearTimeout(saveTimeout);
+<<<<<<< HEAD
         saveTimeout = setTimeout(triggerSave, 1000);
     }
 
     // Listeners for auto-save
+=======
+        saveTimeout = setTimeout(triggerSave, 1000); // 1 second debounce
+    }
+
+    // Attach listeners to all inputs/selects for auto-save
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     const autoSaveInputs = [
         'detail-name', 'detail-description', 'detail-responsibility',
         'detail-brain', 'detail-channel', 'detail-tools', 'detail-workdir', 'detail-api-key'
@@ -413,8 +502,13 @@ function initTrainingUI() {
         });
     }
 
+<<<<<<< HEAD
     // ── RENDERERS ──────────────────────────────────────────────────────────
     function markdownToHtml(text) {
+=======
+    function markdownToHtml(text) {
+        // Delegates to the module-level renderer so history loading and chat both use the same logic
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         return _markdownToHtml(text);
     }
 
@@ -422,6 +516,7 @@ function initTrainingUI() {
         const MAX_ANIMATED_WORDS = 120; // Words beyond this all appear at the same time
         const MS_PER_WORD = 18;         // Delay between each word
 
+<<<<<<< HEAD
         // Walk all text nodes in the rendered HTML tree, skipping code blocks
         const walker = document.createTreeWalker(containerEl, NodeFilter.SHOW_TEXT, {
             acceptNode: (node) => {
@@ -432,6 +527,10 @@ function initTrainingUI() {
                 return NodeFilter.FILTER_ACCEPT;
             }
         });
+=======
+        // Walk all text nodes in the rendered HTML tree
+        const walker = document.createTreeWalker(containerEl, NodeFilter.SHOW_TEXT, null);
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         const textNodes = [];
         let node;
         while ((node = walker.nextNode())) {
@@ -461,6 +560,10 @@ function initTrainingUI() {
             textNode.parentNode.replaceChild(fragment, textNode);
         });
 
+<<<<<<< HEAD
+=======
+        // Scroll as words appear — recalculate at peak animation time
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         const peakMs = Math.min(wordIndex, MAX_ANIMATED_WORDS) * MS_PER_WORD + 400;
         const scrollInterval = setInterval(() => {
             chatArea.scrollTop = chatArea.scrollHeight;
@@ -478,7 +581,11 @@ function initTrainingUI() {
         } else {
             msgDiv.innerHTML = markdownToHtml(text);
             chatArea.appendChild(msgDiv);
+<<<<<<< HEAD
             animateWords(msgDiv);
+=======
+            animateWords(msgDiv); // 🎬 word-by-word reveal
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         }
     }
 
@@ -508,12 +615,20 @@ function initTrainingUI() {
         addMessage(text, true);
         messageInput.value = '';
 
+<<<<<<< HEAD
+=======
+        // 1. Get Configuration
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         const brain = document.getElementById('detail-brain').value;
         if (!brain) {
             addMessage("Error: No Brain selected. Please configure it in the sidebar.", false);
             return;
         }
 
+<<<<<<< HEAD
+=======
+        // 2. Get API Key
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         const apiKey = await window.electronAPI.getApiKey(brain.toLowerCase());
         if (!apiKey) {
             addMessage(`Error: API Key for ${brain} is missing. Please save it in the agent settings.`, false);
@@ -522,6 +637,10 @@ function initTrainingUI() {
 
         showTypingIndicator();
 
+<<<<<<< HEAD
+=======
+        // 3. Send to Backend
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         try {
             const response = await fetch('http://localhost:8000/chat', {
                 method: 'POST',
@@ -558,6 +677,7 @@ function initTrainingUI() {
         if (e.key === 'Enter') handleSend();
     });
 
+<<<<<<< HEAD
     // ── RESIZING LOGIC (REWRITTEN) ──────────────────────────────────────────
     const panel = document.getElementById('training-overlay');
 
@@ -626,6 +746,80 @@ function initTrainingUI() {
         panel.addEventListener('mousedown', (e) => e.stopPropagation());
         panel.addEventListener('click', (e) => e.stopPropagation());
     }
+=======
+    // ── CLICK PROTECTION ────────────────────────────────────────
+    // Stop pointer events from reaching the canvas behind the panel
+    panel.addEventListener('mousedown', (e) => e.stopPropagation());
+    panel.addEventListener('click', (e) => e.stopPropagation());
+
+    // ── Resizer Logic ───────────────────────────────────────────
+    const panel = document.getElementById('training-overlay');
+    const panelResizer = document.getElementById('panel-resizer');
+    const sidebarResizer = document.getElementById('sidebar-resizer');
+    const sidebar = document.getElementById('details-sidebar');
+
+    // 1. Panel Resize (Left Edge)
+    window.isResizingPanelGlobal = false;
+    panelResizer.addEventListener('mousedown', (e) => {
+        window.isResizingPanelGlobal = true;
+        panelResizer.classList.add('dragging');
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        panel.style.transition = 'none';
+        e.preventDefault();
+    });
+
+    // 2. Sidebar Resize (Middle)
+    window.isResizingSidebarGlobal = false;
+    sidebarResizer.addEventListener('mousedown', (e) => {
+        window.isResizingSidebarGlobal = true;
+        sidebarResizer.classList.add('dragging');
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        // Ensure sidebar has an explicit width to start with
+        if (!sidebar.style.width) {
+            sidebar.style.width = sidebar.offsetWidth + 'px';
+        }
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (window.isResizingPanelGlobal) {
+            const newWidth = window.innerWidth - e.clientX;
+            if (newWidth > 350 && newWidth < window.innerWidth * 0.95) {
+                panel.style.width = `${newWidth}px`;
+                if (window.agentCanvasInstance) window.agentCanvasInstance.onResize();
+            }
+        }
+
+        if (window.isResizingSidebarGlobal) {
+            const panelRect = panel.getBoundingClientRect();
+            // Calculate width based on mouse distance from the panel left edge
+            const newSidebarWidth = e.clientX - panelRect.left;
+            const minW = 200;
+            const maxW = panelRect.width - 200;
+
+            if (newSidebarWidth > minW && newSidebarWidth < maxW) {
+                sidebar.style.width = `${newSidebarWidth}px`;
+                sidebar.style.flex = 'none'; // Ensure it respects the width
+            }
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (window.isResizingPanelGlobal) {
+            window.isResizingPanelGlobal = false;
+            panelResizer.classList.remove('dragging');
+            panel.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+        }
+        if (window.isResizingSidebarGlobal) {
+            window.isResizingSidebarGlobal = false;
+            sidebarResizer.classList.remove('dragging');
+        }
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+>>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 }
 
 if (document.readyState === 'loading') {
