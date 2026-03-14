@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Easy Company</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="setup-wizard" class="container">
+        <!-- Step 1: Welcome -->
+        <div id="step-1" class="step">
+            <svg class="logo-svg" width="100" height="100" viewBox="0 0 200 200">
+                <defs>
+                    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#6c5ce7;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#0a0a1a;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                <path fill="url(#grad1)"
+                    d="M 50,20 L 150,20 L 150,50 L 80,50 L 80,80 L 140,80 L 140,110 L 80,110 L 80,140 L 150,140 L 150,170 L 50,170 Z" />
+                <circle cx="100" cy="100" r="90" stroke="#6c5ce7" stroke-width="8" fill="none" />
+            </svg>
+            <h1>Easy Company</h1>
+            <p>Welcome to your new virtual workforce.</p>
+            <button id="next-to-step-2">Next</button>
+        </div>
+
+        <!-- Step 2: Slogan -->
+        <div id="step-2" class="step hidden">
+            <p class="tech-text">Make your own virtual company... you don't need to download models or anything, let
+                your
+                bots take the workload.</p>
+            <button id="next-to-step-3">Configure Brain</button>
+        </div>
+
+        <!-- Step 3: Brain Provider -->
+        <div id="step-3" class="step hidden">
+            <p>Select the brain provider:</p>
+            <select id="brain-provider">
+                <option value="anthropic">Anthropic</option>
+                <option value="gemini">Gemini</option>
+                <option value="chatgpt">ChatGPT</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="grok">Grok</option>
+            </select>
+            <button id="next-to-step-4">Next</button>
+        </div>
+
+        <!-- Step 4: API Key -->
+        <div id="step-4" class="step hidden">
+            <p>Enter your <span id="provider-name"></span> API Key:</p>
+            <input type="password" id="api-key-input" placeholder="••••••••••••••••••••" />
+            <button id="save-key-btn">Save & Continue</button>
+        </div>
+
+        <!-- Step 5: Final -->
+        <div id="step-5" class="step hidden">
+            <h1>Setup Complete</h1>
+            <p>Your Easy Company agent is ready.</p>
+            <button id="launch-workspace-btn" style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">Open Agent
+                Workspace</button>
+            <button id="quit-btn">Finish</button>
+        </div>
+    </div>
+
+    <!-- Workspace UI -->
+    <div id="main-workspace" class="hidden">
+        <div id="agent-canvas">
+            <div class="grid-layer"></div>
+            <svg class="connections-layer"></svg>
+            <div id="nodes-layer"></div>
+        </div>
+
+        <div id="training-overlay" class="training-side-panel">
+            <div class="panel-header">
+                <h2 id="agent-name">Agent Training</h2>
+                <div class="header-actions">
+                    <div id="auto-save-status" class="save-status">Saved</div>
+                    <button id="close-training-btn" class="close-btn">&times;</button>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div id="details-sidebar" class="details-sidebar">
+                    <div class="sidebar-section">
+                        <label>Agent Name</label>
+                        <input type="text" id="detail-name" placeholder="Agent Name">
+                    </div>
+                    <div class="sidebar-section">
+                        <label>Base Goal / Responsibility</label>
+                        <textarea id="detail-responsibility" rows="2"
+                            placeholder="What is this agent's primary purpose?"></textarea>
+                    </div>
+                    <div class="sidebar-section">
+                        <label>Description (Context)</label>
+                        <textarea id="detail-description" rows="3"
+                            placeholder="Context or personality details..."></textarea>
+                    </div>
+                    <div class="sidebar-row">
+                        <div class="sidebar-section">
+                            <label>Brain</label>
+                            <select id="detail-brain">
+                                <option value="">None</option>
+                                <option value="Gemini">Gemini</option>
+                                <option value="Anthropic">Anthropic</option>
+                                <option value="OpenAI">OpenAI</option>
+                                <option value="DeepSeek">DeepSeek</option>
+                            </select>
+                        </div>
+                        <div class="sidebar-section">
+                            <label>Channel</label>
+                            <select id="detail-channel">
+                                <option value="Gmail">Gmail</option>
+                                <option value="Slack">Slack</option>
+                                <option value="Discord">Discord</option>
+                                <option value="Terminal">Terminal</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="api-key-wrapper" class="sidebar-section" style="display: none;">
+                        <label>API Key</label>
+                        <div id="api-key-status" class="api-key-status"></div>
+                        <input type="password" id="detail-api-key" placeholder="Enter API Key">
+                    </div>
+
+                    <div class="sidebar-section">
+                        <label>Capabilities</label>
+                        <div class="capabilities-grid">
+                            <button class="cap-btn" data-cap="search">🌐 Web Search</button>
+                            <button class="cap-btn" data-cap="code">💻 Execution</button>
+                            <button class="cap-btn" data-cap="files">📁 File System</button>
+                            <button class="cap-btn" data-cap="email">📧 Email Tools</button>
+                        </div>
+                    </div>
+                    <div class="sidebar-section">
+                        <label>Working Directory</label>
+                        <div class="input-with-icon">
+                            <input type="text" id="detail-workdir" placeholder="C:\Users\...">
+                            <button id="browse-workdir-btn" title="Browse Folder">📂</button>
+                        </div>
+                    </div>
+                    <div class="sidebar-section">
+                        <label>Tools (CSV)</label>
+                        <input type="text" id="detail-tools" placeholder="gmail, search, weather">
+                    </div>
+                </div>
+
+                <div id="sidebar-resizer" class="resizer sidebar-resizer"></div>
+
+                <div class="chat-main">
+                    <div class="chat-header-row">
+                        <h3>Training & Chat</h3>
+                        <button id="clear-chat-btn" class="text-btn">Clear History</button>
+                    </div>
+                    <div id="chat-area" class="chat-area">
+                        <div class="message agent-message">
+                            Hello! I am ready to be trained. You can upload documents or give me specific instructions
+                            here.
+                        </div>
+                    </div>
+                    <div class="chat-input-wrapper">
+                        <input type="text" id="message-input" placeholder="Type instructions or train the agent...">
+                        <button id="send-btn">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Styles for components -->
+    <link rel="stylesheet" href="canvas.css">
+    <link rel="stylesheet" href="agent-training.css">
+
+    <!-- Core Logic -->
+    <script src="renderer.js"></script>
+    <script src="canvas.js"></script>
+    <script src="agent-training.js"></script>
+</body>
+
+</html>

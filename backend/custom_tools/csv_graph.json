@@ -1,0 +1,6 @@
+{
+  "name": "csv_graph",
+  "description": "Generates a graph from a CSV file using x and y columns and saves it as graph.txt.",
+  "creator": "agent-NewAgent-1773369641133",
+  "created_at": 1773370101.3304126
+}

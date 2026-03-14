@@ -1,0 +1,97 @@
+body {
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    margin: 0;
+    background-color: #121212;
+    color: #ffffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    text-shadow: none;
+}
+
+.container {
+    background: #1e1e1e;
+    padding: 40px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    text-align: center;
+    width: 90%;
+    max-width: 600px;
+}
+
+
+.logo-svg {
+    margin-bottom: 20px;
+    animation: none;
+    filter: none;
+}
+
+h1 {
+    font-size: 2.5em;
+    color: #ffffff;
+    text-shadow: none;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.tech-text {
+    font-size: 1.2em;
+    line-height: 1.6;
+    color: #a0a0a0;
+}
+
+.hidden {
+    display: none;
+}
+
+select, input[type="password"], input[type="text"] {
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    padding: 12px;
+    width: calc(100% - 24px);
+    margin-top: 15px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    background-color: #2d2d2d;
+    color: #ffffff;
+    box-shadow: none;
+    outline: none;
+}
+
+select:focus, input:focus {
+    border-color: #6c5ce7;
+}
+
+button {
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    margin-top: 20px;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 6px;
+    background-color: #6c5ce7;
+    color: #ffffff;
+    font-size: 1em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s, box-shadow 0.3s;
+    text-shadow: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+button:hover {
+    background-color: #5b4cc4;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+#quit-btn {
+    background-color: #2d2d2d;
+    border: 1px solid #ff4d4d;
+    color: #ff4d4d;
+    box-shadow: none;
+}
+
+#quit-btn:hover {
+    background-color: rgba(255, 77, 77, 0.1);
+    box-shadow: none;
+}

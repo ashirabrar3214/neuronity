@@ -1,0 +1,38 @@
+[
+  {
+    "id": "agent-NewAgent-1773499635175",
+    "name": "Researcher",
+    "description": "Agent description...",
+    "brain": "gemini",
+    "channel": "Gmail",
+    "workingDir": "D:\\New folder",
+    "permissions": [
+      "web search",
+      "file access"
+    ],
+    "tools": "Custom",
+    "responsibility": "",
+    "x": -1916.0,
+    "y": -311.0,
+    "connections": [
+      "agent-NewAgent-1773504720806"
+    ]
+  },
+  {
+    "id": "agent-NewAgent-1773504720806",
+    "name": "Reporter",
+    "description": "Agent description...",
+    "brain": "gemini",
+    "channel": "Gmail",
+    "workingDir": "D:\\New folder",
+    "permissions": [
+      "report generation",
+      "file access"
+    ],
+    "tools": "Custom",
+    "responsibility": "",
+    "x": -1604.0,
+    "y": -311.0,
+    "connections": []
+  }
+]

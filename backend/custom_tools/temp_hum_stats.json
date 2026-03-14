@@ -1,0 +1,6 @@
+{
+  "name": "temp_hum_stats",
+  "description": "Calculates basic stats for Temperature and Humidity from a CSV file",
+  "creator": "agent-NewAgent-1773348304125",
+  "created_at": 1773365452.0472994
+}

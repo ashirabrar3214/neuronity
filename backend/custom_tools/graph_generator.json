@@ -1,0 +1,6 @@
+{
+  "name": "graph_generator",
+  "description": "This tool takes a CSV file as input, reads the 'x' and 'y' columns, and generates a graph saved as graph.txt.",
+  "creator": "agent-NewAgent-1773348304125",
+  "created_at": 1773366150.4418783
+}

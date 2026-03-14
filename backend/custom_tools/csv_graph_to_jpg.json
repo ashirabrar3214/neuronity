@@ -1,0 +1,6 @@
+{
+  "name": "csv_graph_to_jpg",
+  "description": "Reads a CSV file, extracts 'Temperature' and 'Humidity' columns, and generates a graph of the first 10 lines saved as graph.jpg",
+  "creator": "agent-NewAgent-1773372348992",
+  "created_at": 1773376715.0101652
+}

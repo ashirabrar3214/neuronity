@@ -1,0 +1,6 @@
+{
+  "name": "csv_graph_creator",
+  "description": "Reads a CSV file, extracts 'Temperature' and 'Humidity' columns, and generates a graph saved as graph.txt",
+  "creator": "agent-NewAgent-1773372348992",
+  "created_at": 1773376645.8020859
+}

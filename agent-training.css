@@ -1,0 +1,552 @@
+/* ── TRAINING OVERLAY: APPLE / macOS INSPIRED ───────────────────────── */
+/* Minimalist, translucent, thin-profile UI with native system fonts. */
+
+:root {
+    --apple-system-blue: #0A84FF;
+    --apple-bg-base: rgba(30, 30, 30, 0.75);
+    --apple-bg-sidebar: rgba(0, 0, 0, 0.2);
+    --apple-bg-chat: transparent;
+    --apple-border: rgba(255, 255, 255, 0.1);
+    --apple-text-main: rgba(255, 255, 255, 0.9);
+    --apple-text-muted: rgba(255, 255, 255, 0.5);
+    --apple-input-bg: rgba(255, 255, 255, 0.05);
+    --apple-input-border: rgba(255, 255, 255, 0.15);
+}
+
+#training-overlay {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: 750px;
+    min-width: 450px;
+    height: 100vh;
+    background: var(--apple-bg-base);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border-left: 1px solid var(--apple-border);
+    box-shadow: -30px 0 80px rgba(0, 0, 0, 0.5);
+    transition: right 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--apple-text-main);
+    font-size: 13px;
+}
+
+#training-overlay.active {
+    right: 0;
+}
+
+/* ── HEADER ─────────────────────────────────────────────────────────── */
+#training-overlay header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--apple-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: transparent;
+}
+
+#training-overlay header h2 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--apple-text-main);
+}
+
+.training-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* ── RESIZERS ───────────────────────────────────────────────────────── */
+.resizer-left {
+    position: absolute;
+    left: -3px;
+    top: 0;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 10;
+}
+
+.sidebar-resizer {
+    width: 1px;
+    background: var(--apple-border);
+    cursor: col-resize;
+    position: relative;
+    z-index: 5;
+    transition: background 0.2s;
+}
+
+.sidebar-resizer::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    right: -3px;
+    top: 0;
+    bottom: 0;
+    background: transparent;
+}
+
+.sidebar-resizer:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* ── SIDEBAR CONFIGURATION ──────────────────────────────────────────── */
+.config-sidebar {
+    width: 280px;
+    /* Slightly narrower, native feel */
+    padding: 20px;
+    background: var(--apple-bg-sidebar);
+    overflow-y: auto;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.config-sidebar label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--apple-text-muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.config-sidebar input,
+.config-sidebar textarea,
+.config-sidebar select {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: var(--apple-input-bg);
+    border: 1px solid var(--apple-input-border);
+    color: var(--apple-text-main);
+    font-size: 13px;
+    padding: 6px 10px;
+    /* Thin profile padding */
+    border-radius: 6px;
+    /* Native macOS radius */
+    font-family: inherit;
+    transition: border 0.2s, background 0.2s;
+}
+
+.config-sidebar input:focus,
+.config-sidebar textarea:focus,
+.config-sidebar select:focus {
+    outline: none;
+    border-color: var(--apple-system-blue);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.config-sidebar textarea {
+    resize: vertical;
+    min-height: 60px;
+    line-height: 1.4;
+}
+
+/* ── BUTTONS & CAPABILITIES ─────────────────────────────────────────── */
+/* Base reset for any generic buttons in the panel */
+button {
+    background: transparent;
+    border: 1px solid var(--apple-input-border);
+    color: var(--apple-text-muted);
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+button:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--apple-text-main);
+}
+
+.capability-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+/* Ultra-thin pill-style capability toggles */
+.cap-btn {
+    background: transparent;
+    border: 1px solid var(--apple-input-border);
+    color: var(--apple-text-muted);
+    padding: 4px 8px;
+    /* Very thin footprint */
+    font-size: 11px;
+    border-radius: 12px;
+    /* Pill shape */
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.cap-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--apple-text-main);
+}
+
+.cap-btn.active {
+    background: rgba(10, 132, 255, 0.15);
+    /* Translucent tint, not solid block */
+    border-color: rgba(10, 132, 255, 0.4);
+    color: var(--apple-system-blue);
+}
+
+/* ── CHAT WINDOW ────────────────────────────────────────────────────── */
+.chat-window {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--apple-bg-chat);
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+#chat-area {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    /* Tighter grouping for chat bubbles */
+}
+
+/* Apple iMessage Style Bubbles (Enhanced) */
+.message {
+    padding: 10px 16px;
+    max-width: 82%;
+    line-height: 1.55;
+    font-size: 14.2px;
+    position: relative;
+    word-wrap: break-word;
+    margin-bottom: 6px;
+    animation: messageEntry 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    opacity: 0;
+}
+
+@keyframes messageEntry {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.user-message {
+    background: linear-gradient(135deg, #0A84FF 0%, #007AFF 100%);
+    color: #ffffff;
+    align-self: flex-end;
+    border-radius: 20px 20px 4px 20px;
+    box-shadow: 0 4px 12px rgba(10, 132, 255, 0.15);
+}
+
+.agent-message {
+    background: rgba(44, 44, 46, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    color: #F2F2F7;
+    align-self: flex-start;
+    border-radius: 20px 20px 20px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.agent-message p {
+    margin: 0 0 12px 0;
+}
+
+.agent-message p:last-child {
+    margin-bottom: 0;
+}
+
+/* Enhanced Code Block Styling */
+.agent-message pre {
+    background: #1C1C1E;
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 12px 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.agent-message code {
+    font-family: 'SF Mono', ui-monospace, 'Fira Code', monospace;
+    font-size: 0.9em;
+    padding: 2px 5px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #FFD60A;
+    /* macOS Canary Yellow for highlights */
+}
+
+.agent-message pre code {
+    background: transparent;
+    padding: 0;
+    color: #64D2FF;
+    /* Sky Blue for code blocks */
+    display: block;
+    line-height: 1.4;
+}
+
+.agent-message blockquote {
+    margin: 12px 0;
+    padding: 8px 16px;
+    border-left: 3px solid var(--apple-system-blue);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 0 8px 8px 0;
+    color: rgba(255, 255, 255, 0.7);
+    font-style: italic;
+}
+
+.agent-message ul,
+.agent-message ol {
+    margin: 12px 0;
+    padding-left: 28px;
+}
+
+.agent-message li {
+    margin-bottom: 8px;
+}
+
+.agent-message h2,
+.agent-message h3 {
+    margin: 20px 0 10px 0;
+    font-size: 1.2em;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.02em;
+}
+
+.agent-message h2 {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 4px;
+}
+
+.agent-message strong {
+    font-weight: 700;
+    color: #fff;
+}
+
+.agent-message em {
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* ── CHAT INPUT AREA ────────────────────────────────────────────────── */
+.chat-input-area {
+    padding: 14px 20px;
+    background: rgba(0, 0, 0, 0.1);
+    border-top: 1px solid var(--apple-border);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+#message-input {
+    flex: 1;
+    margin: 0;
+    border-radius: 20px;
+    /* iMessage pill style */
+    padding: 8px 16px;
+    background: var(--apple-input-bg);
+    border: 1px solid var(--apple-input-border);
+    color: var(--apple-text-main);
+    font-size: 13px;
+    transition: border 0.2s, background 0.2s;
+}
+
+#message-input:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+button#send-btn {
+    background: transparent;
+    color: var(--apple-system-blue);
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+    transition: opacity 0.2s;
+}
+
+button#send-btn:hover {
+    background: transparent;
+    opacity: 0.8;
+}
+
+/* ── ANIMATIONS & MICRO-INTERACTIONS ────────────────────────────────── */
+.word-reveal {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(2px);
+    animation: reveal 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes reveal {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.msg-citation {
+    display: inline-block;
+    font-size: 10px;
+    background: rgba(10, 132, 255, 0.1);
+    color: var(--apple-system-blue);
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-top: 8px;
+    border: 1px solid rgba(10, 132, 255, 0.2);
+    font-weight: 500;
+}
+
+.code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1C1C1E;
+    padding: 4px 12px;
+    border-radius: 8px 8px 0 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: none;
+    font-family: inherit;
+    font-size: 10px;
+    color: var(--apple-text-muted);
+    margin-top: 12px;
+}
+
+.copy-btn {
+    background: transparent;
+    border: none;
+    color: var(--apple-system-blue);
+    cursor: pointer;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.copy-btn:hover {
+    background: rgba(10, 132, 255, 0.1);
+}
+
+.agent-message pre {
+    margin-top: 0;
+    /* Align with header */
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+.msg-link {
+    color: var(--apple-system-blue);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.msg-link:hover {
+    text-decoration: underline;
+}
+
+/* Minimal Typing Indicator */
+.typing-indicator {
+    display: flex;
+    gap: 4px;
+    padding: 12px 16px;
+    background: #2C2C2E;
+    border-radius: 18px 18px 18px 4px;
+    align-self: flex-start;
+    align-items: center;
+    height: 12px;
+}
+
+.typing-dot {
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    animation: typingPulse 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes typingPulse {
+
+    0%,
+    80%,
+    100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+#auto-save-status {
+    position: absolute;
+    bottom: 15px;
+    right: 25px;
+    font-size: 11px;
+    color: var(--apple-text-muted);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+/* ── NATIVE SCROLLBARS (macOS style) ────────────────────────────────── */
+#chat-area::-webkit-scrollbar,
+.config-sidebar::-webkit-scrollbar {
+    width: 14px;
+}
+
+#chat-area::-webkit-scrollbar-track,
+.config-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#chat-area::-webkit-scrollbar-thumb,
+.config-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    border: 4px solid transparent;
+    /* Creates the thin floating look */
+    background-clip: padding-box;
+}
+
+#chat-area::-webkit-scrollbar-thumb:hover,
+.config-sidebar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+}
+
+body.training-panel-active #agent-canvas {
+    width: 100%;
+}

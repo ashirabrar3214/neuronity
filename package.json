@@ -1,0 +1,20 @@
+{
+  "name": "easy-company",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "electron": "^40.8.0"
+  },
+  "dependencies": {
+    "electron-store": "^11.0.2",
+    "pyodide": "^0.29.3"
+  }
+}
