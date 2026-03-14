@@ -3,7 +3,7 @@ class agent_NewAgent_1773499635175:
     def __init__(self):
         self.id = "agent-NewAgent-1773499635175"
         self.name = "Researcher"
-        self.working_dir = r"D:\New folder"
+        self.working_dir = r"c:\Users\Asus\OneDrive\Desktop\Easy Company\backend\agents_code\agent-NewAgent-1773499635175"
         self.permissions = ['web search', 'file access']
         self.tools = "Custom"
         

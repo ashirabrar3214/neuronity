@@ -1,249 +1,4 @@
-<<<<<<< HEAD
-/* ── TRAINING OVERLAY: APPLE / macOS INSPIRED ───────────────────────── */
-/* Minimalist, translucent, thin-profile UI with native system fonts. */
-
-:root {
-    --apple-system-blue: #0A84FF;
-    --apple-bg-base: rgba(30, 30, 30, 0.75);
-    --apple-bg-sidebar: rgba(0, 0, 0, 0.2);
-    --apple-bg-chat: transparent;
-    --apple-border: rgba(255, 255, 255, 0.1);
-    --apple-text-main: rgba(255, 255, 255, 0.9);
-    --apple-text-muted: rgba(255, 255, 255, 0.5);
-    --apple-input-bg: rgba(255, 255, 255, 0.05);
-    --apple-input-border: rgba(255, 255, 255, 0.15);
-}
-
-#training-overlay {
-    position: fixed;
-    top: 0;
-    right: -100%;
-    width: 750px;
-    min-width: 450px;
-    height: 100vh;
-    background: var(--apple-bg-base);
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
-    border-left: 1px solid var(--apple-border);
-    box-shadow: -30px 0 80px rgba(0, 0, 0, 0.5);
-    transition: right 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
-    color: var(--apple-text-main);
-    font-size: 13px;
-}
-
-#training-overlay.active {
-    right: 0;
-}
-
-/* ── HEADER ─────────────────────────────────────────────────────────── */
-#training-overlay header {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--apple-border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: transparent;
-}
-
-#training-overlay header h2 {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    color: var(--apple-text-main);
-}
-
-.training-content {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-    position: relative;
-}
-
-/* ── RESIZERS ───────────────────────────────────────────────────────── */
-.resizer-left {
-    position: absolute;
-    left: -3px;
-    top: 0;
-    width: 6px;
-    height: 100%;
-    cursor: col-resize;
-    background: transparent;
-    z-index: 10;
-}
-
-.sidebar-resizer {
-    width: 1px;
-    background: var(--apple-border);
-    cursor: col-resize;
-    position: relative;
-    z-index: 5;
-    transition: background 0.2s;
-}
-
-.sidebar-resizer::before {
-    content: '';
-    position: absolute;
-    left: -3px;
-    right: -3px;
-    top: 0;
-    bottom: 0;
-    background: transparent;
-}
-
-.sidebar-resizer:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-/* ── SIDEBAR CONFIGURATION ──────────────────────────────────────────── */
-.config-sidebar {
-    width: 280px;
-    /* Slightly narrower, native feel */
-    padding: 20px;
-    background: var(--apple-bg-sidebar);
-    overflow-y: auto;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.config-sidebar label {
-    display: block;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--apple-text-muted);
-    margin-bottom: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.config-sidebar input,
-.config-sidebar textarea,
-.config-sidebar select {
-    width: 100%;
-    box-sizing: border-box;
-    background-color: var(--apple-input-bg);
-    border: 1px solid var(--apple-input-border);
-    color: var(--apple-text-main);
-    font-size: 13px;
-    padding: 6px 10px;
-    /* Thin profile padding */
-    border-radius: 6px;
-    /* Native macOS radius */
-    font-family: inherit;
-    transition: border 0.2s, background 0.2s;
-}
-
-.config-sidebar input:focus,
-.config-sidebar textarea:focus,
-.config-sidebar select:focus {
-    outline: none;
-    border-color: var(--apple-system-blue);
-    background-color: rgba(255, 255, 255, 0.08);
-}
-
-.config-sidebar textarea {
-    resize: vertical;
-    min-height: 60px;
-    line-height: 1.4;
-}
-
-/* ── BUTTONS & CAPABILITIES ─────────────────────────────────────────── */
-/* Base reset for any generic buttons in the panel */
-button {
-    background: transparent;
-    border: 1px solid var(--apple-input-border);
-    color: var(--apple-text-muted);
-    padding: 4px 10px;
-    font-size: 11px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    font-family: inherit;
-}
-
-button:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--apple-text-main);
-}
-
-.capability-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-}
-
-/* Ultra-thin pill-style capability toggles */
-.cap-btn {
-    background: transparent;
-    border: 1px solid var(--apple-input-border);
-    color: var(--apple-text-muted);
-    padding: 4px 8px;
-    /* Very thin footprint */
-    font-size: 11px;
-    border-radius: 12px;
-    /* Pill shape */
-    cursor: pointer;
-    text-align: center;
-    transition: all 0.15s ease;
-    user-select: none;
-}
-
-.cap-btn:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--apple-text-main);
-}
-
-.cap-btn.active {
-    background: rgba(10, 132, 255, 0.15);
-    /* Translucent tint, not solid block */
-    border-color: rgba(10, 132, 255, 0.4);
-    color: var(--apple-system-blue);
-}
-
-/* ── CHAT WINDOW ────────────────────────────────────────────────────── */
-.chat-window {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: var(--apple-bg-chat);
-    box-sizing: border-box;
-    min-width: 0;
-}
-
-#chat-area {
-    flex: 1;
-    padding: 24px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    /* Tighter grouping for chat bubbles */
-}
-
-/* Apple iMessage Style Bubbles (Enhanced) */
-.message {
-    padding: 10px 16px;
-    max-width: 82%;
-    line-height: 1.55;
-    font-size: 14.2px;
-    position: relative;
-    word-wrap: break-word;
-    margin-bottom: 6px;
-    animation: messageEntry 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-    opacity: 0;
-}
-
-@keyframes messageEntry {
-    from {
-        opacity: 0;
-        transform: translateY(10px) scale(0.98);
-=======
+/* ── TRAINING OVERLAY: MODERN PREMIUM THEME ───────────────────────── */
 :root {
     --bg-dark: #121212;
     --bg-panel: #181818;
@@ -255,330 +10,34 @@ button:hover {
     --accent-hover: #5b4cc4;
     --message-user: #6c5ce7;
     --message-agent: #262626;
+
+    /* Apple-inspired tokens for refined feel */
+    --apple-system-blue: #0A84FF;
+    --apple-border: rgba(255, 255, 255, 0.1);
 }
 
-body {
-    background-color: var(--bg-dark);
-    margin: 0;
-    font-family: 'Inter', 'Segoe UI', sans-serif;
-    color: var(--text-primary);
+.training-side-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 80vw;
+    min-width: 400px;
     height: 100vh;
-    overflow: hidden;
-    animation: fadeIn 0.4s ease-out;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #333;
-    border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #444;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
-    }
-
-    to {
-        opacity: 1;
-<<<<<<< HEAD
-        transform: translateY(0) scale(1);
-    }
-}
-
-.user-message {
-    background: linear-gradient(135deg, #0A84FF 0%, #007AFF 100%);
-    color: #ffffff;
-    align-self: flex-end;
-    border-radius: 20px 20px 4px 20px;
-    box-shadow: 0 4px 12px rgba(10, 132, 255, 0.15);
-}
-
-.agent-message {
-    background: rgba(44, 44, 46, 0.75);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    color: #F2F2F7;
-    align-self: flex-start;
-    border-radius: 20px 20px 20px 4px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-}
-
-.agent-message p {
-    margin: 0 0 12px 0;
-}
-
-.agent-message p:last-child {
-    margin-bottom: 0;
-}
-
-/* Enhanced Code Block Styling */
-.agent-message pre {
-    background: #1C1C1E;
-    padding: 12px;
-    border-radius: 8px;
-    overflow-x: auto;
-    margin: 12px 0;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.agent-message code {
-    font-family: 'SF Mono', ui-monospace, 'Fira Code', monospace;
-    font-size: 0.9em;
-    padding: 2px 5px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    color: #FFD60A;
-    /* macOS Canary Yellow for highlights */
-}
-
-.agent-message pre code {
-    background: transparent;
-    padding: 0;
-    color: #64D2FF;
-    /* Sky Blue for code blocks */
-    display: block;
-    line-height: 1.4;
-}
-
-.agent-message blockquote {
-    margin: 12px 0;
-    padding: 8px 16px;
-    border-left: 3px solid var(--apple-system-blue);
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 0 8px 8px 0;
-    color: rgba(255, 255, 255, 0.7);
-    font-style: italic;
-}
-
-.agent-message ul,
-.agent-message ol {
-    margin: 12px 0;
-    padding-left: 28px;
-}
-
-.agent-message li {
-    margin-bottom: 8px;
-}
-
-.agent-message h2,
-.agent-message h3 {
-    margin: 20px 0 10px 0;
-    font-size: 1.2em;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -0.02em;
-}
-
-.agent-message h2 {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding-bottom: 4px;
-}
-
-.agent-message strong {
-    font-weight: 700;
-    color: #fff;
-}
-
-.agent-message em {
-    font-style: italic;
-    color: rgba(255, 255, 255, 0.85);
-}
-
-/* ── CHAT INPUT AREA ────────────────────────────────────────────────── */
-.chat-input-area {
-    padding: 14px 20px;
-    background: rgba(0, 0, 0, 0.1);
-    border-top: 1px solid var(--apple-border);
-    display: flex;
-    gap: 10px;
-    align-items: center;
-}
-
-#message-input {
-    flex: 1;
-    margin: 0;
-    border-radius: 20px;
-    /* iMessage pill style */
-    padding: 8px 16px;
-    background: var(--apple-input-bg);
-    border: 1px solid var(--apple-input-border);
-    color: var(--apple-text-main);
-    font-size: 13px;
-    transition: border 0.2s, background 0.2s;
-}
-
-#message-input:focus {
-    outline: none;
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 0.08);
-}
-
-button#send-btn {
-    background: transparent;
-    color: var(--apple-system-blue);
-    border: none;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 4px 8px;
-    transition: opacity 0.2s;
-}
-
-button#send-btn:hover {
-    background: transparent;
-    opacity: 0.8;
-}
-
-/* ── ANIMATIONS & MICRO-INTERACTIONS ────────────────────────────────── */
-.word-reveal {
-    display: inline-block;
-    opacity: 0;
-    transform: translateY(2px);
-    animation: reveal 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-
-@keyframes reveal {
-=======
-    }
-}
-
-@keyframes messageSlideUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-<<<<<<< HEAD
-.msg-citation {
-    display: inline-block;
-    font-size: 10px;
-    background: rgba(10, 132, 255, 0.1);
-    color: var(--apple-system-blue);
-    padding: 2px 8px;
-    border-radius: 10px;
-    margin-top: 8px;
-    border: 1px solid rgba(10, 132, 255, 0.2);
-    font-weight: 500;
-}
-
-.code-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #1C1C1E;
-    padding: 4px 12px;
-    border-radius: 8px 8px 0 0;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-bottom: none;
-    font-family: inherit;
-    font-size: 10px;
-    color: var(--apple-text-muted);
-    margin-top: 12px;
-}
-
-.copy-btn {
-    background: transparent;
-    border: none;
-    color: var(--apple-system-blue);
-    cursor: pointer;
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 4px;
-}
-
-.copy-btn:hover {
-    background: rgba(10, 132, 255, 0.1);
-}
-
-.agent-message pre {
-    margin-top: 0;
-    /* Align with header */
-    border-top-left-radius: 0;
-    border-top-right-radius: 0;
-}
-
-.msg-link {
-    color: var(--apple-system-blue);
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.msg-link:hover {
-    text-decoration: underline;
-}
-
-/* Minimal Typing Indicator */
-.typing-indicator {
-    display: flex;
-    gap: 4px;
-    padding: 12px 16px;
-    background: #2C2C2E;
-    border-radius: 18px 18px 18px 4px;
-    align-self: flex-start;
-    align-items: center;
-    height: 12px;
-}
-
-.typing-dot {
-    width: 5px;
-    height: 5px;
-    background: rgba(255, 255, 255, 0.4);
-    border-radius: 50%;
-    animation: typingPulse 1.4s infinite ease-in-out both;
-=======
-/* Word-by-word reveal animation for agent responses */
-.word-reveal {
-    display: inline;
-    opacity: 0;
-    animation: wordReveal 0.25s ease forwards;
-}
-
-@keyframes wordReveal {
-    from {
-        opacity: 0;
-        transform: translateX(-5px);
-        filter: blur(2px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0);
-        filter: blur(0);
-    }
-}
-
-.training-container {
+    max-width: 100%;
+    background: var(--bg-dark);
+    z-index: 1100;
+    transform: translateX(100%);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.6);
     display: flex;
     flex-direction: column;
-    height: 100%;
-    width: 100%;
-    max-width: none;
-    margin: 0 auto;
-    background: var(--bg-dark);
 }
 
+.training-side-panel.active {
+    transform: translateX(0);
+}
+
+/* ── HEADER ─────────────────────────────────────────────────────────── */
 .chat-header {
     height: 60px;
     padding: 0 24px;
@@ -587,10 +46,11 @@ button#send-btn:hover {
     align-items: center;
     justify-content: space-between;
     background: var(--bg-panel);
+    flex-shrink: 0;
 }
 
 .chat-header h2 {
-    margin: 0 0 0 16px;
+    margin: 0 16px;
     font-size: 16px;
     color: var(--text-primary);
     font-weight: 600;
@@ -623,7 +83,7 @@ button#send-btn:hover {
     border-color: rgba(255, 77, 77, 0.2);
 }
 
-#back-btn {
+#close-training-btn {
     background: transparent;
     border: none;
     color: var(--text-secondary);
@@ -632,20 +92,18 @@ button#send-btn:hover {
     padding: 8px 12px;
     border-radius: 4px;
     transition: color 0.2s;
-    display: flex;
-    align-items: center;
 }
 
-#back-btn:hover {
+#close-training-btn:hover {
     color: var(--text-primary);
 }
 
-.icon-btn {
-    background: transparent;
-    border: none;
-    font-size: 16px;
-    cursor: pointer;
-    opacity: 0.7;
+/* ── CONTENT LAYOUT ─────────────────────────────────────────────────── */
+.training-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
 }
 
 .content-wrapper {
@@ -655,216 +113,24 @@ button#send-btn:hover {
     position: relative;
 }
 
-.chat-main-column {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-dark);
-}
-
-.chat-area {
-    flex: 1;
-    overflow-y: auto;
-    padding: 30px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.message {
-    max-width: 65%;
-    padding: 14px 18px;
-    border-radius: 18px;
-    font-size: 14px;
-    line-height: 1.6;
-    position: relative;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    animation: messageSlideUp 0.3s ease-out forwards;
-}
-
-.agent-message {
-    align-self: flex-start;
-    background: var(--message-agent);
-    border-bottom-left-radius: 4px;
-    color: #e0e0e0;
-    max-width: 80%;
-    /* wider for rich structured content */
-}
-
-/* Rich Markdown Rendering inside agent messages */
-.agent-message h2 {
-    font-size: 15px;
-    font-weight: 700;
-    color: #ffffff;
-    margin: 0 0 10px 0;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.agent-message h3 {
-    font-size: 13px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.85);
-    margin: 14px 0 6px 0;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.agent-message p {
-    margin: 0 0 10px 0;
-    line-height: 1.7;
-    color: #d0d0d0;
-}
-
-.agent-message p:last-child {
-    margin-bottom: 0;
-}
-
-.agent-message strong {
-    color: #ffffff;
-    font-weight: 600;
-}
-
-.agent-message em {
-    color: #c0c0d0;
-    font-style: italic;
-}
-
-.agent-message code {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 12px;
-    color: #a78bfa;
-}
-
-.msg-citation {
-    font-size: 11px;
-    color: #6c5ce7;
-    font-style: italic;
-    opacity: 0.85;
-}
-
-.msg-link {
-    color: #818cf8;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    text-decoration-color: rgba(129, 140, 248, 0.4);
-    transition: color 0.15s, text-decoration-color 0.15s;
-}
-
-.msg-link:hover {
-    color: #a5b4fc;
-    text-decoration-color: rgba(165, 180, 252, 0.7);
-    cursor: pointer;
-}
-
-.agent-message ul {
-    margin: 4px 0 10px 0;
-    padding-left: 18px;
-    list-style: disc;
-}
-
-.agent-message li {
-    line-height: 1.7;
-    color: #c0c0d0;
-    margin-bottom: 2px;
-}
-
-.user-message {
-    align-self: flex-end;
-    background: var(--message-user);
-    border-bottom-right-radius: 4px;
-    color: #fff;
-}
-
-.input-area {
-    padding: 24px 30px;
-    border-top: 1px solid var(--border-subtle);
-    background: var(--bg-dark);
-    display: flex;
-    gap: 12px;
-    align-items: center;
-}
-
-#message-input {
-    flex: 1;
-    background: #262626;
-    border: 1px solid var(--border-subtle);
-    padding: 14px 20px;
-    border-radius: 24px;
-    color: var(--text-primary);
-    outline: none;
-    font-size: 14px;
-    cursor: text;
-    transition: border-color 0.2s, background 0.2s;
-    user-select: text;
-    -webkit-user-select: text;
-}
-
-#message-input:focus {
-    border-color: var(--accent-color);
-    background: #2a2a2a;
-}
-
-#send-btn {
-    background: var(--accent-color);
-    color: white;
-    border: none;
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.1s, background 0.2s;
-}
-
-#send-btn:hover {
-    background: var(--accent-hover);
-    transform: scale(1.05);
-}
-
-.attach-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, color 0.2s;
-}
-
-.attach-btn:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text-primary);
-}
-
-/* Details Sidebar */
+/* ── SIDEBAR CONFIGURATION ──────────────────────────────────────────── */
 .details-sidebar {
-    width: 600px;
+    width: 320px;
     background: var(--bg-sidebar);
-    border-left: 1px solid var(--border-subtle);
+    border-right: 1px solid var(--border-subtle);
     padding: 24px;
     overflow-y: auto;
     font-size: 13px;
     display: flex;
     flex-direction: column;
     gap: 24px;
+    flex-shrink: 0;
 }
 
 .sidebar-header {
     font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 10px;
     padding-bottom: 16px;
     border-bottom: 1px solid var(--border-subtle);
     display: flex;
@@ -889,11 +155,12 @@ button#send-btn:hover {
 .detail-item {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 .detail-item label {
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: 500;
     color: var(--text-secondary);
 }
 
@@ -903,16 +170,14 @@ button#send-btn:hover {
     background: #262626;
     border: 1px solid var(--border-subtle);
     color: var(--text-primary);
-    padding: 8px;
-    border-radius: 6px;
+    padding: 10px;
+    border-radius: 8px;
     font-size: 13px;
     width: 100%;
     box-sizing: border-box;
     font-family: inherit;
     outline: none;
     transition: border-color 0.2s, background 0.2s;
-    user-select: text;
-    -webkit-user-select: text;
 }
 
 .sidebar-input:focus,
@@ -924,15 +189,8 @@ button#send-btn:hover {
 
 .sidebar-textarea {
     resize: vertical;
-    min-height: 60px;
-}
-
-.save-icon-btn {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-    padding: 0;
+    min-height: 80px;
+    line-height: 1.5;
 }
 
 .sidebar-file-input {
@@ -940,18 +198,12 @@ button#send-btn:hover {
     gap: 8px;
 }
 
-.sidebar-file-input .sidebar-input {
-    flex: 1;
-    cursor: default;
-}
-
 .sidebar-browse-btn {
-    padding: 0;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     background: #262626;
     border: 1px solid var(--border-subtle);
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     color: var(--text-secondary);
     font-size: 14px;
@@ -966,31 +218,10 @@ button#send-btn:hover {
     color: var(--text-primary);
 }
 
-.truncate {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.tags-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.tag {
-    font-size: 10px;
-    background: rgba(108, 92, 231, 0.15);
-    color: var(--accent-color);
-    padding: 4px 10px;
-    border-radius: 12px;
-    border: 1px solid rgba(108, 92, 231, 0.2);
-    font-weight: 500;
-}
-
+/* ── CAPABILITIES ───────────────────────────────────────────────────── */
 .capabilities-grid {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
     margin-top: 4px;
 }
@@ -999,42 +230,263 @@ button#send-btn:hover {
     font-size: 11px;
     background: #262626;
     color: var(--text-secondary);
-    padding: 6px 14px;
+    padding: 8px 12px;
     border-radius: 20px;
     border: 1px solid var(--border-subtle);
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     font-weight: 500;
-    font-family: inherit;
-    outline: none;
+    text-align: center;
 }
 
 .cap-btn:hover {
     border-color: var(--accent-color);
     color: var(--text-primary);
-    background: #2a2a2a;
 }
 
 .cap-btn.active {
-    background: var(--accent-color);
-    color: white;
-    border-color: var(--accent-color);
-    box-shadow: 0 2px 8px rgba(108, 92, 231, 0.3);
+    background: rgba(108, 92, 231, 0.15);
+    color: var(--accent-color);
+    border-color: rgba(108, 92, 231, 0.4);
+    box-shadow: 0 2px 8px rgba(108, 92, 231, 0.1);
 }
 
-/* Typing Indicator */
-.typing-indicator {
-    background: var(--message-agent);
-    padding: 14px 18px;
-    border-radius: 18px;
-    border-bottom-left-radius: 4px;
+/* ── CHAT MAIN COLUMN ───────────────────────────────────────────────── */
+.chat-main-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-dark);
+    min-width: 0;
+}
+
+.chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* iMessage / Modern Style Bubbles */
+.message {
+    padding: 12px 18px;
+    max-width: 75%;
+    line-height: 1.6;
+    font-size: 14.5px;
+    position: relative;
+    word-wrap: break-word;
+    border-radius: 20px;
+    animation: messageEntry 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes messageEntry {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.user-message {
+    align-self: flex-end;
+    background: var(--message-user);
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+}
+
+.agent-message {
     align-self: flex-start;
+    background: var(--message-agent);
+    color: #e0e0e0;
+    border: 1px solid var(--border-subtle);
+    border-bottom-left-radius: 4px;
+    max-width: 85%;
+}
+
+/* ── RICH MARKDOWN IN CHAT ─────────────────────────────────────────── */
+.agent-message p {
+    margin: 0 0 12px 0;
+}
+
+.agent-message p:last-child {
+    margin-bottom: 0;
+}
+
+.agent-message h2,
+.agent-message h3 {
+    margin: 20px 0 10px 0;
+    color: #fff;
+    letter-spacing: -0.01em;
+}
+
+.agent-message h2 {
+    font-size: 1.25em;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 6px;
+}
+
+.agent-message h3 {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-top: 24px;
+}
+
+.agent-message code {
+    font-family: 'SF Mono', 'Consolas', monospace;
+    font-size: 0.9em;
+    padding: 2px 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    color: #a78bfa;
+}
+
+.code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1c1c1e;
+    padding: 6px 12px;
+    border-radius: 10px 10px 0 0;
+    border: 1px solid var(--border-subtle);
+    border-bottom: none;
+    font-size: 11px;
+    color: #888;
+    margin-top: 16px;
+}
+
+.agent-message pre {
+    background: #1c1c1e;
+    padding: 16px;
+    border-radius: 0 0 10px 10px;
+    overflow-x: auto;
+    margin: 0 0 16px 0;
+    border: 1px solid var(--border-subtle);
+}
+
+.agent-message pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #64d2ff;
+    display: block;
+}
+
+.copy-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--accent-color);
+    padding: 2px 8px;
+    font-size: 10px;
+    border-radius: 4px;
+}
+
+.copy-btn:hover {
+    background: rgba(108, 92, 231, 0.1);
+}
+
+.msg-citation {
+    display: inline-block;
+    font-size: 10px;
+    background: rgba(108, 92, 231, 0.1);
+    color: var(--accent-color);
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-top: 8px;
+    border: 1px solid rgba(108, 92, 231, 0.2);
+}
+
+.msg-link {
+    color: var(--apple-system-blue);
+    text-decoration: none;
+}
+
+.msg-link:hover {
+    text-decoration: underline;
+}
+
+/* ── INPUT AREA ─────────────────────────────────────────────────────── */
+.input-area {
+    padding: 20px 30px;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-panel);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+#message-input {
+    flex: 1;
+    background: #262626;
+    border: 1px solid var(--border-subtle);
+    padding: 12px 20px;
+    border-radius: 24px;
+    color: var(--text-primary);
+    outline: none;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+#message-input:focus {
+    border-color: var(--accent-color);
+}
+
+#send-btn {
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
     display: flex;
     align-items: center;
+    justify-content: center;
+    transition: transform 0.15s;
+}
+
+#send-btn:hover {
+    transform: scale(1.08);
+    background: var(--accent-hover);
+}
+
+.attach-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 10px;
+}
+
+/* ── UTILS ──────────────────────────────────────────────────────────── */
+.word-reveal {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(2px);
+    animation: reveal 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes reveal {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.typing-indicator {
+    display: flex;
     gap: 5px;
-    width: fit-content;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    animation: messageSlideUp 0.3s ease-out forwards;
+    padding: 12px 18px;
+    background: var(--message-agent);
+    border-radius: 20px;
+    border-bottom-left-radius: 4px;
+    align-self: flex-start;
 }
 
 .typing-dot {
@@ -1043,109 +495,66 @@ button#send-btn:hover {
     background: var(--text-secondary);
     border-radius: 50%;
     animation: typingBounce 1.4s infinite ease-in-out both;
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 }
 
-.typing-dot:nth-child(1) {
-    animation-delay: -0.32s;
-}
-
-.typing-dot:nth-child(2) {
-    animation-delay: -0.16s;
-}
-
-<<<<<<< HEAD
-@keyframes typingPulse {
-=======
 @keyframes typingBounce {
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 
     0%,
     80%,
     100% {
-<<<<<<< HEAD
-        transform: scale(0.8);
+        transform: scale(0.6);
         opacity: 0.5;
-=======
-        transform: scale(0);
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     }
 
     40% {
         transform: scale(1);
-<<<<<<< HEAD
         opacity: 1;
     }
 }
 
-#auto-save-status {
-    position: absolute;
-    bottom: 15px;
-    right: 25px;
+.typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+.save-status {
     font-size: 11px;
-    color: var(--apple-text-muted);
-    opacity: 0;
-    pointer-events: none;
+    color: var(--text-secondary);
+    opacity: 0.6;
     transition: opacity 0.3s;
 }
 
-/* ── NATIVE SCROLLBARS (macOS style) ────────────────────────────────── */
-#chat-area::-webkit-scrollbar,
-.config-sidebar::-webkit-scrollbar {
-    width: 14px;
+/* Custom Scrollbar for Chat Area */
+.chat-area::-webkit-scrollbar,
+.details-sidebar::-webkit-scrollbar {
+    width: 8px;
 }
 
-#chat-area::-webkit-scrollbar-track,
-.config-sidebar::-webkit-scrollbar-track {
+.chat-area::-webkit-scrollbar-track,
+.details-sidebar::-webkit-scrollbar-track {
     background: transparent;
 }
 
-#chat-area::-webkit-scrollbar-thumb,
-.config-sidebar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 10px;
-    border: 4px solid transparent;
-    /* Creates the thin floating look */
-    background-clip: padding-box;
+.chat-area::-webkit-scrollbar-thumb,
+.details-sidebar::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
 }
 
-#chat-area::-webkit-scrollbar-thumb:hover,
-.config-sidebar::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.4);
+.chat-area::-webkit-scrollbar-thumb:hover,
+.details-sidebar::-webkit-scrollbar-thumb:hover {
+    background: #444;
 }
 
-body.training-panel-active #agent-canvas {
-    width: 100%;
-=======
-    }
+
+/* Resizer specific helper classes */
+.resizer-left {
+    z-index: 100 !important;
 }
 
-/* Layout additions for Resizing */
-.training-side-panel {
-    display: flex;
-    flex-direction: column;
-}
-
-.panel-header {
-    flex-shrink: 0;
-}
-
-.panel-content {
-    flex: 1;
-    display: flex;
-    flex-direction: row;
-    overflow: hidden;
-    position: relative;
-}
-
-.details-sidebar {
-    flex-shrink: 0;
-}
-
-.chat-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 300px;
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
+.resizer-middle {
+    z-index: 100 !important;
 }

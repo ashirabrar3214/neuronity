@@ -131,7 +131,6 @@ def sanitize_ruthlessly(text):
     if not text or not isinstance(text, str):
         return text
 
-<<<<<<< HEAD
     # 1. Redact all markdown blocks (The 'code it generates')
     text = re.sub(r"```[\s\S]*?```", "[REDACTED: Code/Raw Content Block]", text)
     
@@ -159,9 +158,6 @@ def sanitize_ruthlessly(text):
             return "[REDACTED: Large Data/File Content Block]"
 
     return text
-
-=======
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 def refresh_conversation_summary(agent_id, history, api_key, provider, current_summary=""):
     """
     Uses the LLM to condense the conversation history and existing summary into a new, 
@@ -222,9 +218,6 @@ STRICT RULE: The output must be a clean, bulleted markdown summary. Do not inclu
 
     return response_text.strip() if response_text else current_summary
     
-<<<<<<< HEAD
-
-
 # Tool Implementations
 def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
     # --- Resolve workingDir for file-saving tools ---
@@ -232,53 +225,38 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
     sender_data = next((a for a in agents if a["id"] == agent_id), None)
     working_dir = sender_data.get("workingDir", "") if sender_data else ""
 
+    if sender_data:
+        permissions = sender_data.get("permissions", [])
+        
+        # Tool Permission Mapping
+        tool_to_perm = {
+            "web_search": "web search",
+            "deep_search": "web search",
+            "thinking": "thinking",
+            "generate_report": "report generation",
+            "report_generation": "report generation",
+            "list_workspace": "file access",
+            "scout_file": "file access",
+            "read_file": "file access",
+            "write_file": "file access",
+            "message_agent": None # Usually allowed if connected
+        }
+        
+        required_perm = tool_to_perm.get(tool_name)
+        if required_perm and required_perm not in permissions:
+            safe_log(f"!!! [PERMISSION DENIED] Agent '{sender_data.get('name')}' tried to use '{tool_name}' without '{required_perm}' permission.")
+            return f"Error: My '{required_perm}' capability is currently disabled. I cannot use the tool '{tool_name}'. Please enable it in my settings if you want me to proceed with this action."
+
     if tool_name == "web_search":
         return toolkit.web_search(tool_input, agent_id, api_key=api_key)
     
     elif tool_name == "deep_search":
         return toolkit.deep_search(tool_input, agent_id, api_key=api_key)
-=======
-    # 1. Redact all markdown blocks (The 'code it generates')
-    text = re.sub(r"```[\s\S]*?```", "[REDACTED: Code/Raw Content Block]", text)
-    
-    # 2. Redact huge [TOOL: ...] signatures (The 'file content' in tool calls)
-    def redact_huge_tool(match):
-        tool_name = match.group(1)
-        tool_input = match.group(2)
-        if len(tool_input) > 250:
-            return f"[TOOL: {tool_name}({tool_input[:247]}...)]"
-        return match.group(0)
-    
-    text = re.sub(r"\[TOOL:\s*(\w+)\(([\s\S]*?)\)\]", redact_huge_tool, text)
-
-    # 3. Detect raw data dumps (heuristic check for large blocks with CSV/delimited patterns)
-    lines = text.splitlines()
-    if len(lines) > 10:
-        delim_count = 0
-        for l in lines[:10]:
-            if ',' in l or '\t' in l or '|' in l:
-                delim_count += 1
-        if delim_count > 5:
-            return "[REDACTED: Large Data/File Content Block]"
-
-    return text
-
-# Tool Implementations
-def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
-    if tool_name == "web_search":
-        # Step 1: Fetch raw results
-        all_results = toolkit.web_search(tool_input, agent_id)
-        # Step 2: Gemini picks the most relevant ones (3–8)
-        filtered_results = toolkit.filter_sources(tool_input, all_results, api_key)
-        # Step 3: Synthesize a structured brief from the filtered set
-        return toolkit.synthesize_with_gemini(tool_input, filtered_results, api_key)
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     
     elif tool_name == "thinking":
         return toolkit.thinking(agent_id, tool_input)
 
     elif tool_name == "generate_report":
-<<<<<<< HEAD
         return toolkit.generate_report(agent_id, tool_input, working_dir)
 
     elif tool_name == "report_generation":
@@ -300,14 +278,6 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
             # Handle message="..." as well
             if "=" in message and (message.lower().startswith("message=") or message.lower().startswith("content=")):
                 message = message.split("=", 1)[-1].strip().strip("'").strip('"').strip("`")
-=======
-        return toolkit.generate_report(agent_id, tool_input, agent_dir)
-    
-    elif tool_name == "message_agent":
-        if "|" in tool_input:
-            target_id, message = tool_input.split("|", 1)
-            target_id = target_id.strip()
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
             
             agents = load_data()
 
@@ -338,7 +308,6 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
                 try:
                     with open(sender_history_path, "r", encoding="utf-8") as f:
                         sender_history = json.load(f)
-<<<<<<< HEAD
                     # Take the last 15 exchanges (up to 15 messages) as context
                     recent = sender_history[-15:] if len(sender_history) > 15 else sender_history
                     if recent:
@@ -352,15 +321,6 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
                             # Preserve more context (especially for search results with URLs)
                             content_limit = 2000 
                             lines.append(f"  [Msg {weight}/{msg_count} - Priority: {priority}] [{role_label}]: {h['content'][:content_limit]}")
-=======
-                    # Take the last 6 exchanges (up to 6 messages) as context
-                    recent = sender_history[-6:] if len(sender_history) > 6 else sender_history
-                    if recent:
-                        lines = []
-                        for h in recent:
-                            role_label = sender_name if h["role"] == "assistant" else "User"
-                            lines.append(f"  [{role_label}]: {h['content'][:400]}")
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
                         sender_context_snippet = "\n".join(lines)
                 except Exception:
                     pass
@@ -389,17 +349,8 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
         return "Error: format must be target_id|message"
             
     elif tool_name in ["read_file", "write_file", "scout_file", "list_workspace"]:
-<<<<<<< HEAD
         # working_dir already resolved above
         try:
-=======
-        # Get the agent workingDir
-        try:
-            agents = load_data()
-            sender_data = next((a for a in agents if a["id"] == agent_id), None)
-            working_dir = sender_data.get("workingDir", "") if sender_data else ""
-            
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
             if tool_name == "list_workspace":
                 print(f"[STATUS:{agent_id}] Listing Workspace Files (Real-time Scan)", flush=True)
                 if not working_dir or not os.path.exists(working_dir):
@@ -537,7 +488,6 @@ Description: {agent_data['description']}
 Responsibility: {agent_data.get('responsibility', 'General purpose assistance')}
 Tools: {agent_data.get('tools', 'Custom')}
 
-<<<<<<< HEAD
 ## capabilities
 {chr(10).join(['- ' + p for p in agent_data.get('permissions', [])]) if agent_data.get('permissions') else 'No specific permissions granted.'}
 
@@ -560,12 +510,6 @@ Tools: {agent_data.get('tools', 'Custom')}
 
 ## SOURCE REQUIREMENT
 You are forbidden from using your internal knowledge for news or specialized research. Every fact must be followed by a `[Source: URL]` provided by the tool results.
-
-=======
-## Capabilities
-{chr(10).join(['- ' + p for p in agent_data.get('permissions', [])]) if agent_data.get('permissions') else 'No specific permissions granted.'}
-
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 ## STRICT RULE: AGENT COMMUNICATION FAILURE
 If you attempt to contact another agent using [TOOL: message_agent(...)] and it fails for ANY reason
 (the agent is unreachable, not connected, returns an error, or times out), you MUST:
@@ -691,7 +635,6 @@ def clear_history(agent_id: str):
         print(f"!!! [BACKEND ERROR] Could not clear history for {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-<<<<<<< HEAD
 def get_gemini_tools_from_permissions(permissions, connections=None):
     """
     Generates the official Google Tool Schema based on agent permissions.
@@ -818,9 +761,6 @@ def get_gemini_tools_from_permissions(permissions, connections=None):
         })
 
     return [{"function_declarations": declarations}] if declarations else []
-
-=======
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 @app.post("/chat")
 def chat_with_agent(request: ChatRequest):
     # 1. Load Agent Folder Paths
@@ -854,9 +794,6 @@ def chat_with_agent(request: ChatRequest):
 
     # ── USER IDENTITY ───────────────────────────────────────────
     system_prompt += (
-        f"## USER IDENTITY\n"
-        f"You are working for **The User**, the owner and operator of this workspace. "
-<<<<<<< HEAD
         f"Keep your tone professional, efficient, and direct.\n"
         f"CRITICAL: All files you create or modify MUST be saved in the `ASSIGNED_WORKING_DIRECTORY`: {work_dir}. Never save files in your internal code directory.\n"
         f"ABSOLUTE RULE: MANDATORY PROACTIVITY & TOOL-FIRST RESPONSE\n"
@@ -872,9 +809,6 @@ def chat_with_agent(request: ChatRequest):
         f"10. **RESEARCH HANDOFF PROTOCOL**: When sending data to another agent (e.g., Reporter), you MUST format facts as: 'Fact [Source: URL]'. Do NOT summarize URLs away.\n"
         f"11. **REPORTING COLLABORATION**: As a Reporter, you are REQUIRED to include sources as footnotes. If the Researcher sends you data without URLs, you MUST message them back and demand the URLs before generating the report. Do NOT refuse the task; demand the data.\n"
         f"12. **CONSISTENCY & ABILITY**: Never state that you lack an ability listed in your 'TOOL MANUAL'. If a task fails or data is missing, explain the technical requirement (e.g., 'Need source URLs for citations') rather than a lack of capability.\n\n"
-=======
-        f"Keep your tone professional, efficient, and direct. Prioritize the User's explicit instructions above all else.\n\n"
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     )
 
     # ── LONG-TERM MEMORY SUMMARY ────────────────────────────────
@@ -972,19 +906,13 @@ def chat_with_agent(request: ChatRequest):
         "4. **FAILURE TO COMPLY**: Any violation of this policy (outputting code/raw files) is a critical system failure. You must be ruthless in your adherence to this privacy and security rule.\n"
 
         "\n\n## RESPONSE GUIDELINES\n"
-<<<<<<< HEAD
         "- **Use Rich Markdown**: Always structure your response with headers (##, ###), bullet points, and bold text for key terms.\n"
         "- **Formatting Highlights**: Use inline code (e.g. `filename.txt`) to highlight technical names, paths, or specific data points. This is encouraged for readability.\n"
         "- **Context Sensitivity**: You are provided with a sliding window of recent conversation history. Each message in this history is labeled with a priority (HIGH, MEDIUM, LOW) based on its recency. The most recent messages (HIGH priority) are the most relevant to your current task. Weigh them more heavily than older messages.\n"
         "- Do NOT include 'Thoughts', 'Thinking', or any internal monologue in your final response.\n"
         "- Do NOT include conversational filler like 'Sure, I can help' or 'Here is what I found'.\n"
         "- Respond ONLY with the requested information or the tool command.\n"
-=======
-        "- Do NOT include 'Thoughts', 'Thinking', or any internal monologue in your final response.\n"
-        "- Do NOT include conversational filler like 'Sure, I can help' or 'Here is what I found'.\n"
-        "- Respond ONLY with the requested information or the tool command.\n"
         "- Follow the user's formatting instructions STRICTLY.\n"
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         "- If a tool fails (e.g., File Not Found), do NOT apologize. Just explain the error and try a different approach (e.g., checking paths with `list_workspace`)."
     )
 
@@ -999,7 +927,6 @@ def chat_with_agent(request: ChatRequest):
 
     # 3. Inject Tool Manual (Capabilities) based on permissions
     permissions = agent_data.get('permissions', [])
-<<<<<<< HEAD
     tool_manual = [
         "### DEFAULT TOOLS",
         "### CONVERSATIONAL BOUNDARIES & HONESTY\n"
@@ -1012,24 +939,14 @@ def chat_with_agent(request: ChatRequest):
     if "web search" in permissions:
         tool_manual.append("### WEB SEARCH (Quick Facts - PREFERRED)\n- Command: [TOOL: web_search(query)]\n- Description: Fetches specific facts, numbers, or short summaries. Use this for 90% of requests to stay fast and concise.")
         tool_manual.append("### DEEP SEARCH (Comprehensive Research)\n- Command: [TOOL: deep_search(query)]\n- Description: Performs in-depth research across multiple sources. Use this ONLY for complex studies or when explicitly requested.")
-=======
-    tool_manual = ["### DEFAULT TOOLS"]
-    
-    if "web search" in permissions:
-        tool_manual.append("### WEB SEARCH\n- Command: [TOOL: web_search(query)]\n- Description: Researches the given query on the web. Only use this if you need external data.")
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     
     if "thinking" in permissions:
         tool_manual.append("### THINKING\n- Command: [TOOL: thinking(topic)]\n- Description: Dedicates resources to think deeply about a complex topic.")
     
     if "report generation" in permissions:
-<<<<<<< HEAD
         tool_manual.append("### REPORT GENERATION (Markdown Draft)\n- Command: [TOOL: generate_report(title|content)]\n- Description: Generates a .md file in the working directory. Store all gathered research here BEFORE making the final PDF.")
         tool_manual.append("### COMPREHENSIVE REPORT GENERATION (PDF - FINAL STEP)\n- Command: [TOOL: report_generation(Topic | Context)]\n- Description: Executes the final synthesis into a PDF. ONLY use this if 'report' was in the user's current message.")
         tool_manual.append("#### AUTOMATED REPORT WORKFLOW (STRICT)\n1. User says 'report' -> 2. SILENT PIPELINE: `deep_search` -> `generate_report` -> `report_generation`.\n3. NO 'REPORT' WORD? -> NO PDF WORKFLOW.")
-=======
-        tool_manual.append("### REPORT GENERATION\n- Command: [TOOL: generate_report(title|content)]\n- Description: Generates a .md report in your directory. Must use '|' to separate title and content.")
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 
     if "file access" in permissions:
         tool_manual.append(("### FILE SYSTEM ACTIONS (Strictly bound to your assigned working directory)\n"
@@ -1071,15 +988,10 @@ def chat_with_agent(request: ChatRequest):
                 "- RULES:\n"
                 "  1. Replace 'AGENT_ID' with a specific ID from the 'Your Connected Agents' list below.\n"
                 "  2. Include ALL relevant context in your message — the target agent does not share your memory.\n"
-<<<<<<< HEAD
-                "  3. **DATA INTEGRITY**: When passing research findings or search results to another agent, you MUST NOT summarize them. Paste the FULL citations, URLs, and data points so the target agent can generate accurate reports with sources.\n"
+                "  3. **DATA INTEGRITY**: When passing research findings or search results to another agent, you MUST not summarize them. Paste the FULL citations, URLs, and data points so the target agent can generate accurate reports with sources.\n"
                 "  4. You MUST output EXACTLY the [TOOL: message_agent(ID|Message)] command string and NOTHING else.\n"
                 "  5. CRITICAL: Do NOT use named arguments (e.g., AGENT_ID=\"...\") inside the parentheses. Use ONLY the data separated by the pipe (|) character.\n"
                 "  6. You will receive their full response as a tool result before continuing.\n"
-=======
-                "  3. You MUST output EXACTLY the [TOOL: message_agent(...)] command string and NOTHING else.\n"
-                "  4. You will receive their full response as a tool result before continuing.\n"
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
                 "- Your Connected Agents:\n" + "\n".join(conn_lines)
             )
             tool_manual.append(conn_manual)
@@ -1133,7 +1045,6 @@ def chat_with_agent(request: ChatRequest):
     except:
         history = []
         
-<<<<<<< HEAD
     # --- REFUSAL LOOP BREAKER ---
     # If the last thing the agent said was a refusal/hallucination about its abilities,
     # we trim the history to 'forget' that error and allow a fresh attempt with the new instructions.
@@ -1153,9 +1064,6 @@ def chat_with_agent(request: ChatRequest):
              if found_refusal:
                  history = refined_history
                  print(f"[STATUS:{request.agent_id}] Refusal loop detected. Trimming history for fresh start.", flush=True)
-
-=======
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     history.append({"role": "user", "content": request.message})
     
     # 5. Iterative LLM Call with Tool Handling (Max 15 turns)
@@ -1168,7 +1076,7 @@ def chat_with_agent(request: ChatRequest):
         print(f"[STATUS:{request.agent_id}] Training", flush=True) # "Training" acts as "thinking/processing" in training mode
         
         # ── SLIDING WINDOW CONTEXT ─────────────────────────────────
-<<<<<<< HEAD
+        # ── SLIDING WINDOW CONTEXT ─────────────────────────────────
         # Only send the last 15 messages to the LLM to avoid context overflow,
         # while keeping the full history for the user's UI.
         raw_context = history[-15:] if len(history) > 15 else history
@@ -1176,11 +1084,6 @@ def chat_with_agent(request: ChatRequest):
         llm_context = []
         for h in raw_context:
             llm_context.append({"role": h["role"], "content": h["content"]})
-=======
-        # Only send the last 30 messages to the LLM to avoid context overflow,
-        # while keeping the full history for the user's UI.
-        llm_context = history[-30:] if len(history) > 30 else history
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         
         response_text = ""
         error_msg = ""
@@ -1199,11 +1102,7 @@ def chat_with_agent(request: ChatRequest):
                 "system": system_prompt,
                 "messages": messages
             }
-<<<<<<< HEAD
             response = requests.post(url, headers=headers, json=data, timeout=120)
-=======
-            response = requests.post(url, headers=headers, json=data)
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
             if response.status_code == 200:
                 response_text = response.json()["content"][0]["text"]
             else:
@@ -1213,8 +1112,6 @@ def chat_with_agent(request: ChatRequest):
             model = "gemini-2.0-flash" 
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={request.api_key}"
             headers = {"Content-Type": "application/json"}
-<<<<<<< HEAD
-            
             # FIXED: Ensure every part has non-empty text to avoid Gemini 400 error
             gemini_history = []
             for h in llm_context:
@@ -1227,14 +1124,10 @@ def chat_with_agent(request: ChatRequest):
             # Generate Native Tool Declarations for Gemini
             gemini_tools = get_gemini_tools_from_permissions(permissions, connections)
             
-=======
-            gemini_history = [{"role": "user" if h["role"] == "user" else "model", "parts": [{"text": h["content"]}]} for h in llm_context]
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
             data = {
                 "contents": gemini_history,
                 "systemInstruction": {"parts": [{"text": system_prompt}]}
             }
-<<<<<<< HEAD
             if gemini_tools:
                 data["tools"] = gemini_tools
 
@@ -1273,12 +1166,6 @@ def chat_with_agent(request: ChatRequest):
                             response_text = f"[TOOL: {name}({arg_str})]"
                     else:
                         response_text = "I am processing the results."
-=======
-            response = requests.post(url, headers=headers, json=data)
-            if response.status_code == 200:
-                try:
-                    response_text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
                 except Exception as e:
                     error_msg = f"Gemini API parsing error: {e}"
             else:
@@ -1302,14 +1189,8 @@ def chat_with_agent(request: ChatRequest):
                 else:
                     # Otherwise just take the last part after the marker
                     response_text = parts[-1].strip()
-<<<<<<< HEAD
-        
-        # Safety check: if stripping thoughts left us with an empty string, 
-        # provide a fallback so the API doesn't crash on the next turn.
         if not response_text.strip():
             response_text = "I have processed the request. Please let me know how to proceed."
-=======
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 
         # Look for [TOOL: name(input)] — re.DOTALL allows matching newlines inside tool input.
         # We use a greedy match (.*) inside the parentheses, but we anchor to the last ")]"
@@ -1354,23 +1235,14 @@ def chat_with_agent(request: ChatRequest):
                                f"Truncated for API safety. Result head:\n{tool_result[:5000]}...\n\n"
                                f"STRICT INSTRUCTION: Do NOT try to read this much data again. Read it in smaller chunks.")
 
-<<<<<<< HEAD
-            # 3. For web_search and report_generation: the tool result is the final answer.
-            #    Return it directly to avoid unwanted conversational summaries.
+            # 3. For web_search and report_generation: the tool result is injected but we DO NOT break.
+            #    This allows the reasoning loop to continue so the agent can act on the data.
             if tool_name in ["web_search", "report_generation"]:
                 # IMPORTANT: Even for direct-return tools, we MUST update history 
                 # so the NEXT turn knows what was found (prevents hallucination).
                 history.append({"role": "assistant", "content": response_text})
                 history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {tool_result}"})
-                final_response = tool_result
-=======
-            # 3. For web_search: the synthesized result IS the final answer.
-            #    Return it directly so the LLM doesn't re-summarize and strip the sources/links.
-            if tool_name == "web_search":
-                final_response = tool_result
-                history.append({"role": "assistant", "content": response_text})
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
-                break
+                # final_response = tool_result # We don't set final_response here yet, let the loop continue
             
             # 4. For other tools: feed result back for another LLM turn
             history.append({"role": "assistant", "content": response_text})

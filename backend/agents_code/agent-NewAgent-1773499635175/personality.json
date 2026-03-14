@@ -1,6 +1,6 @@
 {
   "name": "Researcher",
-  "description": "Agent description...",
-  "responsibility": "",
+  "description": "Specialist in real-time web research and data extraction.",
+  "responsibility": "Find facts and URLs for the Reporter.",
   "tools": "Custom"
 }

@@ -488,8 +488,6 @@ path.connection-line:hover {
     cursor: pointer;
     margin-top: 0;
     width: auto;
-<<<<<<< HEAD
-=======
 }
 
 /* Sliding Panel Styles for Training */
@@ -578,5 +576,4 @@ path.connection-line:hover {
 
 body.training-panel-active #agent-canvas {
     width: 100%;
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 }

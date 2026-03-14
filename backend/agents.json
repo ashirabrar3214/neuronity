@@ -1,20 +1,19 @@
 [
   {
-<<<<<<< HEAD
     "id": "agent-NewAgent-1773499635175",
     "name": "Researcher",
-    "description": "Agent description...",
+    "description": "Specialist in real-time web research and data extraction.",
     "brain": "gemini",
     "channel": "Gmail",
-    "workingDir": "D:\\New folder",
+    "workingDir": "c:\\Users\\Asus\\OneDrive\\Desktop\\Easy Company\\backend\\agents_code\\agent-NewAgent-1773499635175",
     "permissions": [
       "web search",
       "file access"
     ],
     "tools": "Custom",
-    "responsibility": "",
-    "x": -1916.0,
-    "y": -311.0,
+    "responsibility": "Find facts and URLs for the Reporter.",
+    "x": -2118.0,
+    "y": -185.0,
     "connections": [
       "agent-NewAgent-1773504720806"
     ]
@@ -22,31 +21,18 @@
   {
     "id": "agent-NewAgent-1773504720806",
     "name": "Reporter",
-    "description": "Agent description...",
+    "description": "Specialist in synthesizing data into premium PDF reports.",
     "brain": "gemini",
     "channel": "Gmail",
-    "workingDir": "D:\\New folder",
+    "workingDir": "c:\\Users\\Asus\\OneDrive\\Desktop\\Easy Company\\backend\\agents_code\\agent-NewAgent-1773504720806",
     "permissions": [
       "report generation",
       "file access"
     ],
     "tools": "Custom",
-    "responsibility": "",
+    "responsibility": "Generate final PDF reports with full citations.",
     "x": -1604.0,
     "y": -311.0,
-=======
-    "id": "agent-NewAgent-1773431893483",
-    "name": "New b",
-    "description": "Agent description...",
-    "brain": "gemini",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [],
-    "tools": "Custom",
-    "responsibility": "",
-    "x": 524.0,
-    "y": 4.0,
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     "connections": []
   }
 ]

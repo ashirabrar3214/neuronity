@@ -3,11 +3,8 @@ import os
 import random
 import json
 import requests
-<<<<<<< HEAD
 import re
 from pdf_generator import ReportPDFGenerator
-=======
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 
 # ─────────────────────────────────────────────────
 # WEB SEARCH CAPABILITY
@@ -28,7 +25,6 @@ def safe_log(message):
     except Exception:
         pass
 
-<<<<<<< HEAD
 def _ddgs_search_raw(query, agent_id):
     """
     Internal helper to fetch raw DuckDuckGo results.
@@ -36,18 +32,6 @@ def _ddgs_search_raw(query, agent_id):
     safe_log(f"[STATUS:{agent_id}] Searching Web")
     try:
         from ddgs import DDGS
-=======
-def web_search(query, agent_id):
-    """
-    Fetches up to 15 DuckDuckGo results for the query.
-    Returns a list[dict] with keys: title, href, body.
-    """
-    safe_log(f"[STATUS:{agent_id}] Searching Web")
-    
-    try:
-        from ddgs import DDGS
-        
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         results = []
         for result in DDGS().text(query, max_results=15):
             results.append({
@@ -55,21 +39,11 @@ def web_search(query, agent_id):
                 "href": result.get("href", ""),
                 "body": result.get("body", "")
             })
-<<<<<<< HEAD
         safe_log(f"+++ [INTERNAL:search] Got {len(results)} results")
         return results
     except Exception as e:
         safe_log(f"!!! [INTERNAL:search] Error: {e}")
         return []
-=======
-        
-        safe_log(f"+++ [CAPABILITY:web_search] Got {len(results)} results for '{query}'")
-        return results
-    
-    except Exception as e:
-        safe_log(f"!!! [CAPABILITY:web_search] Error: {e}")
-        return [{"title": "Search Error", "href": "", "body": f"Could not fetch results: {str(e)}"}]
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 
 
 def filter_sources(query, search_results, api_key):
@@ -80,6 +54,10 @@ def filter_sources(query, search_results, api_key):
     safe_log(f"[STATUS] Filtering sources")
     
     if not search_results or not api_key:
+        return search_results
+        
+    # Safety: If search_results is a string (e.g. from a failed or already synthesized step), return it.
+    if isinstance(search_results, str):
         return search_results
     
     # Build a numbered index for Gemini to reference
@@ -126,14 +104,16 @@ Select between 3 and 8 sources. Prioritize: relevance, authority (Wikipedia, maj
 
 
 
-<<<<<<< HEAD
 def synthesize_fact_with_gemini(query, search_results, api_key):
     """
     Specialized synthesis for quick facts, targeted data, or small snippets.
     """
     safe_log(f"[STATUS] Extracting specific facts")
     
-    raw_context = "\n\n".join([f"Content: {r['body']}" for r in search_results])
+    if isinstance(search_results, str):
+        return search_results
+    
+    raw_context = "\n\n".join([f"Source: {r['title']}\nURL: {r['href']}\nContent: {r['body']}" for r in search_results])
     
     fact_prompt = f"""You are a helpful research assistant. Your goal is to answer the user's question directly and concisely using the provided search results.
     
@@ -147,8 +127,8 @@ RULES:
 2. Be concise but complete.
 3. If it's a specific data point (e.g., oil price, date), give the fact and brief context.
 4. If it's a general question (e.g., 'What happened in the news today?'), provide a short summary paragraph.
-5. Do NOT write a multi-section report, introduction, or citation list.
-6. Return ONLY the answer text.
+5. Provide a citation for every major fact found in the format [Source: URL].
+6. Return the answer text followed by a '### Sources' section listing all used URLs.
 7. If the information is not found, state that clearly.
 """
 
@@ -200,8 +180,6 @@ def deep_search(query, agent_id, api_key):
     return synthesize_with_gemini(query, filtered, api_key)
 
 
-=======
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 def synthesize_with_gemini(query, search_results, api_key):
     """
     Function 2: Feed raw search results JSON to Gemini, get a clean synthesis.
@@ -209,41 +187,34 @@ def synthesize_with_gemini(query, search_results, api_key):
     """
     safe_log(f"[STATUS] Synthesizing results with Gemini")
     
+    if isinstance(search_results, str):
+        return search_results
+    
     raw_context = "\n\n".join([
         f"Source: {r['title']}\nURL: {r['href']}\nContent: {r['body']}"
         for r in search_results
     ])
     
     synthesis_prompt = f"""You are an expert research assistant. Analyze the search results below to fulfill the USER'S REQUEST.
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 USER'S ORIGINAL REQUEST: {query}
 
 SEARCH RESULTS FOUND:
 {raw_context}
 
-<<<<<<< HEAD
-RULES:
+STRICT RULES:
 1. Provide a detailed and informative response based ONLY on the data found.
 2. Cite your sources in the text and include their URLs.
-3. If the user explicitly asked for a 'report', format it with a title, summary, and sections. Otherwise, provide a clear, detailed answer.
-4. If there are multiple perspectives in the data, present them fairly.
-5. Return ONLY the content.
-=======
-STRICT RULES:
-1. If the user provided a specific format (e.g., 'top 3 snippets'), follow it EXACTLY.
-2. If no specific format is requested, provide a **Comprehensive Research Report**:
+3. If the user explicitly asked for a 'report', format it with a title, summary, and sections. 
+4. If no specific format is requested, provide a **Comprehensive Research Report**:
    - Start with a clear, descriptive title.
    - Provide a 1-2 paragraph executive summary.
    - Use 'Key Findings' sections with descriptive subheadings.
    - **MANDATORY**: For every major claim or piece of news, cite the source and INCLUDE its URL in the text.
    - Ensure the report is detailed and informative, covering multiple perspectives if present in the data.
-3. Use the CURRENT_DATE provided in the system prompt for context.
-4. Do NOT include 'Thoughts', 'Thinking', or any conversational preamble. Just the report content.
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
+5. Use the CURRENT_DATE provided in the system prompt for context.
+6. Do NOT include 'Thoughts', 'Thinking', or any conversational preamble. Just the report content.
+7. Return ONLY the content.
 """
     
     model = "gemini-2.0-flash"
@@ -284,15 +255,12 @@ def thinking(agent_id, topic):
     """
     Simulates a deep thinking process for a specific topic.
     """
-<<<<<<< HEAD
     # Robust parsing: handle hallucinations like topic="..."
     topic = topic.strip()
     if "=" in topic and topic.lower().startswith("topic="):
         topic = topic.split("=", 1)[-1].strip()
     topic = topic.strip("'").strip('"').strip("`")
 
-=======
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     safe_log(f"[STATUS:{agent_id}] Thinking")
     time.sleep(3)
     return f"Thinking complete on '{topic}'. Ready to respond with deeper analysis."
@@ -302,33 +270,23 @@ def thinking(agent_id, topic):
 # REPORT GENERATION CAPABILITY
 # ─────────────────────────────────────────────────
 
-<<<<<<< HEAD
 def generate_report(agent_id, tool_input, working_dir):
     """
     Generates a structured markdown report file in the agent's working directory.
-=======
-def generate_report(agent_id, tool_input, agent_dir):
-    """
-    Generates a structured markdown report file in the agent's directory.
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
     Usage: [TOOL: generate_report(Title|Content)]
     """
     safe_log(f"[STATUS:{agent_id}] Generating Report")
     time.sleep(1)
     try:
-<<<<<<< HEAD
         if not working_dir:
             return "Error: No working directory assigned. Cannot save report."
             
-=======
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         if "|" in tool_input:
             title, content = tool_input.split("|", 1)
         else:
             title = "Report_" + str(int(time.time()))
             content = tool_input
         
-<<<<<<< HEAD
         # Strip hallucinations like title="..." or content="..."
         title = title.strip()
         if "=" in title and title.lower().startswith("title="):
@@ -344,10 +302,6 @@ def generate_report(agent_id, tool_input, agent_dir):
         clean_title = re.sub(r'[^a-zA-Z0-9\s_-]', '', title.strip().replace('"', ''))
         filename = f"{clean_title.replace(' ', '_')}.md"
         report_path = os.path.join(working_dir, filename)
-=======
-        filename = f"{title.strip().replace(' ', '_')}.md"
-        report_path = os.path.join(agent_dir, filename)
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
         
         full_report = f"""# Agent Report: {title.strip()}
 Generated by: {agent_id}
@@ -359,13 +313,10 @@ Date: {time.strftime("%Y-%m-%d %H:%M:%S")}
 {content.strip()}
 
 ---
-<<<<<<< HEAD
 ## Sources & References
 {'\n'.join([f'- {url}' for url in re.findall(r'https?://[^\s\)]+', content)]) if 'http' in content else 'No explicit URLs found in content.'}
 
 ---
-=======
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 *End of Report*"""
 
         with open(report_path, "w", encoding="utf-8") as f:
@@ -379,7 +330,6 @@ Date: {time.strftime("%Y-%m-%d %H:%M:%S")}
         return f"Error generating report: {str(e)}"
 
 # ─────────────────────────────────────────────────
-<<<<<<< HEAD
 # COMPREHENSIVE REPORT GENERATION (PDF)
 # ─────────────────────────────────────────────────
 
@@ -482,8 +432,6 @@ FORMATTING RULES:
         return f"Failed to generate report: {str(e)}"
 
 # ─────────────────────────────────────────────────
-=======
->>>>>>> 1846afc321911808c7e60d319a425d0b6ac26607
 # AGENT-TO-AGENT COMMUNICATION CAPABILITY
 # ─────────────────────────────────────────────────
 
