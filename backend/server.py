@@ -131,6 +131,65 @@ def sanitize_ruthlessly(text):
     if not text or not isinstance(text, str):
         return text
 
+def calculate_semantic_similarity(text1, text2):
+    """
+    UNIVERSAL FIX: SEMANTIC STIGMERGY (Topic-Gated Blackboard)
+    Calculates word-overlap similarity (Keyword Energy) between two strings.
+    """
+    if not text1 or not text2: return 0.0
+    # Filter out noise words for better 'Energy' matching
+    stop_words = {"a", "an", "the", "and", "or", "but", "if", "then", "else", "to", "for", "with", "is", "was", "be", "of", "in", "on", "at"}
+    words1 = set(w for w in re.findall(r'\w+', text1.lower()) if w not in stop_words)
+    words2 = set(w for w in re.findall(r'\w+', text2.lower()) if w not in stop_words)
+    intersection = words1.intersection(words2)
+    union = words1.union(words2)
+    return len(intersection) / len(union) if union else 0.0
+
+def process_generational_history(history, max_turns=50):
+    """
+    UNIVERSAL FIX: EXPONENTIAL CONTEXT DECAY (Temporal Attention)
+    Implement Generational Context: Full Detail -> Concise Summary -> Topic-Only.
+    """
+    if not history: return []
+    raw = history[-max_turns:] if len(history) > max_turns else history
+    processed = []
+    
+    # Process in reverse to count generation distance from CURRENT turn (index 0)
+    rev_raw = list(reversed(raw))
+    for i, msg in enumerate(rev_raw):
+        role = msg["role"]
+        content = msg.get("content", "") or ""
+        
+        # Generation 0 (Last 5 messages): Full Energy (Attention Focus)
+        if i < 5:
+            processed.insert(0, {"role": role, "content": content})
+        
+        # Generation 1 (Messages 6-15): Mid-range Decay (Condensed Summary)
+        elif i < 15:
+            # For tool calls, keep the command name but shorten args
+            if content.startswith("[TOOL:"):
+                # Preserve tool name, shorten params
+                parts = content.split("(", 1)
+                cmd = parts[0]
+                processed.insert(0, {"role": role, "content": f"[DECAYED_TOOL_CMD]: {cmd}(...)"})
+            else:
+                preview = content[:250] + "..." if len(content) > 250 else content
+                processed.insert(0, {"role": role, "content": f"[GENERATIONAL_SUMMARY]: {preview}"})
+            
+        # Generation 2 (Messages 16-50): Long-term Decay (Metadata Only/Background Noise)
+        else:
+            if content.startswith("[TOOL:"):
+                tool_name = content.split("(", 1)[0].replace("[TOOL:", "").strip()
+                meta = f"[PREVIOUS_ACTION_METADATA: Executed {tool_name}]"
+            elif content.startswith("SYSTEM TOOL RESULT:"):
+                res_preview = content.replace("SYSTEM TOOL RESULT: ", "")[:50]
+                meta = f"[PREVIOUS_RESULT_TYPE: {res_preview}...]"
+            else:
+                meta = f"[BACKGROUND_INFO_METADATA: {content[:100]}...]"
+            processed.insert(0, {"role": role, "content": meta})
+            
+    return processed
+
     # 1. Redact all markdown blocks (The 'code it generates')
     text = re.sub(r"```[\s\S]*?```", "[REDACTED: Code/Raw Content Block]", text)
     
@@ -874,13 +933,33 @@ def chat_with_agent(request: ChatRequest):
             system_prompt = f.read()
 
     # ── 1. IDENTITY LAYER (Persona & Context) ────────────────────
-    is_reporter = "report_generation" in agent_data.get('permissions', [])
+    # UNIVERSAL FIX: THE BROKER PATTERN
+    # Take the 'If report, delegate' logic out of prompt.md.
+    # Agents follow 'Capability Matchmaking' instead of hardcoded rules.
+    broker_logic = ""
+    if agent_data.get("id") == "agent-MasterBot-001":
+        broker_logic = "### SEMANTIC MATCHMAKNG (Agent Relevance scores based on current request)\n"
+        matched_agents = []
+        for a in agents:
+            if a["id"] == agent_data["id"]: continue
+            # Combine name, resp, and permissions for comparison
+            profile = f"{a.get('name')} {a.get('responsibility')} {' '.join(a.get('permissions', []))}"
+            score = calculate_semantic_similarity(request.message, profile)
+            matched_agents.append((score, a))
+        
+        # Sort by relevance
+        matched_agents.sort(key=lambda x: x[0], reverse=True)
+        for score, a in matched_agents:
+            relevance = "EXCELLENT" if score > 0.4 else "MODERATE" if score > 0.1 else "LOW"
+            broker_logic += f"- **{a['name']}** (`{a['id']}`): Match Score: {score:.2f} [{relevance} MATCH]\n"
+        broker_logic += "\n"
+
     reporting_rules = (
-        f"1. **EXPLICIT REPORT TRIGGER (REPORTER)**: Since you have report generation capabilities, you MUST ONLY initiate the automated Research-to-PDF pipeline if the user's **CURRENT MESSAGE** explicitly asks for a 'report'. If they mention 'document', 'PDF', or 'file' without 'report', just answer them conversationally or ask for details. NEVER assume a report is wanted from vague hints.\n"
-        f"4. **SILENT EXECUTION**: ONLY for explicit 'report' requests, you stay silent during the tool pipeline. For all other questions, be conversational.\n"
-    ) if is_reporter else (
-        f"1. **DELEGATE REPORT REQUESTS**: You do NOT have report generation tools. If the user asks for a 'report', you MUST check your 'Connected Agents' list for an agent with `report generation` capabilities. Use [TOOL: message_agent(AGENT_ID|Message)] to delegate the task to them.\n"
-        f"4. **NO SILENT MODE**: Always remain conversational while managing your tools.\n"
+        "## COLLABORATION PROTOCOL (Broker Pattern)\n"
+        "1. **Analyze Capability Distance**: Before stating 'I cannot do this', check if your connected agents have the necessary Capability Embedding. "
+        "Use your Agent Directory to find the highest semantic match for any missing tool.\n"
+        "2. **The Delegation Rule**: If a task (like 'generate report' or 'deep research') is outside your PERMISSIONS but inside a teammate's responsibility, "
+        "use [TOOL: message_agent(AGENT_ID|Detailed Request)] immediately. Do NOT try to simulate their capability.\n"
     )
 
     identity_layer = (
@@ -890,9 +969,9 @@ def chat_with_agent(request: ChatRequest):
         f"CURRENT_DATE: {now}\n"
         f"ASSIGNED_WORKING_DIRECTORY: {work_dir}\n"
         f"Keep your tone professional, efficient, and direct.\n\n"
+        f"{broker_logic}\n" # Semantic matchmaking for MasterBot
         f"{system_prompt}\n\n" # Original prompt.md content
-        f"ABSOLUTE RULE: MANDATORY PROACTIVITY & TOOL-FIRST RESPONSE\n"
-        f"{reporting_rules}\n"
+        f"## UNIVERSAL COLLABORATION\n{reporting_rules}\n"
     )
 
     # ── 2. TOOL MANUAL (Capabilities) ───────────────────────────
@@ -954,17 +1033,31 @@ def chat_with_agent(request: ChatRequest):
                 )
         except: pass
 
-    # STIGMERGY: SHARED WORKSPACE LEDGER
+    # STIGMERGY: SHARED WORKSPACE LEDGER (Topic-Gated Blackboard)
     ledger_path = os.path.join(AGENTS_CODE_DIR, "knowledge_base.json")
     if os.path.exists(ledger_path):
         try:
             with open(ledger_path, "r", encoding="utf-8") as f:
                 ledger_data = json.load(f)
                 if ledger_data:
-                    transient_task_layer += "### SHARED WORKSPACE LEDGER (Global Knowledge)\n"
-                    for entry in ledger_data[-15:]: # Show last 15 findings
-                        transient_task_layer += f"- [{entry.get('agent_id')}] {entry.get('insight')} (Source: {entry.get('source')})\n"
-                    transient_task_layer += "\n"
+                    # UNIVERSAL FIX: TOPIC-GATED FILTERING
+                    # Filter findings that match the Global Objective or current user request
+                    reference_text = f"{global_obj} {request.message}"
+                    relevant_findings = []
+                    for entry in ledger_data:
+                        score = calculate_semantic_similarity(reference_text, entry.get("insight", ""))
+                        if score > 0.05: # Minimal energy threshold for relevance
+                            relevant_findings.append((score, entry))
+                    
+                    # Sort and take top 10 most related
+                    relevant_findings.sort(key=lambda x: x[0], reverse=True)
+                    top_findings = [f[1] for f in relevant_findings[:10]]
+
+                    if top_findings:
+                        transient_task_layer += "### SHARED WORKSPACE LEDGER (Topic-Relevant Knowledge Only)\n"
+                        for entry in top_findings:
+                            transient_task_layer += f"- [{entry.get('agent_id')}] {entry.get('insight')} (Source: {entry.get('source')})\n"
+                        transient_task_layer += "\n"
         except: pass
 
     # Global Objective
@@ -1066,15 +1159,9 @@ def chat_with_agent(request: ChatRequest):
     while iteration < max_turns:
         print(f"[STATUS:{request.agent_id}] Turn {iteration+1}/{max_turns}: Thinking...", flush=True)
         
-        # ── SLIDING WINDOW CONTEXT ─────────────────────────────────
-        # ── SLIDING WINDOW CONTEXT ─────────────────────────────────
-        # Only send the last 50 messages to the LLM to avoid context overflow,
-        # while keeping the full history for the user's UI.
-        raw_context = history[-50:] if len(history) > 50 else history
-        
-        llm_context = []
-        for h in raw_context:
-            llm_context.append({"role": h["role"], "content": h["content"]})
+        # ── SLIDING WINDOW CONTEXT (Exponential Decay Implementation) ──
+        # Generations: Full Energy -> Condensed -> Metadata Only
+        llm_context = process_generational_history(history)
         
         response_text = ""
         error_msg = ""
