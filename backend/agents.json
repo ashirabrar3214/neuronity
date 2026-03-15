@@ -1,8 +1,8 @@
 [
   {
-    "id": "agent-NewAgent-1773527895535",
-    "name": "Researcher",
-    "description": "Agent description...",
+    "id": "agent-MasterBot-001",
+    "name": "MasterBot",
+    "description": "Main orchestrator agent.",
     "brain": "gemini",
     "channel": "Gmail",
     "workingDir": "D:\\New folder",
@@ -11,28 +11,44 @@
       "thinking",
       "file access"
     ],
-    "tools": "Custom",
-    "responsibility": "",
-    "x": -2237.0,
-    "y": -407.0,
+    "tools": "Gmail",
+    "responsibility": "Coordinate all agents",
+    "x": -51.0,
+    "y": 185.0,
     "connections": [
-      "agent-NewAgent-1773527922450"
+      "agent-NewAgent-1773551457827",
+      "agent-NewAgent-1773583928103"
     ]
   },
   {
-    "id": "agent-NewAgent-1773527922450",
-    "name": "Reporter",
+    "id": "agent-NewAgent-1773551457827",
+    "name": "Jaime",
     "description": "Agent description...",
     "brain": "gemini",
     "channel": "Gmail",
     "workingDir": "D:\\New folder",
     "permissions": [
+      "web search",
       "report generation"
     ],
     "tools": "Custom",
+    "responsibility": "make report",
+    "x": 285.0,
+    "y": 251.0,
+    "connections": []
+  },
+  {
+    "id": "agent-NewAgent-1773583928103",
+    "name": "New Agent",
+    "description": "Agent description...",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [],
+    "tools": "Custom",
     "responsibility": "",
-    "x": -1759.0,
-    "y": -512.5,
+    "x": 287.0,
+    "y": 47.0,
     "connections": []
   }
 ]

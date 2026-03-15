@@ -1,10 +1,10 @@
 
-class agent_NewAgent_1773527922450:
+class agent_NewAgent_1773551457827:
     def __init__(self):
-        self.id = "agent-NewAgent-1773527922450"
-        self.name = "Reporter"
+        self.id = "agent-NewAgent-1773551457827"
+        self.name = "Jaime"
         self.working_dir = r"D:\New folder"
-        self.permissions = ['report generation']
+        self.permissions = ['web search', 'report generation']
         self.tools = "Custom"
         
     def get_personality(self):
@@ -17,5 +17,5 @@ class agent_NewAgent_1773527922450:
             return {}
 
 if __name__ == "__main__":
-    agent = agent_NewAgent_1773527922450()
+    agent = agent_NewAgent_1773551457827()
     print(f"Agent {agent.name} initialized.")

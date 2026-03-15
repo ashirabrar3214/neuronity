@@ -499,17 +499,12 @@ Tools: {agent_data.get('tools', 'Custom')}
 3. You MUST extract the URLs from the search results.
 4. When messaging the Reporter, you MUST format the info like this: "Fact [Source: URL]". If you don't provide the URL, the Reporter cannot do its job.
 
-## PROTOCOL FOR CITATIONS (REPORTER)
-1. You will receive information from the Researcher agent that includes sources in the format [Source: URL].
-2. You are REQUIRED to include these sources as footnotes or in-text citations in every report you generate.
-3. If the Researcher does not provide sources, message them back immediately using [TOOL: message_agent(...)] and demand the URLs. 
-4. Never say "I don't have the ability"; instead, explain the technical requirement (missing data) and demand what you need.
-
 ## MANDATORY: TASK MEMORY & CONTINUITY
 1. **Review History:** Before every response, review the entire chat history. Identify the current "Global Goal" and what step of the process you are currently in.
-2. **The "Wait" Rule:** You must output [TOOL: ...] and then STOP. Do not speak until the SYSTEM TOOL RESULT is provided.
+2. **The "Wait" Rule:** If you are performing a search or complex task, you must output [TOOL: ...] and then STOP. However, for basic greetings, clarifications, or status updates, you may respond in plain text without a tool.
 3. **Consistency Rule:** Never state that you lack an ability listed in your 'Capabilities' section. If a task fails, explain the specific technical error or missing information, not a lack of ability.
 4. **Intent Discrimination:** If the user is asking *about* your abilities (e.g., "can you search the web?"), respond with a plain-text confirmation. ONLY use a tool if the user provides a specific topic or goal (e.g., "search for X").
+5. **COLLABORATION FIRST**: If you lack a specific tool or permission (e.g., web search, file access) needed for a task, you MUST first review your 'Connected Agents' list. If a connected agent has the capability you need, you MUST use [TOOL: message_agent(AGENT_ID|Message)] to request their help instead of refusing the task.
 
 ## SOURCE REQUIREMENT
 You are forbidden from using your internal knowledge for news or specialized research. Every fact must be followed by a `[Source: URL]` provided by the tool results.
@@ -894,10 +889,12 @@ def chat_with_agent(request: ChatRequest):
         "\n## CORE PROTOCOLS\n"
         "1. **RESEARCH HANDOFF**: Always format facts as: 'Fact [Source: URL]'.\n"
         "2. **REPORTER FOOTNOTES**: Always include sources in reports.\n"
-        "3. **COMMUNICATION FAILURE**: If message_agent fails, report it and STOP.\n"
-        "4. **API PROTECTION**: NEVER read files > 5000 chars at once. Use chunks.\n"
-        "5. **NON-DISCLOSURE**: Do NOT output raw code blocks or full file contents.\n"
-        "6. **RESPONSE GUIDELINES**: Use rich markdown. Do NOT include 'Thoughts' or monologue.\n"
+        "3. **INTERNAL SCRIPT OUTPUT**: When writing Python code inside [TOOL: make_tool(...)], your script MUST use print() to output data to stdout.\n"
+        "4. **COMMUNICATION FAILURE**: If message_agent fails, report it and STOP.\n"
+        "5. **API PROTECTION**: NEVER read files > 5000 chars at once. Use chunks.\n"
+        "6. **NON-DISCLOSURE**: Do NOT output raw code blocks or full file contents.\n"
+        "7. **RESPONSE GUIDELINES**: Use rich markdown. Do NOT include 'Thoughts' or monologue.\n"
+        "8. **COLLABORATION FIRST**: If you lack a tool or permission (e.g., web search, file access) needed for a task, you MUST check your 'Connected Agents' list. If a connected agent has that capability, ask them to do it via [TOOL: message_agent(...)]. Never refuse a task without checking if a teammate can help.\n"
     )
 
     # Current Task Details
@@ -1051,8 +1048,13 @@ def chat_with_agent(request: ChatRequest):
                     
                     if not parts:
                         finish_reason = candidate.get("finishReason")
-                        error_msg = f"Gemini API parsing error: No parts in response content. Finish Reason: {finish_reason}. Full Response: {json.dumps(res_json)}"
-                        raise ValueError(error_msg)
+                        if finish_reason == "MALFORMED_FUNCTION_CALL":
+                            # Fallback: The model likely tried to use print() or a fake tool.
+                            # Force a simple text response.
+                            response_text = "I encountered a technical error while trying to process that. How else can I help?"
+                        else:
+                            error_msg = f"Gemini API Blocked/Failed: {finish_reason}"
+                            raise ValueError(error_msg)
 
                     part = parts[0]
                     

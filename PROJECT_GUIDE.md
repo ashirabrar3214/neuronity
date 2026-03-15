@@ -26,7 +26,11 @@ Array of objects containing:
 
 #### `backend/agents_code/[ID]/history.json` (Short-term memory)
 - Array of `{"role": "user" | "assistant", "content": "..."}` objects.
-- Limited to the last 10 messages to maintain context window efficiency.
+- Maintains a sliding window context (last 50 messages) for the LLM while keeping full history for the UI.
+
+#### `backend/agents_code/[ID]/summary.json` (Long-term memory)
+- Contains a cumulative distillation of the historical conversation.
+- **Proactive Distillation**: When history exceeds 50 messages, the system automatically summarizes older context into this file to preserve memory without bloating the API context.
 
 ---
 
@@ -85,33 +89,33 @@ Array of objects containing:
 
 ### `server.py` (FastAPI Core)
 - **Tool Routing**: `perform_tool_call()`
-    - Decides which function in `capabilities.py` to run based on the detected tool command.
+    - Decides which function in `toolkit.py` to run based on the detected tool command.
 - **Persistence**: `load_data()` / `save_data()`
     - Thread-safe reading/writing of the `agents.json` registry.
+- **Layered Prompt Architecture**:
+    - **Identity Layer**: Persona, role, current date, and assigned working directory.
+    - **Tool Manual Layer**: Dynamic documentation of available commands based on permissions.
+    - **Transient Task Layer**: Live project context, global objectives, agent directory, and history summary.
 - **The Reasoning Loop (`chat_with_agent`)**:
-    1.  Load agent's custom `prompt.md` and conversation `history.json`.
-    2.  Build **System Prompt**: Combines Identity + Capabilities + Connection Manual.
-    3.  **Iteration Loop** (Max 5 turns):
-        -   Call LLM API.
-        -   Regex Search for `[TOOL: tool_name(input)]`.
-        -   If found: Trigger `perform_tool_call`, append `SYSTEM TOOL RESULT` to messages, and re-call the LLM.
-        -   If not found: Break and return final string.
+    1.  **Memory Load**: Retrieves history and any existing long-term summary.
+    2.  **Context Construction**: Builds a layered system prompt and injects current task details.
+    3.  **Iteration Loop** (Max 15 turns):
+        -   **Gemini Native Tools**: Uses official Google Tool Schema to expose functions directly to Gemini models.
+        -   **Error Handling**: Includes a fallback for `MALFORMED_FUNCTION_CALL` to handle hallucinated tools gracefully.
+        -   **Tool Execution**: Regex/Native parsing for `[TOOL: name(args)]`. Triggers `perform_tool_call`, appends results to history, and iterates.
+        -   **Final Response**: Sanitizes output (redacts code blocks/large dumps) and returns to the frontend.
 
-### `capabilities.py` (The Agent Skills)
-- `web_search(query, agent_id)`:
-    - Uses `DDGS` (DuckDuckGo Search) to pull the top 15 results.
-- `filter_sources(query, search_results, api_key)`:
-    - **Optimization Step**: Sends the 15 results to Gemini-Flash 2.0.
-    - Gemini returns a JSON array of the 3-8 most relevant result indices.
-    - This trims "noise" and prevents context-window bloat in the final synthesis.
-- `synthesize_with_gemini(query, search_results, api_key)`:
-    - Generates a structured research brief with "Key Findings" and "Summary."
-    - **Safety Feature**: Hard-codes the "Sources" section directly from the raw data to ensure URLs aren't hallucinated.
-- `thinking(topic)`: A dummy 3-second sleep to simulate heavy computation (can be expanded to complex multi-step analysis).
-- `generate_report(title, content)`: Writes a timestamped `.md` file to the agent's local directory.
-- `message_agent(target_id, message, sender_name)`:
-    - Launches a nested `/chat` request.
-    - Uses `threading.Thread` to avoid FastAPI event-loop deadlocks when Agent A waits for Agent B.
+### `toolkit.py` (The Agent Skills)
+- `web_search(query, agent_id)`: **Quick Fact Search**. Returns raw titles, URLs, and snippets.
+- `deep_search(query, agent_id)`: **Comprehensive Research**. Filters DuckDuckGo results using a Gemini-Flash 2.0 librarian step to pick the top 3-8 most relevant sources.
+- `thinking(agent_id, topic)`: Simulates deep logical analysis with terminal status updates.
+- `generate_report(agent_id, tool_input, working_dir)`: Writes a markdown report to the agent's folder.
+- `report_generation(agent_id, tool_input, working_dir)`: **Premium PDF Synthesis**. Uses `ReportPDFGenerator` to create professional documents with executive summaries and citations.
+- `message_agent(target_id, message, sender_id)`:
+    - **Cross-Agent Delegation**. Launches a nested `/chat` request.
+    - **Context Inversion**: Sends a weighted priority snippet of the sender's history to the recipient so they understand the request's context.
+    - Uses `threading.Thread` to enable concurrent execution.
+- **File System Tools**: `scout_file`, `read_file`, `write_file`, `list_workspace`. Includes strict path traversal protection.
 
 ### `response_formatter.py` (The Stylizer)
 - Uses `re.sub` for high-performance string transformation.
@@ -154,15 +158,26 @@ Array of objects containing:
 
 ---
 
-## 🔄 6. COMPLETE EXECUTION FLOW (Life of a Request)
+## ⚖️ 6. CORE AGENT PROTOCOLS
+
+1.  **Intent Discrimination**: Agents must verify if the user wants a tool action or just a conversational clarification.
+2.  **Wait Rule**: Tool calls must be followed by a `STOP` until system results are provided, except for basic status updates.
+3.  **Collaboration First**: If an agent lacks a tool (e.g., file access), it MUST check connected neighbors and delegate via `message_agent` instead of refusing.
+4.  **Ruthless Sanitization**: Raw code blocks and massive data dumps are automatically redacted from chat history to maintain privacy and UI performance.
+5.  **Proactive Memory**: High-frequency chats are distilled into summaries to prevent context loss at the 50-message boundary.
+
+---
+
+## 🔄 7. COMPLETE EXECUTION FLOW (Life of a Request)
 
 1.  **User Typing**: User hits "Enter" in Training Panel.
-2.  **API Key Retrieval**: `agent-training.js` asks Electron Main for the key.
-3.  **POST Request**: Frontend hits `localhost:8000/chat`.
-4.  **Backend Assembly**: FastAPI reads `prompt.md` (System) + `history.json` (Context) + `User Message`.
-5.  **Iteration 1**: Gemini returns `[TOOL: web_search("Deepseek model specs")]`.
-6.  **Tool Execution**: `capabilities.py` runs search -> gets 15 results -> filters to top 5.
-7.  **Iteration 2**: Backend sends Tool Results back to Gemini.
-8.  **Final Response**: Gemini sends the summary.
-9.  **Formatting**: `response_formatter.py` turns Markdown into Terminal Style.
-10. **Delivery**: Frontend receives JSON, runs the word-reveal animation, and updates the Canvas node terminal to "Ready".
+2.  **Context Loading**: Backend loads `agents.json`, `history.json`, and `summary.json`.
+3.  **Prompt Assembly**: Layered prompt is built with live project context.
+4.  **Distillation Check**: If history > 50 messages, a summary is proactively generated/updated.
+5.  **Iteration 1**: LLM receives context + message. Returns tool call (e.g., `web_search`).
+6.  **Tool Execution**: `toolkit.py` runs search -> results returned as `SYSTEM TOOL RESULT`.
+7.  **Iteration 2+**: LLM analyzes results, potentially chains more tools (up to 15 turns).
+8.  **Final Response**: Final answer is synthesized.
+9.  **Sanitization**: `sanitize_ruthlessly` redacts sensitive/massive data.
+10. **Formatting**: `response_formatter.py` stylizes Markdown for the terminal.
+11. **Delivery**: Frontend receives JSON, runs animations, and updates UI status to "Ready".
