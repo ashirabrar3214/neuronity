@@ -1,57 +1,87 @@
 [
   {
-    "id": "agent-MasterBot-001",
-    "name": "MasterBot",
-    "description": "Main orchestrator agent.",
+    "id": "agent-NewAgent-1773592605150",
+    "name": "Masterbot",
+    "description": "a high level of control, expertise, and capability in managing and executing tasks. It implies a central role in coordinating activities and possessing advanced skills in automation and problem-solving.",
     "brain": "gemini",
     "channel": "Gmail",
     "workingDir": "D:\\New folder",
     "permissions": [
       "web search",
-      "thinking",
-      "file access"
-    ],
-    "tools": "Gmail",
-    "responsibility": "Coordinate all agents",
-    "x": -51.0,
-    "y": 185.0,
-    "connections": [
-      "agent-NewAgent-1773551457827",
-      "agent-NewAgent-1773583928103"
-    ]
-  },
-  {
-    "id": "agent-NewAgent-1773551457827",
-    "name": "Jaime",
-    "description": "Agent description...",
-    "brain": "gemini",
-    "channel": "Gmail",
-    "workingDir": "D:\\New folder",
-    "permissions": [
-      "web search",
-      "report generation"
-    ],
-    "tools": "Custom",
-    "responsibility": "make report",
-    "x": 303.0,
-    "y": 534.0,
-    "connections": []
-  },
-  {
-    "id": "agent-NewAgent-1773583928103",
-    "name": "Warfaze",
-    "description": "Agent description...",
-    "brain": "gemini",
-    "channel": "Gmail",
-    "workingDir": "D:\\New folder",
-    "permissions": [
-      "thinking",
       "file access"
     ],
     "tools": "Custom",
     "responsibility": "",
-    "x": 350.0,
-    "y": -80.0,
+    "x": -343.0,
+    "y": 95.0,
+    "connections": [
+      "agent-NewAgent-1773592704556",
+      "agent-NewAgent-1773592863811",
+      "agent-NewAgent-1773592878351"
+    ]
+  },
+  {
+    "id": "agent-NewAgent-1773592704556",
+    "name": "Jaime",
+    "description": "Agent description...",
+    "brain": "gemini",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [
+      "report generation"
+    ],
+    "tools": "Custom",
+    "responsibility": "",
+    "x": 56.0,
+    "y": -236.0,
+    "connections": [
+      "agent-NewAgent-1773593030487"
+    ]
+  },
+  {
+    "id": "agent-NewAgent-1773592863811",
+    "name": "Tyrion",
+    "description": "Agent description...",
+    "brain": "gemini",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [],
+    "tools": "Custom",
+    "responsibility": "",
+    "x": 56.0,
+    "y": 115.0,
+    "connections": [
+      "agent-NewAgent-1773593030487"
+    ]
+  },
+  {
+    "id": "agent-NewAgent-1773592878351",
+    "name": "John",
+    "description": "Agent description...",
+    "brain": "gemini",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [],
+    "tools": "Custom",
+    "responsibility": "",
+    "x": 61.0,
+    "y": 468.0,
+    "connections": [
+      "agent-NewAgent-1773593030487"
+    ]
+  },
+  {
+    "id": "agent-NewAgent-1773593030487",
+    "name": "Tywin",
+    "description": "Agent description...",
+    "brain": "gemini",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [],
+    "tools": "Custom",
+    "responsibility": "",
+    "x": 463.0,
+    "y": 109.0,
     "connections": []
   }
 ]

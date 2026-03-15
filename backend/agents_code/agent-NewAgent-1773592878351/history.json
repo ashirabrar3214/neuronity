@@ -1,0 +1,38 @@
+[
+  {
+    "role": "assistant",
+    "content": "\u2699\ufe0f *Agent Action: Update Plan...*"
+  },
+  {
+    "role": "assistant",
+    "content": "Okay, I'm ready. What task do you need me to execute?\n"
+  },
+  {
+    "role": "assistant",
+    "content": "Why don't scientists trust atoms?\n\nBecause they make up everything!\n"
+  },
+  {
+    "role": "assistant",
+    "content": "What's worse than finding a worm in your apple?\n\nFinding half a worm.\n"
+  },
+  {
+    "role": "assistant",
+    "content": "\u2699\ufe0f *Agent Action: Message Agent...*"
+  },
+  {
+    "role": "assistant",
+    "content": "\u2699\ufe0f *Agent Action: Web Search...*"
+  },
+  {
+    "role": "assistant",
+    "content": "I am unable to perform the web search because my 'web search' capability is currently disabled. I will need that enabled to proceed.\n"
+  },
+  {
+    "role": "assistant",
+    "content": "\u2699\ufe0f *Agent Action: Message Agent...*"
+  },
+  {
+    "role": "assistant",
+    "content": "I am unable to fulfill Tywin's request as I cannot perform the web search and he is unable to contact Tyrion. I will inform Masterbot of this situation.\n"
+  }
+]

@@ -1,11 +1,10 @@
-# Agent Instructions: Warfaze
+# Agent Instructions: Tyrion
 Description: Agent description...
 Responsibility: 
 Tools: Custom
 
 ## capabilities
-- thinking
-- file access
+No specific permissions granted.
 
 ## STIGMERGY (SHARED LEDGER)
 1. **The Ledger First**: Before acting, you MUST mentally check the Shared Workspace Ledger (in your system prompt) to see if the required data has already been posted by another agent.

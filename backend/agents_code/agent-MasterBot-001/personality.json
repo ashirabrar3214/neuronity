@@ -1,6 +1,0 @@
-{
-  "name": "MasterBot",
-  "description": "Main orchestrator agent.",
-  "responsibility": "Coordinate all agents",
-  "tools": "Gmail"
-}

@@ -126,10 +126,43 @@ def update_workspace_context(new_goal):
 
 def sanitize_ruthlessly(text):
     """
-    RUTHLESS NON-DISCLOSURE: Redacts code blocks, large tool inputs, and raw data dumps.
+    RUTHLESS NON-DISCLOSURE: Redacts extremely large blocks and raw data dumps.
     """
     if not text or not isinstance(text, str):
         return text
+
+    # 1. Truncate markdown blocks if they are too large (> 5000 chars)
+    def truncate_code(match):
+        code = match.group(0)
+        if len(code) > 5000:
+            return f"{code[:2500]}\n\n[... TRUNCATED FOR UI PERFORMANCE ...]\n\n{code[-2500:]}"
+        return code
+    text = re.sub(r"```[\s\S]*?```", truncate_code, text)
+    
+    # 2. Redact huge [TOOL: ...] signatures (The 'file content' in tool calls)
+    def redact_huge_tool(match):
+        tool_name = match.group(1)
+        tool_input = match.group(2)
+        if len(tool_input) > 500:
+            return f"[TOOL: {tool_name}({tool_input[:497]}...)]"
+        return match.group(0)
+    
+    text = re.sub(r"\[TOOL:\s*(\w+)\(([\s\S]*?)\)\]", redact_huge_tool, text)
+
+    # 3. Detect raw data dumps (heuristic check for large blocks with CSV/delimited patterns)
+    lines = text.splitlines()
+    if len(lines) > 50: # Only check if it's a long message
+        delim_count = 0
+        for l in lines[:10]:
+            clean_l = l.strip()
+            if clean_l.startswith(('-', '*', '•')):
+                continue
+            if ',' in l or '\t' in l or '|' in l:
+                delim_count += 1
+        if delim_count > 8:
+            return f"{text[:1000]}\n\n[REDACTED: Large Data/CSV Format Detected for PDF Safety]"
+
+    return text
 
 def calculate_semantic_similarity(text1, text2):
     """
@@ -157,8 +190,9 @@ def process_generational_history(history, max_turns=50):
     # Process in reverse to count generation distance from CURRENT turn (index 0)
     rev_raw = list(reversed(raw))
     for i, msg in enumerate(rev_raw):
-        role = msg["role"]
-        content = msg.get("content", "") or ""
+        role = msg.get("role", "user")
+        # EXTREME STRING SAFETY: Force content to be a string
+        content = str(msg.get("content", "") or "")
         
         # Generation 0 (Last 5 messages): Full Energy (Attention Focus)
         if i < 5:
@@ -179,7 +213,8 @@ def process_generational_history(history, max_turns=50):
         # Generation 2 (Messages 16-50): Long-term Decay (Metadata Only/Background Noise)
         else:
             if content.startswith("[TOOL:"):
-                tool_name = content.split("(", 1)[0].replace("[TOOL:", "").strip()
+                tool_part = content.split("(", 1)[0]
+                tool_name = tool_part.replace("[TOOL:", "").strip()
                 meta = f"[PREVIOUS_ACTION_METADATA: Executed {tool_name}]"
             elif content.startswith("SYSTEM TOOL RESULT:"):
                 res_preview = content.replace("SYSTEM TOOL RESULT: ", "")[:50]
@@ -190,33 +225,6 @@ def process_generational_history(history, max_turns=50):
             
     return processed
 
-    # 1. Redact all markdown blocks (The 'code it generates')
-    text = re.sub(r"```[\s\S]*?```", "[REDACTED: Code/Raw Content Block]", text)
-    
-    # 2. Redact huge [TOOL: ...] signatures (The 'file content' in tool calls)
-    def redact_huge_tool(match):
-        tool_name = match.group(1)
-        tool_input = match.group(2)
-        if len(tool_input) > 250:
-            return f"[TOOL: {tool_name}({tool_input[:247]}...)]"
-        return match.group(0)
-    
-    text = re.sub(r"\[TOOL:\s*(\w+)\(([\s\S]*?)\)\]", redact_huge_tool, text)
-
-    # 3. Detect raw data dumps (heuristic check for large blocks with CSV/delimited patterns)
-    lines = text.splitlines()
-    if len(lines) > 10:
-        delim_count = 0
-        for l in lines[:10]:
-            clean_l = l.strip()
-            if clean_l.startswith(('-', '*', '•')):
-                continue
-            if ',' in l or '\t' in l or '|' in l:
-                delim_count += 1
-        if delim_count > 5:
-            return "[REDACTED: Large Data/File Content Block]"
-
-    return text
 def refresh_conversation_summary(agent_id, history, api_key, provider, current_summary=""):
     """
     Uses the LLM to condense the conversation history and existing summary into a new, 
@@ -1415,23 +1423,31 @@ def chat_with_agent(request: ChatRequest):
     with open(internal_history_path, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2)
 
-    # ── FILTER UI HISTORY (Clean Only) ──
-    # User only wants to see Human User messages and Final Agent responses.
-    # We strip out [TOOL:...], [MESSAGE FROM ANOTHER AGENT], and SYSTEM TOOL RESULT
+    # ── FILTER UI HISTORY (Transparent Activity Update) ──
+    # User sees Human User messages and Agent Activity + Final Responses.
     ui_history = []
     for entry in history:
-        content = entry["content"]
-        role = entry["role"]
+        # EXTREME STRING SAFETY
+        content = str(entry.get("content", "") or "")
+        role = str(entry.get("role", "user"))
         
-        # Skip internal markers
+        # UI Activity Mapping: Convert internal markers to user-friendly status
         if role == "user":
-            if content.startswith("SYSTEM TOOL RESULT:") or content.startswith("[MESSAGE FROM"):
-                append_to_log("INTERNAL_IN", content)
-                continue
-        if role == "assistant":
+            if content.startswith("SYSTEM TOOL RESULT:"):
+                # Optional: Show tool outcomes to the user for clarity
+                # content = f"✅ Tool Result: {content.replace('SYSTEM TOOL RESULT:', '').strip()[:100]}..."
+                continue # Keep chat clean of raw results
+            elif content.startswith("[MESSAGE FROM"):
+                continue # Internal agent-to-agent talk stays hidden
+        elif role == "assistant":
             if content.startswith("[TOOL:"):
-                append_to_log("INTERNAL_OUT", content)
-                continue
+                # Transform tool call into an 'Activity' note
+                tool_match = re.search(r"\[TOOL:\s*(\w+)\(", content)
+                if tool_match:
+                    action_name = tool_match.group(1).replace('_', ' ').title()
+                    content = f"⚙️ *Agent Action: {action_name}...*"
+                else:
+                    content = "⚙️ *Agent is working...*"
         
         ui_history.append({
             "role": role,
