@@ -4,7 +4,7 @@ class agent_NewAgent_1773593030487:
         self.id = "agent-NewAgent-1773593030487"
         self.name = "Tywin"
         self.working_dir = r""
-        self.permissions = []
+        self.permissions = ['web search']
         self.tools = "Custom"
         
     def get_personality(self):

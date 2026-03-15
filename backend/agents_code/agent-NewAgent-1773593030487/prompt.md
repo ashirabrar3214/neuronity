@@ -4,7 +4,7 @@ Responsibility:
 Tools: Custom
 
 ## capabilities
-No specific permissions granted.
+- web search
 
 ## STIGMERGY (SHARED LEDGER)
 1. **The Ledger First**: Before acting, you MUST mentally check the Shared Workspace Ledger (in your system prompt) to see if the required data has already been posted by another agent.

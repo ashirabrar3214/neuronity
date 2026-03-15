@@ -2,7 +2,7 @@
   {
     "id": "agent-NewAgent-1773592605150",
     "name": "Masterbot",
-    "description": "a high level of control, expertise, and capability in managing and executing tasks. It implies a central role in coordinating activities and possessing advanced skills in automation and problem-solving.",
+    "description": "",
     "brain": "gemini",
     "channel": "Gmail",
     "workingDir": "D:\\New folder",
@@ -64,8 +64,8 @@
     "permissions": [],
     "tools": "Custom",
     "responsibility": "",
-    "x": 61.0,
-    "y": 468.0,
+    "x": 51.0,
+    "y": 361.0,
     "connections": [
       "agent-NewAgent-1773593030487"
     ]
@@ -77,7 +77,9 @@
     "brain": "gemini",
     "channel": "Gmail",
     "workingDir": "",
-    "permissions": [],
+    "permissions": [
+      "web search"
+    ],
     "tools": "Custom",
     "responsibility": "",
     "x": 463.0,

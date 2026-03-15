@@ -46,3 +46,499 @@ Hello Tywin, how are you doing today?
 [Context Explosion Mitigation: Individual history snippets are disabled in favor of the Shared Workspace Ledger.]
 ──────────────────────────────────────────────────
 ------------------------------
+[2026-03-15 12:53:53] [SYSTEM]: Starting chat session for agent: agent-NewAgent-1773593030487
+------------------------------
+[2026-03-15 12:53:53] [USER_IN]: [MESSAGE FROM ANOTHER AGENT]
+Sender:   Tyrion (ID: agent-NewAgent-1773592863811)
+──────────────────────────────────────────────────
+## Task / Request
+Hi Tywin.
+──────────────────────────────────────────────────
+## Context (Recent conversation from sender — read this to understand the full situation)
+[Context Explosion Mitigation: Individual history snippets are disabled in favor of the Shared Workspace Ledger.]
+──────────────────────────────────────────────────
+------------------------------
+[2026-03-15 12:53:53] [SYSTEM_PROMPT]: ## AGENT IDENTITY
+You are Tywin. Your role is: .
+CURRENT_DATE: 2026-03-15 12:53:53
+ASSIGNED_WORKING_DIRECTORY: Not Assigned
+Keep your tone professional, efficient, and direct.
+
+
+# Agent Instructions: Tywin
+Description: Agent description...
+Responsibility: 
+Tools: Custom
+
+## capabilities
+No specific permissions granted.
+
+## STIGMERGY (SHARED LEDGER)
+1. **The Ledger First**: Before acting, you MUST mentally check the Shared Workspace Ledger (in your system prompt) to see if the required data has already been posted by another agent.
+2. **Post Findings**: When you find a definitive fact, correlation, or insight, you MUST use [TOOL: post_finding(Insight | Source URL)] immediately. This prevents other agents from duplicating your work.
+
+## BDI PLANNING & STATE
+1. **Plan Persistence**: You have a `plan.json` that tracks your objective and progress. 
+2. **Atomic Updates**: You MUST use [TOOL: update_plan(Task Completed)] to cross off a task before you are allowed to send a final message to the user.
+3. **Initialization**: If you have no plan, use [TOOL: update_plan(Objective | Step 1, Step 2, ...)] to set one.
+
+## PROTOCOL FOR SEARCHING (RESEARCHER)
+1. You MUST call [TOOL: web_search(query="...")] and then STOP.
+2. Do NOT provide any information until you receive a SYSTEM TOOL RESULT.
+3. You MUST extract the URLs from the search results.
+4. When messaging other agents or the Ledger, you MUST provide the URL.
+
+## MANDATORY: TASK MEMORY & CONTINUITY
+1. **Review History & Plan:** Before every response, review the chat history and your current Plan. Identify what step of the process you are currently in.
+2. **The "Wait" Rule:** If you are performing a tool action, you must output [TOOL: ...] and then STOP. 
+3. **Intent Discrimination**: Only use a tool if the user provides a specific topic or goal.
+4. **COLLABORATION FIRST**: If you lack a tool, message a connected agent.
+
+## SOURCE REQUIREMENT
+You are forbidden from using your internal knowledge for news or specialized research. Every fact must be followed by a `[Source: URL]` provided by the tool results.
+## STRICT RULE: AGENT COMMUNICATION FAILURE
+If you attempt to contact another agent using [TOOL: message_agent(...)] and it fails for ANY reason
+(the agent is unreachable, not connected, returns an error, or times out), you MUST:
+1. Report the failure clearly: state which agent you tried to contact and what the error was.
+2. STOP. Do NOT attempt to complete the task yourself as a substitute.
+3. Do NOT silently re-route the work to a different agent.
+4. Do NOT pretend the task was completed.
+5. Your only allowed response after a failed agent message is to explain the failure and ask the user how to proceed.
+
+
+## UNIVERSAL COLLABORATION
+## COLLABORATION PROTOCOL (Broker Pattern)
+1. **Analyze Capability Distance**: Before stating 'I cannot do this', check if your connected agents have the necessary Capability Embedding. Use your Agent Directory to find the highest semantic match for any missing tool.
+2. **The Delegation Rule**: If a task (like 'generate report' or 'deep research') is outside your PERMISSIONS but inside a teammate's responsibility, use [TOOL: message_agent(AGENT_ID|Detailed Request)] immediately. Do NOT try to simulate their capability.
+
+## TOOL MANUAL
+If you use a tool, respond ONLY with the [TOOL: ...] command and nothing else.
+
+### DEFAULT TOOLS
+
+### BDI PLANNING (INTERNAL STATE)
+- [TOOL: update_plan(Objective | Step 1, Step 2)]: Initialize your goal.
+- [TOOL: update_plan(Task Completed)]: Mark progress. MANDATORY before finalizing.
+### STIGMERGY (WORKSPACE LEDGER)
+- [TOOL: post_finding(Insight | Source)]: Share data with ALL agents globally.
+### CONVERSATIONAL BOUNDARIES & HONESTY
+- If the user is just chatting ('How are you?', 'Thanks', 'Cool'), DO NOT use any tools. Just respond naturally.
+- Tool use is for task-oriented requests only.
+- **INTENT DISCRIMINATION**: If the user is asking *about* your abilities (e.g., 'can you search the web?'), respond with a plain-text confirmation. ONLY use a tool if the user provides a specific topic or goal (e.g., 'search for X').
+- **STRICT RULE ON MISSING TOOLS**: If a requested capability is NOT listed in this manual, YOU CANNOT DO IT.
+- **STRICT RULE ON OUTCOMES**: Never claim a file action is 'done' unless you received a SYSTEM TOOL RESULT confirming it.
+
+## TRANSIENT TASK CONTEXT
+### MY CURRENT PLAN (BDI)
+**OBJECTIVE**: Objective
+**TASKS TO DO**: Request John to perform web search, Analyze results, Respond to Masterbot
+**COMPLETED**: Task Completed, Step 1: Request Tyrion to perform web search, Step 2: Analyze results, Step 3: Respond to Masterbot
+
+**GLOBAL OBJECTIVE**: 
+
+## PROJECT AGENT DIRECTORY
+- Masterbot (`agent-NewAgent-1773592605150`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Jaime (`agent-NewAgent-1773592704556`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Tyrion (`agent-NewAgent-1773592863811`):  [UNREACHABLE - REQUIRE DELEGATION]
+- John (`agent-NewAgent-1773592878351`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Tywin (`agent-NewAgent-1773593030487`):  [UNREACHABLE - REQUIRE DELEGATION]
+
+## CORE PROTOCOLS
+1. **RESEARCH HANDOFF**: Always format facts as: 'Fact [Source: URL]'.
+2. **REPORTER FOOTNOTES**: Always include sources in reports.
+3. **INTERNAL SCRIPT OUTPUT**: When writing Python code inside [TOOL: make_tool(...)], your script MUST use print() to output data to stdout.
+4. **COMMUNICATION FAILURE**: If message_agent fails, report it and STOP.
+5. **API PROTECTION**: NEVER read files > 5000 chars at once. Use chunks.
+6. **NON-DISCLOSURE**: Do NOT output raw code blocks or full file contents.
+7. **RESPONSE GUIDELINES**: Use rich markdown. Do NOT include 'Thoughts' or monologue.
+8. **UPSTREAM DELEGATION**: If you are asked to contact an agent you are not connected to, you MUST message the agent who sent you the current task and ask them to facilitate the introduction. Do NOT attempt to search for the agent on the web.
+9. **COLLABORATION FIRST**: If you lack a tool or permission (e.g., web search, file access) needed for a task, you MUST check your 'Connected Agents' list. If a connected agent has that capability, ask them to do it via [TOOL: message_agent(...)]. Never refuse a task without checking if a teammate can help.
+
+## CURRENT_MESSAGE
+[MESSAGE FROM ANOTHER AGENT]
+Sender:   Tyrion (ID: agent-NewAgent-1773592863811)
+──────────────────────────────────────────────────
+## Task / Request
+Hi Tywin.
+──────────────────────────────────────────────────
+## Context (Recent conversation from sender — read this to understand the full situation)
+[Context Explosion Mitigation: Individual history snippets are disabled in favor of the Shared Workspace Ledger.]
+──────────────────────────────────────────────────
+
+------------------------------
+[2026-03-15 12:54:18] [SYSTEM]: Starting chat session for agent: agent-NewAgent-1773593030487
+------------------------------
+[2026-03-15 12:54:18] [USER_IN]: [MESSAGE FROM ANOTHER AGENT]
+Sender:   Tyrion (ID: agent-NewAgent-1773592863811)
+──────────────────────────────────────────────────
+## Task / Request
+Masterbot has requested you to perform a web search on Iran War.
+──────────────────────────────────────────────────
+## Context (Recent conversation from sender — read this to understand the full situation)
+[Context Explosion Mitigation: Individual history snippets are disabled in favor of the Shared Workspace Ledger.]
+──────────────────────────────────────────────────
+------------------------------
+[2026-03-15 12:54:18] [SYSTEM_PROMPT]: ## AGENT IDENTITY
+You are Tywin. Your role is: .
+CURRENT_DATE: 2026-03-15 12:54:18
+ASSIGNED_WORKING_DIRECTORY: Not Assigned
+Keep your tone professional, efficient, and direct.
+
+
+# Agent Instructions: Tywin
+Description: Agent description...
+Responsibility: 
+Tools: Custom
+
+## capabilities
+No specific permissions granted.
+
+## STIGMERGY (SHARED LEDGER)
+1. **The Ledger First**: Before acting, you MUST mentally check the Shared Workspace Ledger (in your system prompt) to see if the required data has already been posted by another agent.
+2. **Post Findings**: When you find a definitive fact, correlation, or insight, you MUST use [TOOL: post_finding(Insight | Source URL)] immediately. This prevents other agents from duplicating your work.
+
+## BDI PLANNING & STATE
+1. **Plan Persistence**: You have a `plan.json` that tracks your objective and progress. 
+2. **Atomic Updates**: You MUST use [TOOL: update_plan(Task Completed)] to cross off a task before you are allowed to send a final message to the user.
+3. **Initialization**: If you have no plan, use [TOOL: update_plan(Objective | Step 1, Step 2, ...)] to set one.
+
+## PROTOCOL FOR SEARCHING (RESEARCHER)
+1. You MUST call [TOOL: web_search(query="...")] and then STOP.
+2. Do NOT provide any information until you receive a SYSTEM TOOL RESULT.
+3. You MUST extract the URLs from the search results.
+4. When messaging other agents or the Ledger, you MUST provide the URL.
+
+## MANDATORY: TASK MEMORY & CONTINUITY
+1. **Review History & Plan:** Before every response, review the chat history and your current Plan. Identify what step of the process you are currently in.
+2. **The "Wait" Rule:** If you are performing a tool action, you must output [TOOL: ...] and then STOP. 
+3. **Intent Discrimination**: Only use a tool if the user provides a specific topic or goal.
+4. **COLLABORATION FIRST**: If you lack a tool, message a connected agent.
+
+## SOURCE REQUIREMENT
+You are forbidden from using your internal knowledge for news or specialized research. Every fact must be followed by a `[Source: URL]` provided by the tool results.
+## STRICT RULE: AGENT COMMUNICATION FAILURE
+If you attempt to contact another agent using [TOOL: message_agent(...)] and it fails for ANY reason
+(the agent is unreachable, not connected, returns an error, or times out), you MUST:
+1. Report the failure clearly: state which agent you tried to contact and what the error was.
+2. STOP. Do NOT attempt to complete the task yourself as a substitute.
+3. Do NOT silently re-route the work to a different agent.
+4. Do NOT pretend the task was completed.
+5. Your only allowed response after a failed agent message is to explain the failure and ask the user how to proceed.
+
+
+## UNIVERSAL COLLABORATION
+## COLLABORATION PROTOCOL (Broker Pattern)
+1. **Analyze Capability Distance**: Before stating 'I cannot do this', check if your connected agents have the necessary Capability Embedding. Use your Agent Directory to find the highest semantic match for any missing tool.
+2. **The Delegation Rule**: If a task (like 'generate report' or 'deep research') is outside your PERMISSIONS but inside a teammate's responsibility, use [TOOL: message_agent(AGENT_ID|Detailed Request)] immediately. Do NOT try to simulate their capability.
+
+## TOOL MANUAL
+If you use a tool, respond ONLY with the [TOOL: ...] command and nothing else.
+
+### DEFAULT TOOLS
+
+### BDI PLANNING (INTERNAL STATE)
+- [TOOL: update_plan(Objective | Step 1, Step 2)]: Initialize your goal.
+- [TOOL: update_plan(Task Completed)]: Mark progress. MANDATORY before finalizing.
+### STIGMERGY (WORKSPACE LEDGER)
+- [TOOL: post_finding(Insight | Source)]: Share data with ALL agents globally.
+### CONVERSATIONAL BOUNDARIES & HONESTY
+- If the user is just chatting ('How are you?', 'Thanks', 'Cool'), DO NOT use any tools. Just respond naturally.
+- Tool use is for task-oriented requests only.
+- **INTENT DISCRIMINATION**: If the user is asking *about* your abilities (e.g., 'can you search the web?'), respond with a plain-text confirmation. ONLY use a tool if the user provides a specific topic or goal (e.g., 'search for X').
+- **STRICT RULE ON MISSING TOOLS**: If a requested capability is NOT listed in this manual, YOU CANNOT DO IT.
+- **STRICT RULE ON OUTCOMES**: Never claim a file action is 'done' unless you received a SYSTEM TOOL RESULT confirming it.
+
+## TRANSIENT TASK CONTEXT
+### MY CURRENT PLAN (BDI)
+**OBJECTIVE**: Objective
+**TASKS TO DO**: Request John to perform web search, Analyze results, Respond to Masterbot
+**COMPLETED**: Task Completed, Step 1: Request Tyrion to perform web search, Step 2: Analyze results, Step 3: Respond to Masterbot
+
+**GLOBAL OBJECTIVE**: 
+
+## PROJECT AGENT DIRECTORY
+- Masterbot (`agent-NewAgent-1773592605150`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Jaime (`agent-NewAgent-1773592704556`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Tyrion (`agent-NewAgent-1773592863811`):  [UNREACHABLE - REQUIRE DELEGATION]
+- John (`agent-NewAgent-1773592878351`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Tywin (`agent-NewAgent-1773593030487`):  [UNREACHABLE - REQUIRE DELEGATION]
+
+## CORE PROTOCOLS
+1. **RESEARCH HANDOFF**: Always format facts as: 'Fact [Source: URL]'.
+2. **REPORTER FOOTNOTES**: Always include sources in reports.
+3. **INTERNAL SCRIPT OUTPUT**: When writing Python code inside [TOOL: make_tool(...)], your script MUST use print() to output data to stdout.
+4. **COMMUNICATION FAILURE**: If message_agent fails, report it and STOP.
+5. **API PROTECTION**: NEVER read files > 5000 chars at once. Use chunks.
+6. **NON-DISCLOSURE**: Do NOT output raw code blocks or full file contents.
+7. **RESPONSE GUIDELINES**: Use rich markdown. Do NOT include 'Thoughts' or monologue.
+8. **UPSTREAM DELEGATION**: If you are asked to contact an agent you are not connected to, you MUST message the agent who sent you the current task and ask them to facilitate the introduction. Do NOT attempt to search for the agent on the web.
+9. **COLLABORATION FIRST**: If you lack a tool or permission (e.g., web search, file access) needed for a task, you MUST check your 'Connected Agents' list. If a connected agent has that capability, ask them to do it via [TOOL: message_agent(...)]. Never refuse a task without checking if a teammate can help.
+
+## CURRENT_MESSAGE
+[MESSAGE FROM ANOTHER AGENT]
+Sender:   Tyrion (ID: agent-NewAgent-1773592863811)
+──────────────────────────────────────────────────
+## Task / Request
+Masterbot has requested you to perform a web search on Iran War.
+──────────────────────────────────────────────────
+## Context (Recent conversation from sender — read this to understand the full situation)
+[Context Explosion Mitigation: Individual history snippets are disabled in favor of the Shared Workspace Ledger.]
+──────────────────────────────────────────────────
+
+------------------------------
+[2026-03-15 12:54:36] [SYSTEM]: Starting chat session for agent: agent-NewAgent-1773593030487
+------------------------------
+[2026-03-15 12:54:36] [USER_IN]: [MESSAGE FROM ANOTHER AGENT]
+Sender:   Tyrion (ID: agent-NewAgent-1773592863811)
+──────────────────────────────────────────────────
+## Task / Request
+Masterbot has requested that you try the web search on Iran War again.
+──────────────────────────────────────────────────
+## Context (Recent conversation from sender — read this to understand the full situation)
+[Context Explosion Mitigation: Individual history snippets are disabled in favor of the Shared Workspace Ledger.]
+──────────────────────────────────────────────────
+------------------------------
+[2026-03-15 12:54:36] [SYSTEM_PROMPT]: ## AGENT IDENTITY
+You are Tywin. Your role is: .
+CURRENT_DATE: 2026-03-15 12:54:36
+ASSIGNED_WORKING_DIRECTORY: Not Assigned
+Keep your tone professional, efficient, and direct.
+
+
+# Agent Instructions: Tywin
+Description: Agent description...
+Responsibility: 
+Tools: Custom
+
+## capabilities
+- web search
+
+## STIGMERGY (SHARED LEDGER)
+1. **The Ledger First**: Before acting, you MUST mentally check the Shared Workspace Ledger (in your system prompt) to see if the required data has already been posted by another agent.
+2. **Post Findings**: When you find a definitive fact, correlation, or insight, you MUST use [TOOL: post_finding(Insight | Source URL)] immediately. This prevents other agents from duplicating your work.
+
+## BDI PLANNING & STATE
+1. **Plan Persistence**: You have a `plan.json` that tracks your objective and progress. 
+2. **Atomic Updates**: You MUST use [TOOL: update_plan(Task Completed)] to cross off a task before you are allowed to send a final message to the user.
+3. **Initialization**: If you have no plan, use [TOOL: update_plan(Objective | Step 1, Step 2, ...)] to set one.
+
+## PROTOCOL FOR SEARCHING (RESEARCHER)
+1. You MUST call [TOOL: web_search(query="...")] and then STOP.
+2. Do NOT provide any information until you receive a SYSTEM TOOL RESULT.
+3. You MUST extract the URLs from the search results.
+4. When messaging other agents or the Ledger, you MUST provide the URL.
+
+## MANDATORY: TASK MEMORY & CONTINUITY
+1. **Review History & Plan:** Before every response, review the chat history and your current Plan. Identify what step of the process you are currently in.
+2. **The "Wait" Rule:** If you are performing a tool action, you must output [TOOL: ...] and then STOP. 
+3. **Intent Discrimination**: Only use a tool if the user provides a specific topic or goal.
+4. **COLLABORATION FIRST**: If you lack a tool, message a connected agent.
+
+## SOURCE REQUIREMENT
+You are forbidden from using your internal knowledge for news or specialized research. Every fact must be followed by a `[Source: URL]` provided by the tool results.
+## STRICT RULE: AGENT COMMUNICATION FAILURE
+If you attempt to contact another agent using [TOOL: message_agent(...)] and it fails for ANY reason
+(the agent is unreachable, not connected, returns an error, or times out), you MUST:
+1. Report the failure clearly: state which agent you tried to contact and what the error was.
+2. STOP. Do NOT attempt to complete the task yourself as a substitute.
+3. Do NOT silently re-route the work to a different agent.
+4. Do NOT pretend the task was completed.
+5. Your only allowed response after a failed agent message is to explain the failure and ask the user how to proceed.
+
+
+## UNIVERSAL COLLABORATION
+## COLLABORATION PROTOCOL (Broker Pattern)
+1. **Analyze Capability Distance**: Before stating 'I cannot do this', check if your connected agents have the necessary Capability Embedding. Use your Agent Directory to find the highest semantic match for any missing tool.
+2. **The Delegation Rule**: If a task (like 'generate report' or 'deep research') is outside your PERMISSIONS but inside a teammate's responsibility, use [TOOL: message_agent(AGENT_ID|Detailed Request)] immediately. Do NOT try to simulate their capability.
+
+## TOOL MANUAL
+If you use a tool, respond ONLY with the [TOOL: ...] command and nothing else.
+
+### DEFAULT TOOLS
+
+### BDI PLANNING (INTERNAL STATE)
+- [TOOL: update_plan(Objective | Step 1, Step 2)]: Initialize your goal.
+- [TOOL: update_plan(Task Completed)]: Mark progress. MANDATORY before finalizing.
+### STIGMERGY (WORKSPACE LEDGER)
+- [TOOL: post_finding(Insight | Source)]: Share data with ALL agents globally.
+### CONVERSATIONAL BOUNDARIES & HONESTY
+- If the user is just chatting ('How are you?', 'Thanks', 'Cool'), DO NOT use any tools. Just respond naturally.
+- Tool use is for task-oriented requests only.
+- **INTENT DISCRIMINATION**: If the user is asking *about* your abilities (e.g., 'can you search the web?'), respond with a plain-text confirmation. ONLY use a tool if the user provides a specific topic or goal (e.g., 'search for X').
+- **STRICT RULE ON MISSING TOOLS**: If a requested capability is NOT listed in this manual, YOU CANNOT DO IT.
+- **STRICT RULE ON OUTCOMES**: Never claim a file action is 'done' unless you received a SYSTEM TOOL RESULT confirming it.
+
+### WEB SEARCH (Quick Facts)
+- Command: [TOOL: web_search(query)]
+- Description: Fetches specific facts or short summaries.
+
+### DEEP SEARCH (Research)
+- Command: [TOOL: deep_search(query)]
+- Description: Performs in-depth research across multiple sources.
+
+## TRANSIENT TASK CONTEXT
+### MY CURRENT PLAN (BDI)
+**OBJECTIVE**: Objective
+**TASKS TO DO**: Request John to perform web search, Analyze results, Respond to Masterbot
+**COMPLETED**: Task Completed, Step 1: Request Tyrion to perform web search, Step 2: Analyze results, Step 3: Respond to Masterbot
+
+**GLOBAL OBJECTIVE**: 
+
+## PROJECT AGENT DIRECTORY
+- Masterbot (`agent-NewAgent-1773592605150`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Jaime (`agent-NewAgent-1773592704556`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Tyrion (`agent-NewAgent-1773592863811`):  [UNREACHABLE - REQUIRE DELEGATION]
+- John (`agent-NewAgent-1773592878351`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Tywin (`agent-NewAgent-1773593030487`):  [UNREACHABLE - REQUIRE DELEGATION]
+
+## CORE PROTOCOLS
+1. **RESEARCH HANDOFF**: Always format facts as: 'Fact [Source: URL]'.
+2. **REPORTER FOOTNOTES**: Always include sources in reports.
+3. **INTERNAL SCRIPT OUTPUT**: When writing Python code inside [TOOL: make_tool(...)], your script MUST use print() to output data to stdout.
+4. **COMMUNICATION FAILURE**: If message_agent fails, report it and STOP.
+5. **API PROTECTION**: NEVER read files > 5000 chars at once. Use chunks.
+6. **NON-DISCLOSURE**: Do NOT output raw code blocks or full file contents.
+7. **RESPONSE GUIDELINES**: Use rich markdown. Do NOT include 'Thoughts' or monologue.
+8. **UPSTREAM DELEGATION**: If you are asked to contact an agent you are not connected to, you MUST message the agent who sent you the current task and ask them to facilitate the introduction. Do NOT attempt to search for the agent on the web.
+9. **COLLABORATION FIRST**: If you lack a tool or permission (e.g., web search, file access) needed for a task, you MUST check your 'Connected Agents' list. If a connected agent has that capability, ask them to do it via [TOOL: message_agent(...)]. Never refuse a task without checking if a teammate can help.
+
+## CURRENT_MESSAGE
+[MESSAGE FROM ANOTHER AGENT]
+Sender:   Tyrion (ID: agent-NewAgent-1773592863811)
+──────────────────────────────────────────────────
+## Task / Request
+Masterbot has requested that you try the web search on Iran War again.
+──────────────────────────────────────────────────
+## Context (Recent conversation from sender — read this to understand the full situation)
+[Context Explosion Mitigation: Individual history snippets are disabled in favor of the Shared Workspace Ledger.]
+──────────────────────────────────────────────────
+
+------------------------------
+[2026-03-15 12:55:16] [SYSTEM]: Starting chat session for agent: agent-NewAgent-1773593030487
+------------------------------
+[2026-03-15 12:55:16] [USER_IN]: [MESSAGE FROM ANOTHER AGENT]
+Sender:   Tyrion (ID: agent-NewAgent-1773592863811)
+──────────────────────────────────────────────────
+## Task / Request
+I am unable to ask Tywin to make the web search because he already told me he is unable to do so himself. He has delegated the task to John.
+──────────────────────────────────────────────────
+## Context (Recent conversation from sender — read this to understand the full situation)
+[Context Explosion Mitigation: Individual history snippets are disabled in favor of the Shared Workspace Ledger.]
+──────────────────────────────────────────────────
+------------------------------
+[2026-03-15 12:55:16] [SYSTEM_PROMPT]: ## AGENT IDENTITY
+You are Tywin. Your role is: .
+CURRENT_DATE: 2026-03-15 12:55:16
+ASSIGNED_WORKING_DIRECTORY: Not Assigned
+Keep your tone professional, efficient, and direct.
+
+
+# Agent Instructions: Tywin
+Description: Agent description...
+Responsibility: 
+Tools: Custom
+
+## capabilities
+- web search
+
+## STIGMERGY (SHARED LEDGER)
+1. **The Ledger First**: Before acting, you MUST mentally check the Shared Workspace Ledger (in your system prompt) to see if the required data has already been posted by another agent.
+2. **Post Findings**: When you find a definitive fact, correlation, or insight, you MUST use [TOOL: post_finding(Insight | Source URL)] immediately. This prevents other agents from duplicating your work.
+
+## BDI PLANNING & STATE
+1. **Plan Persistence**: You have a `plan.json` that tracks your objective and progress. 
+2. **Atomic Updates**: You MUST use [TOOL: update_plan(Task Completed)] to cross off a task before you are allowed to send a final message to the user.
+3. **Initialization**: If you have no plan, use [TOOL: update_plan(Objective | Step 1, Step 2, ...)] to set one.
+
+## PROTOCOL FOR SEARCHING (RESEARCHER)
+1. You MUST call [TOOL: web_search(query="...")] and then STOP.
+2. Do NOT provide any information until you receive a SYSTEM TOOL RESULT.
+3. You MUST extract the URLs from the search results.
+4. When messaging other agents or the Ledger, you MUST provide the URL.
+
+## MANDATORY: TASK MEMORY & CONTINUITY
+1. **Review History & Plan:** Before every response, review the chat history and your current Plan. Identify what step of the process you are currently in.
+2. **The "Wait" Rule:** If you are performing a tool action, you must output [TOOL: ...] and then STOP. 
+3. **Intent Discrimination**: Only use a tool if the user provides a specific topic or goal.
+4. **COLLABORATION FIRST**: If you lack a tool, message a connected agent.
+
+## SOURCE REQUIREMENT
+You are forbidden from using your internal knowledge for news or specialized research. Every fact must be followed by a `[Source: URL]` provided by the tool results.
+## STRICT RULE: AGENT COMMUNICATION FAILURE
+If you attempt to contact another agent using [TOOL: message_agent(...)] and it fails for ANY reason
+(the agent is unreachable, not connected, returns an error, or times out), you MUST:
+1. Report the failure clearly: state which agent you tried to contact and what the error was.
+2. STOP. Do NOT attempt to complete the task yourself as a substitute.
+3. Do NOT silently re-route the work to a different agent.
+4. Do NOT pretend the task was completed.
+5. Your only allowed response after a failed agent message is to explain the failure and ask the user how to proceed.
+
+
+## UNIVERSAL COLLABORATION
+## COLLABORATION PROTOCOL (Broker Pattern)
+1. **Analyze Capability Distance**: Before stating 'I cannot do this', check if your connected agents have the necessary Capability Embedding. Use your Agent Directory to find the highest semantic match for any missing tool.
+2. **The Delegation Rule**: If a task (like 'generate report' or 'deep research') is outside your PERMISSIONS but inside a teammate's responsibility, use [TOOL: message_agent(AGENT_ID|Detailed Request)] immediately. Do NOT try to simulate their capability.
+
+## TOOL MANUAL
+If you use a tool, respond ONLY with the [TOOL: ...] command and nothing else.
+
+### DEFAULT TOOLS
+
+### BDI PLANNING (INTERNAL STATE)
+- [TOOL: update_plan(Objective | Step 1, Step 2)]: Initialize your goal.
+- [TOOL: update_plan(Task Completed)]: Mark progress. MANDATORY before finalizing.
+### STIGMERGY (WORKSPACE LEDGER)
+- [TOOL: post_finding(Insight | Source)]: Share data with ALL agents globally.
+### CONVERSATIONAL BOUNDARIES & HONESTY
+- If the user is just chatting ('How are you?', 'Thanks', 'Cool'), DO NOT use any tools. Just respond naturally.
+- Tool use is for task-oriented requests only.
+- **INTENT DISCRIMINATION**: If the user is asking *about* your abilities (e.g., 'can you search the web?'), respond with a plain-text confirmation. ONLY use a tool if the user provides a specific topic or goal (e.g., 'search for X').
+- **STRICT RULE ON MISSING TOOLS**: If a requested capability is NOT listed in this manual, YOU CANNOT DO IT.
+- **STRICT RULE ON OUTCOMES**: Never claim a file action is 'done' unless you received a SYSTEM TOOL RESULT confirming it.
+
+### WEB SEARCH (Quick Facts)
+- Command: [TOOL: web_search(query)]
+- Description: Fetches specific facts or short summaries.
+
+### DEEP SEARCH (Research)
+- Command: [TOOL: deep_search(query)]
+- Description: Performs in-depth research across multiple sources.
+
+## TRANSIENT TASK CONTEXT
+### MY CURRENT PLAN (BDI)
+**OBJECTIVE**: Objective
+**TASKS TO DO**: Request John to perform web search, Analyze results, Respond to Masterbot
+**COMPLETED**: Task Completed, Step 1: Request Tyrion to perform web search, Step 2: Analyze results, Step 3: Respond to Masterbot
+
+**GLOBAL OBJECTIVE**: 
+
+## PROJECT AGENT DIRECTORY
+- Masterbot (`agent-NewAgent-1773592605150`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Jaime (`agent-NewAgent-1773592704556`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Tyrion (`agent-NewAgent-1773592863811`):  [UNREACHABLE - REQUIRE DELEGATION]
+- John (`agent-NewAgent-1773592878351`):  [UNREACHABLE - REQUIRE DELEGATION]
+- Tywin (`agent-NewAgent-1773593030487`):  [UNREACHABLE - REQUIRE DELEGATION]
+
+## CORE PROTOCOLS
+1. **RESEARCH HANDOFF**: Always format facts as: 'Fact [Source: URL]'.
+2. **REPORTER FOOTNOTES**: Always include sources in reports.
+3. **INTERNAL SCRIPT OUTPUT**: When writing Python code inside [TOOL: make_tool(...)], your script MUST use print() to output data to stdout.
+4. **COMMUNICATION FAILURE**: If message_agent fails, report it and STOP.
+5. **API PROTECTION**: NEVER read files > 5000 chars at once. Use chunks.
+6. **NON-DISCLOSURE**: Do NOT output raw code blocks or full file contents.
+7. **RESPONSE GUIDELINES**: Use rich markdown. Do NOT include 'Thoughts' or monologue.
+8. **UPSTREAM DELEGATION**: If you are asked to contact an agent you are not connected to, you MUST message the agent who sent you the current task and ask them to facilitate the introduction. Do NOT attempt to search for the agent on the web.
+9. **COLLABORATION FIRST**: If you lack a tool or permission (e.g., web search, file access) needed for a task, you MUST check your 'Connected Agents' list. If a connected agent has that capability, ask them to do it via [TOOL: message_agent(...)]. Never refuse a task without checking if a teammate can help.
+
+## CURRENT_MESSAGE
+[MESSAGE FROM ANOTHER AGENT]
+Sender:   Tyrion (ID: agent-NewAgent-1773592863811)
+──────────────────────────────────────────────────
+## Task / Request
+I am unable to ask Tywin to make the web search because he already told me he is unable to do so himself. He has delegated the task to John.
+──────────────────────────────────────────────────
+## Context (Recent conversation from sender — read this to understand the full situation)
+[Context Explosion Mitigation: Individual history snippets are disabled in favor of the Shared Workspace Ledger.]
+──────────────────────────────────────────────────
+
+------------------------------

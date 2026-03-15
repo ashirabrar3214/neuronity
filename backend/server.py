@@ -1076,7 +1076,8 @@ def chat_with_agent(request: ChatRequest):
     # Agent Directory
     transient_task_layer += "## PROJECT AGENT DIRECTORY\n"
     for a in agents:
-        transient_task_layer += f"- {a.get('name')} (`{a['id']}`): {a.get('responsibility')}\n"
+        status = "[DIRECTLY CONNECTED]" if a['id'] in connections else "[UNREACHABLE - REQUIRE DELEGATION]"
+        transient_task_layer += f"- {a.get('name')} (`{a['id']}`): {a.get('responsibility')} {status}\n"
 
     # Summary
     if current_summary:
@@ -1105,7 +1106,8 @@ def chat_with_agent(request: ChatRequest):
         "5. **API PROTECTION**: NEVER read files > 5000 chars at once. Use chunks.\n"
         "6. **NON-DISCLOSURE**: Do NOT output raw code blocks or full file contents.\n"
         "7. **RESPONSE GUIDELINES**: Use rich markdown. Do NOT include 'Thoughts' or monologue.\n"
-        "8. **COLLABORATION FIRST**: If you lack a tool or permission (e.g., web search, file access) needed for a task, you MUST check your 'Connected Agents' list. If a connected agent has that capability, ask them to do it via [TOOL: message_agent(...)]. Never refuse a task without checking if a teammate can help.\n"
+        "8. **UPSTREAM DELEGATION**: If you are asked to contact an agent you are not connected to, you MUST message the agent who sent you the current task and ask them to facilitate the introduction. Do NOT attempt to search for the agent on the web.\n"
+        "9. **COLLABORATION FIRST**: If you lack a tool or permission (e.g., web search, file access) needed for a task, you MUST check your 'Connected Agents' list. If a connected agent has that capability, ask them to do it via [TOOL: message_agent(...)]. Never refuse a task without checking if a teammate can help.\n"
     )
 
     # Current Task Details

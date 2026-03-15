@@ -1,5 +1,5 @@
 # Agent Instructions: Masterbot
-Description: a high level of control, expertise, and capability in managing and executing tasks. It implies a central role in coordinating activities and possessing advanced skills in automation and problem-solving.
+Description: 
 Responsibility: 
 Tools: Custom
 
