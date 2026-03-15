@@ -202,7 +202,14 @@ STRICT RULE: The output must be a clean, bulleted markdown summary. Do not inclu
             }
             resp = requests.post(url, json=data, timeout=30)
             if resp.status_code == 200:
-                response_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                res_json = resp.json()
+                candidates = res_json.get("candidates", [])
+                if candidates and isinstance(candidates, list) and len(candidates) > 0:
+                    cand = candidates[0]
+                    content = cand.get("content", {})
+                    parts = content.get("parts", [])
+                    if parts and isinstance(parts, list) and len(parts) > 0:
+                        response_text = parts[0].get("text", "")
         elif provider == "anthropic":
             url = "https://api.anthropic.com/v1/messages"
             headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
@@ -213,7 +220,10 @@ STRICT RULE: The output must be a clean, bulleted markdown summary. Do not inclu
             }
             resp = requests.post(url, headers=headers, json=data, timeout=30)
             if resp.status_code == 200:
-                response_text = resp.json()["content"][0]["text"]
+                res_json = resp.json()
+                content = res_json.get("content", [])
+                if content and isinstance(content, list) and len(content) > 0:
+                    response_text = content[0].get("text", "")
     except Exception as e:
         print(f"!!! [SUMMARY ERROR] Failed to update summary: {e}")
         return current_summary
@@ -630,10 +640,23 @@ def clear_history(agent_id: str):
     """Wipes the conversation history for an agent (fresh start)."""
     history_path = os.path.join(AGENTS_CODE_DIR, agent_id, "history.json")
     try:
+        if os.path.exists(history_path):
+            os.remove(history_path)
+        
+        internal_history_path = os.path.join(AGENTS_CODE_DIR, agent_id, "internal_history.json")
+        if os.path.exists(internal_history_path):
+            os.remove(internal_history_path)
+            
+        comm_log_path = os.path.join(AGENTS_CODE_DIR, agent_id, "communication.log")
+        if os.path.exists(comm_log_path):
+            os.remove(comm_log_path)
+
+        # Re-initialize main history as empty
         with open(history_path, "w", encoding="utf-8") as f:
             json.dump([], f)
+            
         print(f"--- [BACKEND] Cleared history for agent: {agent_id}")
-        return {"status": "success", "message": "History cleared"}
+        return {"status": "success", "message": "History and logs cleared"}
     except Exception as e:
         print(f"!!! [BACKEND ERROR] Could not clear history for {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -797,6 +820,8 @@ def chat_with_agent(request: ChatRequest):
         
     prompt_path = os.path.join(agent_dir, "prompt.md")
     history_path = os.path.join(agent_dir, "history.json")
+    internal_history_path = os.path.join(agent_dir, "internal_history.json")
+    comm_log_path = os.path.join(agent_dir, "communication.log")
     
     # Define system prompt and permissions
     agents = load_data()
@@ -826,6 +851,19 @@ def chat_with_agent(request: ChatRequest):
 
     import datetime
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # --- INTERNAL LOGGING HELPER ---
+    def append_to_log(role, content):
+        try:
+            with open(comm_log_path, "a", encoding="utf-8") as f:
+                ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"[{ts}] [{role.upper()}]: {content}\n")
+                f.write("-" * 30 + "\n")
+        except: pass
+
+    # Always log the start of a conversation
+    append_to_log("SYSTEM", f"Starting chat session for agent: {request.agent_id}")
+    append_to_log("USER_IN", request.message)
     
     if os.path.exists(prompt_path):
         with open(prompt_path, "r", encoding="utf-8") as f:
@@ -975,9 +1013,12 @@ def chat_with_agent(request: ChatRequest):
     system_prompt = identity_layer + tool_manual_layer + transient_task_layer
 
 
-    # 4. Load History
+    # 4. Load History (Prefer internal history for full context)
     try:
-        if os.path.exists(history_path):
+        if os.path.exists(internal_history_path):
+            with open(internal_history_path, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        elif os.path.exists(history_path):
             with open(history_path, "r", encoding="utf-8") as f:
                 history = json.load(f)
         else:
@@ -1062,7 +1103,12 @@ def chat_with_agent(request: ChatRequest):
             }
             response = requests.post(url, headers=headers, json=data, timeout=120)
             if response.status_code == 200:
-                response_text = response.json()["content"][0]["text"]
+                res_json = response.json()
+                content_list = res_json.get("content", [])
+                if content_list and isinstance(content_list, list) and len(content_list) > 0:
+                    response_text = content_list[0].get("text", "")
+                else:
+                    error_msg = f"Anthropic API parsing error: Invalid content structure. Response: {json.dumps(res_json)}"
             else:
                 error_msg = f"Anthropic API Error: {response.text}"
 
@@ -1101,31 +1147,28 @@ def chat_with_agent(request: ChatRequest):
             if response.status_code == 200:
                 try:
                     res_json = response.json()
+                    candidates = res_json.get("candidates")
                     
-                    # Safer check for parts
-                    candidates = res_json.get("candidates", [])
-                    if not candidates:
-                        # Check for filter reasons
+                    if not candidates or not isinstance(candidates, list) or len(candidates) == 0:
+                        # Safety: Handle cases where the key is missing or null
                         prompt_feedback = res_json.get("promptFeedback", {})
                         block_reason = prompt_feedback.get("blockReason")
                         if block_reason:
-                            error_msg = f"Gemini API Blocked: {block_reason}. The model refused to generate content due to safety filters."
+                            error_msg = f"Gemini API Blocked: {block_reason}. The model refused to generate content."
                         else:
-                            error_msg = f"Gemini API parsing error: No candidates returned. Full Response: {json.dumps(res_json)}"
+                            error_msg = f"Gemini API parsing error: No valid candidates found. Payload: {json.dumps(res_json)}"
                         raise ValueError(error_msg)
 
                     candidate = candidates[0]
                     content = candidate.get("content", {})
                     parts = content.get("parts", [])
                     
-                    if not parts:
-                        finish_reason = candidate.get("finishReason")
+                    if not parts or not isinstance(parts, list) or len(parts) == 0:
+                        finish_reason = candidate.get("finishReason", "UNKNOWN")
                         if finish_reason == "MALFORMED_FUNCTION_CALL":
-                            # Fallback: The model likely tried to use print() or a fake tool.
-                            # Force a simple text response.
-                            response_text = "I encountered a technical error while trying to process that. How else can I help?"
+                            response_text = "I encountered a technical technical error while generating that tool call. Let me try another way."
                         else:
-                            error_msg = f"Gemini API Blocked/Failed: {finish_reason}"
+                            error_msg = f"Gemini API Failed: Finish reason is {finish_reason}. Response: {json.dumps(res_json)}"
                             raise ValueError(error_msg)
 
                     part = parts[0]
@@ -1133,35 +1176,41 @@ def chat_with_agent(request: ChatRequest):
                     if "text" in part:
                         response_text = part["text"]
                     elif "functionCall" in part:
-                        # Convert native function call back to our [TOOL: name(args)] format 
-                        # so the existing tool-parsing logic can handle it seamlessly.
                         fn = part["functionCall"]
-                        name = fn["name"]
+                        name = fn.get("name", "unknown")
                         args = fn.get("args", {})
                         
-                        # Map native structured args back to our pipe-separated string format
+                        # Structured conversion with fallback safety
                         if name in ["web_search", "deep_search", "thinking", "scout_file", "read_file"]:
-                            val = next(iter(args.values())) if args else ""
+                            # Safe extraction of first argument
+                            val = ""
+                            if isinstance(args, dict) and args:
+                                val_list = list(args.values())
+                                if val_list: val = str(val_list[0])
                             response_text = f"[TOOL: {name}({val})]"
-                        elif name == "generate_report":
-                            response_text = f"[TOOL: {name}({args.get('title','')}|{args.get('content','')})]"
-                        elif name == "report_generation":
-                            response_text = f"[TOOL: {name}({args.get('topic','')}|{args.get('context','')})]"
                         elif name == "write_file":
-                            response_text = f"[TOOL: {name}({args.get('filename','')}|{args.get('content','')})]"
+                            response_text = f"[TOOL: {name}({args.get('filename','')}|{args.get('content', '')})]"
+                        elif name == "generate_report":
+                            response_text = f"[TOOL: {name}({args.get('title','')}|{args.get('content', '')})]"
+                        elif name == "report_generation":
+                            response_text = f"[TOOL: {name}({args.get('topic','')}|{args.get('context', '')})]"
                         elif name == "message_agent":
-                            response_text = f"[TOOL: {name}({args.get('target_id','')}|{args.get('message','')})]"
+                            response_text = f"[TOOL: {name}({args.get('target_id','')}|{args.get('message', '')})]"
                         elif name in ["list_workspace"]:
                             response_text = f"[TOOL: {name}()]"
                         else:
-                            # Fallback
-                            arg_str = " | ".join([str(v) for v in args.values()])
+                            # Generic fallback
+                            arg_str = " | ".join([str(v) for v in args.values()]) if isinstance(args, dict) else str(args)
                             response_text = f"[TOOL: {name}({arg_str})]"
                     else:
-                        response_text = "I am processing the results."
+                        response_text = "I have processed your request. How should we proceed?"
+
+                except (IndexError, KeyError, ValueError) as e:
+                    if not error_msg:
+                        error_msg = f"Gemini API parsing error ({type(e).__name__}): {str(e)}"
                 except Exception as e:
                     if not error_msg:
-                        error_msg = f"Gemini API parsing error: {str(e)}"
+                        error_msg = f"Gemini API unexpected error ({type(e).__name__}): {str(e)}"
             else:
                 error_msg = f"Gemini API Error: {response.text}"
         else:
@@ -1169,6 +1218,7 @@ def chat_with_agent(request: ChatRequest):
 
         if error_msg:
             print(f"[STATUS:{request.agent_id}] Error", flush=True)
+            append_to_log("ERROR", error_msg)
             return {"error": error_msg}
 
         # ── POST-PROCESS: Clean 'Thoughts' ──────────────────────────
@@ -1268,32 +1318,48 @@ def chat_with_agent(request: ChatRequest):
     # 6. Save and Return
     print(f"[STATUS:{request.agent_id}] Ready", flush=True)
     
-    # ── POST-PROCESS: Ruthless Sanitization ─────────────────────
+    # RUTHLESS Sanitization
     if final_response:
         final_response = sanitize_ruthlessly(final_response)
 
     history.append({"role": "assistant", "content": final_response})
     
-    # RUTHLESS: Sanitize the ENTIRE history before saving to disk
-    # This prevents intermediate tool leaks from staying in the chat UI
-    sanitized_history = []
+    # ── SAVE INTERNAL HISTORY (FULL) ──
+    with open(internal_history_path, "w", encoding="utf-8") as f:
+        json.dump(history, f, indent=2)
+
+    # ── FILTER UI HISTORY (Clean Only) ──
+    # User only wants to see Human User messages and Final Agent responses.
+    # We strip out [TOOL:...], [MESSAGE FROM ANOTHER AGENT], and SYSTEM TOOL RESULT
+    ui_history = []
     for entry in history:
-        sanitized_history.append({
-            "role": entry["role"],
-            "content": sanitize_ruthlessly(entry["content"])
+        content = entry["content"]
+        role = entry["role"]
+        
+        # Skip internal markers
+        if role == "user":
+            if content.startswith("SYSTEM TOOL RESULT:") or content.startswith("[MESSAGE FROM"):
+                append_to_log("INTERNAL_IN", content)
+                continue
+        if role == "assistant":
+            if content.startswith("[TOOL:"):
+                append_to_log("INTERNAL_OUT", content)
+                continue
+        
+        ui_history.append({
+            "role": role,
+            "content": sanitize_ruthlessly(content)
         })
     
-    # Save the SANITIZED history
+    # Save the CLEAN history for the UI
     with open(history_path, "w", encoding="utf-8") as f:
-        json.dump(sanitized_history, f, indent=2)
+        json.dump(ui_history, f, indent=2)
 
-    # Check if we need to refresh the summary (every 50 messages, or when count > 60)
-    # This keeps the summary updated incrementally.
-    if len(sanitized_history) > 60:
-        # We summarize the part that is likely to be rotated out of the sliding window soon
+    # Check if we need to refresh the summary (based on internal history)
+    if len(history) > 60:
         new_summary = refresh_conversation_summary(
             request.agent_id, 
-            sanitized_history[:-30], # Summarize everything older than the last 30
+            history[:-30],
             request.api_key, 
             provider, 
             current_summary

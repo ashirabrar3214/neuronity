@@ -33,22 +33,25 @@
     ],
     "tools": "Custom",
     "responsibility": "make report",
-    "x": 285.0,
-    "y": 251.0,
+    "x": 303.0,
+    "y": 534.0,
     "connections": []
   },
   {
     "id": "agent-NewAgent-1773583928103",
-    "name": "New Agent",
+    "name": "Warfaze",
     "description": "Agent description...",
-    "brain": "",
+    "brain": "gemini",
     "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [],
+    "workingDir": "D:\\New folder",
+    "permissions": [
+      "thinking",
+      "file access"
+    ],
     "tools": "Custom",
     "responsibility": "",
-    "x": 287.0,
-    "y": 47.0,
+    "x": 350.0,
+    "y": -80.0,
     "connections": []
   }
 ]

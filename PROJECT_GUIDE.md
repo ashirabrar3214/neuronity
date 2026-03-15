@@ -24,13 +24,18 @@ Array of objects containing:
 - `x`, `y`: Visual coordinates on the canvas.
 - `connections`: IDs of agents this agent can message.
 
-#### `backend/agents_code/[ID]/history.json` (Short-term memory)
-- Array of `{"role": "user" | "assistant", "content": "..."}` objects.
-- Maintains a sliding window context (last 50 messages) for the LLM while keeping full history for the UI.
+#### `backend/agents_code/[ID]/history.json` (UI-Only Chat History)
+- Contains ONLY messages from the Human User and the final synthesized responses from the agent.
+- All internal tool calls and agent-to-agent communications are filtered out to keep the UI clean.
+
+#### `backend/agents_code/[ID]/internal_history.json` (The "Black Box" Context)
+- Stores the 100% complete conversation history, including intermediate `[TOOL:]` calls, `SYSTEM TOOL RESULT` data, and internal agent handoffs.
+- The LLM identifies this as its source of truth to maintain continuity.
+
+#### `backend/agents_code/[ID]/communication.log` (Internal Audit Log)
+- A human-readable text file that logs every internal event (Inbound/Outbound agent messages, tool results) with timestamps for debugging.
 
 #### `backend/agents_code/[ID]/summary.json` (Long-term memory)
-- Contains a cumulative distillation of the historical conversation.
-- **Proactive Distillation**: When history exceeds 50 messages, the system automatically summarizes older context into this file to preserve memory without bloating the API context.
 
 #### `backend/agents_code/[ID]/plan.json` (BDI Internal State)
 - **Objective**: The agent's current high-level goal.

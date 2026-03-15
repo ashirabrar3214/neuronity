@@ -87,15 +87,22 @@ Select between 3 and 8 sources. Prioritize: relevance, authority (Wikipedia, maj
     try:
         response = requests.post(url, headers={"Content-Type": "application/json"}, json=data, timeout=15)
         if response.status_code == 200:
-            raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-            # Extract the JSON array from the response
-            import re
-            match = re.search(r'\[([\d,\s]+)\]', raw)
-            if match:
-                indices = json.loads(match.group(0))
-                filtered = [search_results[i] for i in indices if 0 <= i < len(search_results)]
-                safe_log(f"+++ [CAPABILITY:filter] Kept {len(filtered)}/{len(search_results)} sources")
-                return filtered if filtered else search_results
+            res_json = response.json()
+            candidates = res_json.get("candidates", [])
+            if candidates and isinstance(candidates, list) and len(candidates) > 0:
+                cand = candidates[0]
+                content = cand.get("content", {})
+                parts = content.get("parts", [])
+                if parts and isinstance(parts, list) and len(parts) > 0:
+                    raw = parts[0].get("text", "")
+                    # Extract the JSON array from the response
+                    import re
+                    match = re.search(r'\[([\d,\s]+)\]', raw)
+                    if match:
+                        indices = json.loads(match.group(0))
+                        filtered = [search_results[i] for i in indices if 0 <= i < len(search_results)]
+                        safe_log(f"+++ [CAPABILITY:filter] Kept {len(filtered)}/{len(search_results)} sources")
+                        return filtered if filtered else search_results
     except Exception as e:
         safe_log(f"!!! [CAPABILITY:filter] Error: {e} — using all results")
     
@@ -141,7 +148,14 @@ RULES:
     try:
         response = requests.post(url, json=data, timeout=15)
         if response.status_code == 200:
-            return response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            res_json = response.json()
+            candidates = res_json.get("candidates", [])
+            if candidates and isinstance(candidates, list) and len(candidates) > 0:
+                cand = candidates[0]
+                content = cand.get("content", {})
+                parts = content.get("parts", [])
+                if parts and isinstance(parts, list) and len(parts) > 0:
+                    return parts[0].get("text", "").strip()
     except Exception as e:
         safe_log(f"!!! [INTERNAL:fact_synth] Error: {e}")
     
@@ -239,7 +253,18 @@ STRICT RULES:
     try:
         response = requests.post(url, headers=headers, json=data, timeout=20)
         if response.status_code == 200:
-            gemini_text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            res_json = response.json()
+            candidates = res_json.get("candidates", [])
+            if candidates and isinstance(candidates, list) and len(candidates) > 0:
+                cand = candidates[0]
+                content = cand.get("content", {})
+                parts = content.get("parts", [])
+                if parts and isinstance(parts, list) and len(parts) > 0:
+                    gemini_text = parts[0].get("text", "")
+                else:
+                    gemini_text = "Synthesis failed: No parts found."
+            else:
+                gemini_text = "Synthesis failed: No candidates found."
         else:
             print(f"!!! [CAPABILITY:synthesize] Gemini error {response.status_code}: {response.text}", flush=True)
             gemini_text = f"Search found results but synthesis failed.\n\n{raw_context}"
@@ -421,7 +446,18 @@ FORMATTING RULES:
         if response.status_code != 200:
             return f"Synthesis failed: {response.text}"
             
-        report_data_json = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        res_json = response.json()
+        candidates = res_json.get("candidates", [])
+        if not candidates or not isinstance(candidates, list) or len(candidates) == 0:
+            return f"Synthesis failed: No candidates in response. Payload: {json.dumps(res_json)}"
+            
+        cand = candidates[0]
+        content = cand.get("content", {})
+        parts = content.get("parts", [])
+        if not parts or not isinstance(parts, list) or len(parts) == 0:
+            return f"Synthesis failed: No parts in response. Payload: {json.dumps(res_json)}"
+            
+        report_data_json = parts[0].get("text", "")
         report_data = json.loads(report_data_json)
         
         # Get dynamic title from LLM or fallback to topic

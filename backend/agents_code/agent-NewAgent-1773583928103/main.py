@@ -2,9 +2,9 @@
 class agent_NewAgent_1773583928103:
     def __init__(self):
         self.id = "agent-NewAgent-1773583928103"
-        self.name = "New Agent"
-        self.working_dir = r""
-        self.permissions = []
+        self.name = "Warfaze"
+        self.working_dir = r"D:\New folder"
+        self.permissions = ['thinking', 'file access']
         self.tools = "Custom"
         
     def get_personality(self):
