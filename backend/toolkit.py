@@ -658,3 +658,81 @@ def write_file(agent_id, input_str, working_dir):
     except Exception as e:
         return f"Error writing file: {e}"
 
+
+# ─────────────────────────────────────────────────
+# GLOBAL KNOWLEDGE & BDI PLANNING
+# ─────────────────────────────────────────────────
+
+def post_finding(agent_id, tool_input):
+    """
+    Writes a key insight to the Global Knowledge Base (Stigmergy).
+    Format: "Insight/Fact | Source URL"
+    """
+    try:
+        ledger_path = os.path.join(os.path.dirname(__file__), "agents_code", "knowledge_base.json")
+        os.makedirs(os.path.dirname(ledger_path), exist_ok=True)
+        
+        data = []
+        if os.path.exists(ledger_path):
+            try:
+                with open(ledger_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except: pass
+
+        parts = tool_input.split("|", 1)
+        insight = parts[0].strip()
+        source = parts[1].strip() if len(parts) > 1 else "N/A"
+            
+        entry = {
+            "agent_id": agent_id,
+            "insight": insight,
+            "source": source,
+            "timestamp": time.time()
+        }
+        data.append(entry)
+        
+        # Keep it lean (last 50 findings)
+        if len(data) > 50:
+            data = data[-50:]
+            
+        with open(ledger_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            
+        return f"Success: Insight recorded in the Workspace Ledger."
+    except Exception as e:
+        return f"Error posting finding: {e}"
+
+def update_plan(agent_id, tool_input):
+    """
+    Atomic updates to the agent's internal plan (BDI Model).
+    Format: "Completed task" OR "Objective | Step 1, Step 2, Step 3"
+    """
+    try:
+        plan_path = os.path.join(os.path.dirname(__file__), "agents_code", agent_id, "plan.json")
+        os.makedirs(os.path.dirname(plan_path), exist_ok=True)
+        
+        plan = {"objective": "Not Set", "steps": [], "completed": []}
+        if os.path.exists(plan_path):
+            try:
+                with open(plan_path, "r", encoding="utf-8") as f:
+                    plan = json.load(f)
+            except: pass
+
+        if "|" in tool_input:
+            obj, steps_str = tool_input.split("|", 1)
+            plan["objective"] = obj.strip()
+            plan["steps"] = [s.strip() for s in steps_str.split(",") if s.strip()]
+            # Don't clear completed if re-initializing objective unless it's a major change?
+            # Let's keep it simple: objective reset = fresh plan
+            plan["completed"] = []
+        else:
+            item = tool_input.strip()
+            if item not in plan["completed"]:
+                plan["completed"].append(item)
+            
+        with open(plan_path, "w", encoding="utf-8") as f:
+            json.dump(plan, f, indent=2)
+            
+        return f"Success: Internal plan updated. Objective: {plan['objective']}"
+    except Exception as e:
+        return f"Error updating plan: {e}"

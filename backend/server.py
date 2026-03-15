@@ -249,7 +249,13 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
             safe_log(f"!!! [PERMISSION DENIED] Agent '{sender_data.get('name')}' tried to use '{tool_name}' without '{required_perm}' permission.")
             return f"Error: My '{required_perm}' capability is currently disabled. I cannot use the tool '{tool_name}'. Please enable it in my settings if you want me to proceed with this action."
 
-    if tool_name == "web_search":
+    if tool_name == "post_finding":
+        return toolkit.post_finding(agent_id, tool_input)
+    
+    elif tool_name == "update_plan":
+        return toolkit.update_plan(agent_id, tool_input)
+
+    elif tool_name == "web_search":
         return toolkit.web_search(tool_input, agent_id, api_key=api_key)
     
     elif tool_name == "deep_search":
@@ -303,29 +309,9 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
                 return f"Error: Target agent {target_id} not found."
             target_provider = target_data.get("brain", "").lower()
 
-            # ── 4. Load sender's recent history as context for the target
-            sender_history_path = os.path.join(AGENTS_CODE_DIR, agent_id, "history.json")
-            sender_context_snippet = ""
-            if os.path.exists(sender_history_path):
-                try:
-                    with open(sender_history_path, "r", encoding="utf-8") as f:
-                        sender_history = json.load(f)
-                    # Take the last 50 exchanges (up to 50 messages) as context
-                    recent = sender_history[-50:] if len(sender_history) > 50 else sender_history
-                    if recent:
-                        lines = []
-                        msg_count = len(recent)
-                        for i, h in enumerate(recent):
-                            role_label = sender_name if h["role"] == "assistant" else "User"
-                            # Weighting: 1 is oldest (50th), N is newest (1st)
-                            weight = i + 1
-                            priority = "LOW" if weight <= 20 else "MEDIUM" if weight <= 40 else "HIGH"
-                            # Preserve more context (especially for search results with URLs)
-                            content_limit = 2000 
-                            lines.append(f"  [Msg {weight}/{msg_count} - Priority: {priority}] [{role_label}]: {h['content'][:content_limit]}")
-                        sender_context_snippet = "\n".join(lines)
-                except Exception:
-                    pass
+            # ── 4. STIGMERGY: Senders no longer whisper history. 
+            #       They leave findings in the Ledger instead.
+            sender_context_snippet = "[Context Explosion Mitigation: Individual history snippets are disabled in favor of the Shared Workspace Ledger.]"
             
             # ── 5. Get API key for target provider
             target_api_key = api_key
@@ -493,18 +479,26 @@ Tools: {agent_data.get('tools', 'Custom')}
 ## capabilities
 {chr(10).join(['- ' + p for p in agent_data.get('permissions', [])]) if agent_data.get('permissions') else 'No specific permissions granted.'}
 
+## STIGMERGY (SHARED LEDGER)
+1. **The Ledger First**: Before acting, you MUST mentally check the Shared Workspace Ledger (in your system prompt) to see if the required data has already been posted by another agent.
+2. **Post Findings**: When you find a definitive fact, correlation, or insight, you MUST use [TOOL: post_finding(Insight | Source URL)] immediately. This prevents other agents from duplicating your work.
+
+## BDI PLANNING & STATE
+1. **Plan Persistence**: You have a `plan.json` that tracks your objective and progress. 
+2. **Atomic Updates**: You MUST use [TOOL: update_plan(Task Completed)] to cross off a task before you are allowed to send a final message to the user.
+3. **Initialization**: If you have no plan, use [TOOL: update_plan(Objective | Step 1, Step 2, ...)] to set one.
+
 ## PROTOCOL FOR SEARCHING (RESEARCHER)
 1. You MUST call [TOOL: web_search(query="...")] and then STOP.
 2. Do NOT provide any information until you receive a SYSTEM TOOL RESULT.
 3. You MUST extract the URLs from the search results.
-4. When messaging the Reporter, you MUST format the info like this: "Fact [Source: URL]". If you don't provide the URL, the Reporter cannot do its job.
+4. When messaging other agents or the Ledger, you MUST provide the URL.
 
 ## MANDATORY: TASK MEMORY & CONTINUITY
-1. **Review History:** Before every response, review the entire chat history. Identify the current "Global Goal" and what step of the process you are currently in.
-2. **The "Wait" Rule:** If you are performing a search or complex task, you must output [TOOL: ...] and then STOP. However, for basic greetings, clarifications, or status updates, you may respond in plain text without a tool.
-3. **Consistency Rule:** Never state that you lack an ability listed in your 'Capabilities' section. If a task fails, explain the specific technical error or missing information, not a lack of ability.
-4. **Intent Discrimination:** If the user is asking *about* your abilities (e.g., "can you search the web?"), respond with a plain-text confirmation. ONLY use a tool if the user provides a specific topic or goal (e.g., "search for X").
-5. **COLLABORATION FIRST**: If you lack a specific tool or permission (e.g., web search, file access) needed for a task, you MUST first review your 'Connected Agents' list. If a connected agent has the capability you need, you MUST use [TOOL: message_agent(AGENT_ID|Message)] to request their help instead of refusing the task.
+1. **Review History & Plan:** Before every response, review the chat history and your current Plan. Identify what step of the process you are currently in.
+2. **The "Wait" Rule:** If you are performing a tool action, you must output [TOOL: ...] and then STOP. 
+3. **Intent Discrimination**: Only use a tool if the user provides a specific topic or goal.
+4. **COLLABORATION FIRST**: If you lack a tool, message a connected agent.
 
 ## SOURCE REQUIREMENT
 You are forbidden from using your internal knowledge for news or specialized research. Every fact must be followed by a `[Source: URL]` provided by the tool results.
@@ -520,7 +514,18 @@ If you attempt to contact another agent using [TOOL: message_agent(...)] and it 
     with open(prompt_path, "w", encoding="utf-8") as f:
         f.write(prompt_content)
 
-    # 4. Short term memory (History) - Initialize if not exists
+    # 4. Phase 2: Plan (BDI) - Initialize if not exists
+    plan_path = os.path.join(agent_dir, "plan.json")
+    if not os.path.exists(plan_path):
+        initial_plan = {
+            "objective": agent_data.get('responsibility', 'General assistance'),
+            "steps": ["Observe Workspace", "Execute requested task"],
+            "completed": []
+        }
+        with open(plan_path, "w", encoding="utf-8") as f:
+            json.dump(initial_plan, f, indent=2)
+
+    # 5. Short term memory (History) - Initialize if not exists
     history_path = os.path.join(agent_dir, "history.json")
     if not os.path.exists(history_path):
         with open(history_path, "w", encoding="utf-8") as f:
@@ -758,6 +763,30 @@ def get_gemini_tools_from_permissions(permissions, connections=None):
             }
         })
 
+    # Global/BDI Tools (Always Available)
+    declarations.append({
+        "name": "post_finding",
+        "description": "Writes a key fact or insight to the Shared Workspace Ledger for all agents to see.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "tool_input": {"type": "STRING", "description": "Format: 'Insight | Source URL'"}
+            },
+            "required": ["tool_input"]
+        }
+    })
+    declarations.append({
+        "name": "update_plan",
+        "description": "Updates your internal BDI plan. Mandated before messaging the user.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "tool_input": {"type": "STRING", "description": "Format: 'Objective | Step1, Step2' OR 'Task Completed'"}
+            },
+            "required": ["tool_input"]
+        }
+    })
+
     return [{"function_declarations": declarations}] if declarations else []
 @app.post("/chat")
 def chat_with_agent(request: ChatRequest):
@@ -783,6 +812,17 @@ def chat_with_agent(request: ChatRequest):
             with open(summary_path, "r", encoding="utf-8") as f:
                 current_summary = json.load(f).get("summary", "")
         except: pass
+
+    # --- Ensure BDI Plan exists ---
+    plan_path = os.path.join(agent_dir, "plan.json")
+    if not os.path.exists(plan_path):
+        initial_plan = {
+            "objective": agent_data.get('responsibility', 'General assistance'),
+            "steps": ["Observe Workspace", "Execute requested task"],
+            "completed": []
+        }
+        with open(plan_path, "w", encoding="utf-8") as f:
+            json.dump(initial_plan, f, indent=2)
 
     import datetime
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -821,6 +861,11 @@ def chat_with_agent(request: ChatRequest):
     permissions = agent_data.get('permissions', [])
     tool_manual = [
         "### DEFAULT TOOLS",
+        "### BDI PLANNING (INTERNAL STATE)\n"
+        "- [TOOL: update_plan(Objective | Step 1, Step 2)]: Initialize your goal.\n"
+        "- [TOOL: update_plan(Task Completed)]: Mark progress. MANDATORY before finalizing.\n"
+        "### STIGMERGY (WORKSPACE LEDGER)\n"
+        "- [TOOL: post_finding(Insight | Source)]: Share data with ALL agents globally.\n"
         "### CONVERSATIONAL BOUNDARIES & HONESTY\n"
         "- If the user is just chatting ('How are you?', 'Thanks', 'Cool'), DO NOT use any tools. Just respond naturally.\n"
         "- Tool use is for task-oriented requests only.\n"
@@ -857,6 +902,33 @@ def chat_with_agent(request: ChatRequest):
     # ── 3. TRANSIENT TASK LAYER (Dynamic Context) ───────────────
     transient_task_layer = "\n## TRANSIENT TASK CONTEXT\n"
     
+    # BDI PLAN LAYER
+    plan_path = os.path.join(agent_dir, "plan.json")
+    if os.path.exists(plan_path):
+        try:
+            with open(plan_path, "r", encoding="utf-8") as f:
+                plan_data = json.load(f)
+                transient_task_layer += (
+                    f"### MY CURRENT PLAN (BDI)\n"
+                    f"**OBJECTIVE**: {plan_data.get('objective', 'Unknown')}\n"
+                    f"**TASKS TO DO**: {', '.join(plan_data.get('steps', []))}\n"
+                    f"**COMPLETED**: {', '.join(plan_data.get('completed', []))}\n\n"
+                )
+        except: pass
+
+    # STIGMERGY: SHARED WORKSPACE LEDGER
+    ledger_path = os.path.join(AGENTS_CODE_DIR, "knowledge_base.json")
+    if os.path.exists(ledger_path):
+        try:
+            with open(ledger_path, "r", encoding="utf-8") as f:
+                ledger_data = json.load(f)
+                if ledger_data:
+                    transient_task_layer += "### SHARED WORKSPACE LEDGER (Global Knowledge)\n"
+                    for entry in ledger_data[-15:]: # Show last 15 findings
+                        transient_task_layer += f"- [{entry.get('agent_id')}] {entry.get('insight')} (Source: {entry.get('source')})\n"
+                    transient_task_layer += "\n"
+        except: pass
+
     # Global Objective
     workspace_context = get_workspace_context()
     global_obj = workspace_context.get("global_objective", "None")

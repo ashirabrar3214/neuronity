@@ -32,6 +32,17 @@ Array of objects containing:
 - Contains a cumulative distillation of the historical conversation.
 - **Proactive Distillation**: When history exceeds 50 messages, the system automatically summarizes older context into this file to preserve memory without bloating the API context.
 
+#### `backend/agents_code/[ID]/plan.json` (BDI Internal State)
+- **Objective**: The agent's current high-level goal.
+- **Steps**: Array of planned sub-tasks.
+- **Completed**: Array of finished sub-tasks.
+- This file is injected into the system prompt to ensure the agent never "forgets" where it is in a multi-step process.
+
+#### `backend/agents_code/knowledge_base.json` (The Shared Ledger)
+- A global repository for all agents.
+- Stores insights, facts, and correlations discovered by individual agents.
+- Implements **Stigmergy**: agents leave "scents" (data) in the ledger instead of whispering history to each other.
+
 ---
 
 ## 🌐 2. FRONTEND DETAIL (JavaScript)
@@ -113,8 +124,10 @@ Array of objects containing:
 - `report_generation(agent_id, tool_input, working_dir)`: **Premium PDF Synthesis**. Uses `ReportPDFGenerator` to create professional documents with executive summaries and citations.
 - `message_agent(target_id, message, sender_id)`:
     - **Cross-Agent Delegation**. Launches a nested `/chat` request.
-    - **Context Inversion**: Sends a weighted priority snippet of the sender's history to the recipient so they understand the request's context.
+    - **Context Inversion**: Individual history snippets are disabled in favor of the **Shared Workspace Ledger**.
     - Uses `threading.Thread` to enable concurrent execution.
+- `post_finding(insight | source)`: Writes key data to the Global Knowledge Graph for other agents to react to.
+- `update_plan(objective | steps OR completed)`: Mutates the agent's internal BDI state.
 - **File System Tools**: `scout_file`, `read_file`, `write_file`, `list_workspace`. Includes strict path traversal protection.
 
 ### `response_formatter.py` (The Stylizer)
@@ -165,6 +178,8 @@ Array of objects containing:
 3.  **Collaboration First**: If an agent lacks a tool (e.g., file access), it MUST check connected neighbors and delegate via `message_agent` instead of refusing.
 4.  **Ruthless Sanitization**: Raw code blocks and massive data dumps are automatically redacted from chat history to maintain privacy and UI performance.
 5.  **Proactive Memory**: High-frequency chats are distilled into summaries to prevent context loss at the 50-message boundary.
+6.  **The Ledger Protocol (Stigmergy)**: Agents MUST read the `knowledge_base.json` before acting and post findings immediately upon discovery.
+7.  **Atomic Plan Updates (BDI)**: Agents MUST use `update_plan` to cross off a task before sending a final message to the user.
 
 ---
 
