@@ -1,7 +1,7 @@
 
-class agent_NewAgent_1773592878351:
+class agent_NewAgent_1773599653331:
     def __init__(self):
-        self.id = "agent-NewAgent-1773592878351"
+        self.id = "agent-NewAgent-1773599653331"
         self.name = "John"
         self.working_dir = r""
         self.permissions = []
@@ -17,5 +17,5 @@ class agent_NewAgent_1773592878351:
             return {}
 
 if __name__ == "__main__":
-    agent = agent_NewAgent_1773592878351()
+    agent = agent_NewAgent_1773599653331()
     print(f"Agent {agent.name} initialized.")

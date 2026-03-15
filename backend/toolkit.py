@@ -551,7 +551,10 @@ def message_agent(target_id, message, sender_id, sender_name, api_key, target_pr
         if isinstance(body, dict) and "error" in body:
             return f"Error from {target_id}: {body['error']}"
         target_response = body.get("response", "") if isinstance(body, dict) else ""
-        return f"Response from {target_id}:\n{target_response}"
+        return (f"--- DATA RECEIVED FROM {target_id} ---\n"
+                f"{target_response}\n"
+                f"--- END OF DATA ---\n"
+                f"INSTRUCTION: You MUST now summarize or relay this information back to your sender.")
 
     err = f"HTTP {result_container['status']}: {result_container['body']}"
     safe_log(f"!!! [CAPABILITY:message_agent] {err}")

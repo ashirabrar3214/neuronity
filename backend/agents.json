@@ -1,61 +1,25 @@
 [
   {
-    "id": "agent-NewAgent-1773592605150",
-    "name": "Masterbot",
-    "description": "",
+    "id": "agent-MasterBot-001",
+    "name": "MasterBot",
+    "description": "Main orchestrator agent.",
     "brain": "gemini",
     "channel": "Gmail",
-    "workingDir": "D:\\New folder",
+    "workingDir": "",
     "permissions": [
       "web search",
-      "file access"
+      "thinking"
     ],
-    "tools": "Custom",
-    "responsibility": "",
+    "tools": "Gmail",
+    "responsibility": "Coordinate all agents",
     "x": -343.0,
-    "y": 95.0,
+    "y": 116.0,
     "connections": [
-      "agent-NewAgent-1773592704556",
-      "agent-NewAgent-1773592863811",
-      "agent-NewAgent-1773592878351"
+      "agent-NewAgent-1773599653331"
     ]
   },
   {
-    "id": "agent-NewAgent-1773592704556",
-    "name": "Jaime",
-    "description": "Agent description...",
-    "brain": "gemini",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [
-      "report generation"
-    ],
-    "tools": "Custom",
-    "responsibility": "",
-    "x": -52.0,
-    "y": -71.0,
-    "connections": [
-      "agent-NewAgent-1773593030487"
-    ]
-  },
-  {
-    "id": "agent-NewAgent-1773592863811",
-    "name": "Tyrion",
-    "description": "Agent description...",
-    "brain": "gemini",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [],
-    "tools": "Custom",
-    "responsibility": "",
-    "x": -41.0,
-    "y": 96.0,
-    "connections": [
-      "agent-NewAgent-1773593030487"
-    ]
-  },
-  {
-    "id": "agent-NewAgent-1773592878351",
+    "id": "agent-NewAgent-1773599653331",
     "name": "John",
     "description": "Agent description...",
     "brain": "gemini",
@@ -64,26 +28,8 @@
     "permissions": [],
     "tools": "Custom",
     "responsibility": "",
-    "x": -32.0,
-    "y": 263.0,
-    "connections": [
-      "agent-NewAgent-1773593030487"
-    ]
-  },
-  {
-    "id": "agent-NewAgent-1773593030487",
-    "name": "Tywin",
-    "description": "Agent description...",
-    "brain": "gemini",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [
-      "web search"
-    ],
-    "tools": "Custom",
-    "responsibility": "",
-    "x": 305.0,
-    "y": 105.0,
+    "x": 45.0,
+    "y": 82.0,
     "connections": []
   }
 ]

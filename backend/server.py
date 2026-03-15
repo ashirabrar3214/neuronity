@@ -991,6 +991,9 @@ def chat_with_agent(request: ChatRequest):
         f"## UNIVERSAL COLLABORATION\n{reporting_rules}\n"
     )
 
+    if "[MESSAGE FROM ANOTHER AGENT]" in request.message:
+        identity_layer += "\n**RELAY MODE ACTIVE**: You are providing a service to a teammate. Ensure your final response contains the specific facts or results they requested.\n"
+
     # ── 2. TOOL MANUAL (Capabilities) ───────────────────────────
     permissions = agent_data.get('permissions', [])
     tool_manual = [
@@ -1127,6 +1130,8 @@ def chat_with_agent(request: ChatRequest):
     # Protocols & Protection
     transient_task_layer += (
         "\n## CORE PROTOCOLS\n"
+        "9. **MESSENGER PROTOCOL**: If you are delegating a task to another agent, your FINAL response to your sender MUST include the exact output you received from that agent. "
+        "Do NOT just confirm the message was sent; relay the actual payload.\n"
         "1. **RESEARCH HANDOFF**: Always format facts as: 'Fact [Source: URL]'.\n"
         "2. **REPORTER FOOTNOTES**: Always include sources in reports.\n"
         "3. **INTERNAL SCRIPT OUTPUT**: When writing Python code inside [TOOL: make_tool(...)], your script MUST use print() to output data to stdout.\n"

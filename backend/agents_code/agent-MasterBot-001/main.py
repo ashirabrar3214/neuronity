@@ -1,11 +1,11 @@
 
-class agent_NewAgent_1773593030487:
+class agent_MasterBot_001:
     def __init__(self):
-        self.id = "agent-NewAgent-1773593030487"
-        self.name = "Tywin"
+        self.id = "agent-MasterBot-001"
+        self.name = "MasterBot"
         self.working_dir = r""
-        self.permissions = ['web search']
-        self.tools = "Custom"
+        self.permissions = ['web search', 'thinking']
+        self.tools = "Gmail"
         
     def get_personality(self):
         import json
@@ -17,5 +17,5 @@ class agent_NewAgent_1773593030487:
             return {}
 
 if __name__ == "__main__":
-    agent = agent_NewAgent_1773593030487()
+    agent = agent_MasterBot_001()
     print(f"Agent {agent.name} initialized.")
