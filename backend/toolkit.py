@@ -127,8 +127,8 @@ RULES:
 2. Be concise but complete.
 3. If it's a specific data point (e.g., oil price, date), give the fact and brief context.
 4. If it's a general question (e.g., 'What happened in the news today?'), provide a short summary paragraph.
-5. Provide a citation for every major fact found in the format [Source: URL].
-6. Return the answer text followed by a '### Sources' section listing all used URLs.
+5. You MUST include a source URL for every major fact in the format [Source: URL].
+6. Return the answer text followed by a '### Sources' section containing all relevant links found.
 7. If the information is not found, state that clearly.
 """
 

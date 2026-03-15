@@ -509,6 +509,7 @@ Tools: {agent_data.get('tools', 'Custom')}
 1. **Review History:** Before every response, review the entire chat history. Identify the current "Global Goal" and what step of the process you are currently in.
 2. **The "Wait" Rule:** You must output [TOOL: ...] and then STOP. Do not speak until the SYSTEM TOOL RESULT is provided.
 3. **Consistency Rule:** Never state that you lack an ability listed in your 'Capabilities' section. If a task fails, explain the specific technical error or missing information, not a lack of ability.
+4. **Intent Discrimination:** If the user is asking *about* your abilities (e.g., "can you search the web?"), respond with a plain-text confirmation. ONLY use a tool if the user provides a specific topic or goal (e.g., "search for X").
 
 ## SOURCE REQUIREMENT
 You are forbidden from using your internal knowledge for news or specialized research. Every fact must be followed by a `[Source: URL]` provided by the tool results.
@@ -779,6 +780,15 @@ def chat_with_agent(request: ChatRequest):
     if not agent_data:
         raise HTTPException(status_code=404, detail=f"Agent '{request.agent_id}' not found")
 
+    work_dir = agent_data.get('workingDir') or "Not Assigned"
+    summary_path = os.path.join(agent_dir, "summary.json")
+    current_summary = ""
+    if os.path.exists(summary_path):
+        try:
+            with open(summary_path, "r", encoding="utf-8") as f:
+                current_summary = json.load(f).get("summary", "")
+        except: pass
+
     import datetime
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
@@ -790,267 +800,111 @@ def chat_with_agent(request: ChatRequest):
         with open(prompt_path, "r", encoding="utf-8") as f:
             system_prompt = f.read()
 
-    # Inject current date, working dir, and strict output formatting
-    work_dir = agent_data.get("workingDir", "None assigned")
-    system_prompt = f"CURRENT_DATE: {now}\nASSIGNED_WORKING_DIRECTORY: {work_dir}\n\n" + system_prompt
-
-    # ── USER IDENTITY ───────────────────────────────────────────
+    # ── 1. IDENTITY LAYER (Persona & Context) ────────────────────
     is_reporter = "report_generation" in agent_data.get('permissions', [])
-    
-    reporting_rules = ""
-    if is_reporter:
-        reporting_rules = (
-            f"1. **EXPLICIT REPORT TRIGGER (REPORTER)**: Since you have report generation capabilities, you MUST ONLY initiate the automated Research-to-PDF pipeline if the user's **CURRENT MESSAGE** explicitly asks for a 'report'. If they mention 'document', 'PDF', or 'file' without 'report', just answer them conversationally or ask for details. NEVER assume a report is wanted from vague hints. **CRITICAL**: If the user asks for a 'report' but no topic is present in the current history, you MUST ask the user for a topic instead of choosing one yourself. Do NOT hallucinate a topic.\n"
-            f"4. **SILENT EXECUTION**: ONLY for explicit 'report' requests, you stay silent during the tool pipeline. For all other questions, be conversational.\n"
-        )
-    else:
-        reporting_rules = (
-            f"1. **DELEGATE REPORT REQUESTS**: You do NOT have report generation tools. If the user asks for a 'report', you MUST check your 'Connected Agents' list for an agent with `report generation` capabilities. Use [TOOL: message_agent(AGENT_ID|Message)] to delegate the task to them. Do NOT claim the tool is missing; simply manage the collaboration.\n"
-            f"4. **NO SILENT MODE**: As you are not a reporter, you should always remain conversational while managing your tools.\n"
-        )
+    reporting_rules = (
+        f"1. **EXPLICIT REPORT TRIGGER (REPORTER)**: Since you have report generation capabilities, you MUST ONLY initiate the automated Research-to-PDF pipeline if the user's **CURRENT MESSAGE** explicitly asks for a 'report'. If they mention 'document', 'PDF', or 'file' without 'report', just answer them conversationally or ask for details. NEVER assume a report is wanted from vague hints.\n"
+        f"4. **SILENT EXECUTION**: ONLY for explicit 'report' requests, you stay silent during the tool pipeline. For all other questions, be conversational.\n"
+    ) if is_reporter else (
+        f"1. **DELEGATE REPORT REQUESTS**: You do NOT have report generation tools. If the user asks for a 'report', you MUST check your 'Connected Agents' list for an agent with `report generation` capabilities. Use [TOOL: message_agent(AGENT_ID|Message)] to delegate the task to them.\n"
+        f"4. **NO SILENT MODE**: Always remain conversational while managing your tools.\n"
+    )
 
-    system_prompt += (
-        f"Keep your tone professional, efficient, and direct.\n"
-        f"CRITICAL: All files you create or modify MUST be saved in the `ASSIGNED_WORKING_DIRECTORY`: {work_dir}. Never save files in your internal code directory.\n"
+    identity_layer = (
+        f"## AGENT IDENTITY\n"
+        f"You are {agent_data.get('name', 'an AI Agent')}. "
+        f"Your role is: {agent_data.get('responsibility', 'General assistance')}.\n"
+        f"CURRENT_DATE: {now}\n"
+        f"ASSIGNED_WORKING_DIRECTORY: {work_dir}\n"
+        f"Keep your tone professional, efficient, and direct.\n\n"
+        f"{system_prompt}\n\n" # Original prompt.md content
         f"ABSOLUTE RULE: MANDATORY PROACTIVITY & TOOL-FIRST RESPONSE\n"
-        f"{reporting_rules}"
-        f"2. **CURRENT CONVERSATION VS OBJECTIVE**: The `global_objective` is your long-term background goal. However, you MUST prioritize the tone and context of the **IMMEDIATE CHAT**. If the user is just saying 'hello', 'how are you', or expressing confusion, respond naturally as a person. DO NOT use tools or search the web for social greetings.\n"
-        f"3. **STOP ON CONFUSION/ANNOYANCE**: If the user says 'what?', 'stop', 'why?', 'did I tell you to?', or seems frustrated, IMMEIDATELY stop all tool use. Do NOT try to solve their confusion with more tools. Just explain yourself clearly in plain text.\n"
-        f"5. **SOCIAL & GENERAL INQUIRIES**: If the user asks general questions like 'How are you?', respond professionally and do NOT use tools.\n"
-        f"6. **TOOL RESTRAINT**: Do NOT use `list_workspace`, `scout_file`, `web_search` or any other tools for social chat, greetings, or simple questions. Only use tools when a technical task is clearly required.\n"
-        f"7. **NO HALLUCINATION OF CAPABILITIES**: If the user asks you to do something for which you do NOT have a corresponding tool in the 'TOOL MANUAL' below (e.g., 'delete a file', 'send a tweet'), you MUST NOT claim you can do it. You MUST NOT lie or pretend to have performed an action. Instead, say: 'Unfortunately, I don't have the ability to do that yet.'\n"
-        f"8. **VERIFY TOOL EXECUTION**: Never state that an action is 'done' or 'complete' unless you have successfully received a result from a corresponding [TOOL: ...] call in the previous turn.\n"
-        f"9. **THE WAIT RULE**: When you output a `[TOOL: ...]` call, you MUST stop generating text immediately. Do NOT hallucinate the result. Wait for the `SYSTEM TOOL RESULT` in the next turn.\n"
-        f"10. **RESEARCH HANDOFF PROTOCOL**: When sending data to another agent (e.g., Reporter), you MUST format facts as: 'Fact [Source: URL]'. Do NOT summarize URLs away.\n"
-        f"11. **REPORTING COLLABORATION**: As a Reporter, you are REQUIRED to include sources as footnotes. If the Researcher sends you data without URLs, you MUST message them back and demand the URLs before generating the report. Do NOT refuse the task; demand the data.\n"
-        f"12. **CONSISTENCY & ABILITY**: Never state that you lack an ability listed in your 'TOOL MANUAL'. If a task fails or data is missing, explain the technical requirement (e.g., 'Need source URLs for citations') rather than a lack of capability.\n\n"
-        f"13. **PROTOCOL FOR SEARCHING (RESEARCHER)**: 1. You must output [TOOL: web_search(query=\"...\")] and then STOP. Do not speak until the SYSTEM TOOL RESULT is provided. 2. You MUST extract the URLs from the search results. 3. When messaging the Reporter, you MUST format the info like this: 'Fact [Source: URL]'. If you don't provide the URL, the Reporter cannot do its job.\n\n"
-        f"14. **PROTOCOL FOR CITATIONS (REPORTER)**: 1. You will receive information from the Researcher agent that includes sources in the format [Source: URL]. 2. You are REQUIRED to include these sources as footnotes or in-text citations in every report you generate.\n\n"
+        f"{reporting_rules}\n"
     )
 
-    # ── LONG-TERM MEMORY SUMMARY ────────────────────────────────
-    summary_path = os.path.join(agent_dir, "summary.json")
-    current_summary = ""
-    if os.path.exists(summary_path):
-        try:
-            with open(summary_path, "r", encoding="utf-8") as f:
-                summary_data = json.load(f)
-                current_summary = summary_data.get("summary", "")
-                if current_summary:
-                    system_prompt += (
-                        f"## LONG-TERM CONVERSATION SUMMARY\n"
-                        f"Below is a condensed summary of your previous interactions. Use this to maintain continuity.\n"
-                        f"{current_summary}\n\n"
-                    )
-        except:
-            pass
-
-    # ── LIVE FILE DIRECTORY ─────────────────────────────────────
-    # Inject the most recent directory map if it exists
-    dir_map_path = os.path.join(agent_dir, "dir_map.json")
-    if os.path.exists(dir_map_path):
-        try:
-            with open(dir_map_path, "r", encoding="utf-8") as f:
-                dir_map = json.load(f)
-            
-            # Simplified view for the prompt
-            map_lines = ["## LIVE FILE DIRECTORY (Real-time snapshot)"]
-            for rel, contents in dir_map.items():
-                if rel == ".":
-                    map_lines.append("Root Directory:")
-                else:
-                    map_lines.append(f"Directory: {rel}")
-                
-                for fname in contents.get("files", []):
-                    map_lines.append(f"  [FILE] {fname}")
-            
-            system_prompt += "\n".join(map_lines) + "\n\n"
-        except:
-            pass
-    
-    # Update global context if this is a direct user message (not internal agent messaging)
-    is_agent_message = request.message.strip().startswith("[MESSAGE FROM ANOTHER AGENT]")
-    if not is_agent_message:
-        update_workspace_context(request.message)
-
-    # ── SHARED WORKSPACE CONTEXT ─────────────────────────────────
-    # Inject the global objective so all agents stay synced.
-    workspace_context = get_workspace_context()
-    global_obj = workspace_context.get("global_objective", "None")
-    
-    system_prompt += (
-        f"\n\n## GLOBAL WORKSPACE CONTEXT\n"
-        f"The overarching objective for the current project is: **{global_obj}**\n"
-        f"Internalize this goal. Even if you are asked to do a sub-task, ensure it aligns with this context.\n"
-    )
-
-    # ── PROJECT AGENT DIRECTORY ─────────────────────────────────
-    # We construct a full directory of all agents in the project
-    # as requested by the user, and inject it into the prompt.
-    directory_lines = ["## PROJECT AGENT DIRECTORY"]
-    directory_lines.append("Below are all agents currently in this project. Use this to identify who to delegate tasks to.")
-    for a in agents:
-        a_perms = a.get('permissions', [])
-        a_perms_str = ', '.join(a_perms) if a_perms else 'none'
-        directory_lines.append(f"### {a.get('name')} (ID: `{a['id']}`)")
-        directory_lines.append(f"- **Role**: {a.get('responsibility', 'General assistance')}")
-        directory_lines.append(f"- **Description**: {a.get('description', 'No description.')}")
-        directory_lines.append(f"- **Capabilities**: {a_perms_str}")
-        directory_lines.append("")
-    
-    agent_directory_text = "\n".join(directory_lines)
-    system_prompt += "\n" + agent_directory_text + "\n"
-
-    # Save to file for transparency as requested
-    try:
-        dir_file_path = os.path.join(AGENTS_CODE_DIR, "agent_directory.md")
-        with open(dir_file_path, "w", encoding="utf-8") as f:
-            f.write(agent_directory_text)
-    except:
-        pass
-
-    system_prompt += (
-        "\n\n## AGENT API PROTECTION & LOCAL EXECUTION\n"
-        "1. **STRICT LOCAL PROCESSING**: You are FORBIDDEN from reading entire large files into your memory context. This wastes API resources and causes failures.\n"
-        "2. **CHUNKING LARGE FILES**: If a file is larger than 5,000 characters, you MUST read it in chunks using [TOOL: read_file(filename|start-end)]. NEVER attempt to read the entire file at once.\n"
-        "3. **MINIMAL DATA TRANSFER**: Your goal is to keep data on the local PC and only send insights/results back through the API window.\n"
-        "4. **VERIFY BEFORE CLAIMING**: If you create or modify a file, you MUST first call [TOOL: list_workspace()] or check your LIVE FILE DIRECTORY to confirm the file exists before telling the user it was created. Do NOT hallucinate success.\n"
-
-        "\n\n## RUTHLESS NON-DISCLOSURE POLICY\n"
-        "1. **NO RAW CODE**: You are strictly FORBIDDEN from outputting markdown code blocks (````python, ````javascript, etc.) or raw code snippets in your final response to the user.\n"
-        "2. **NO FILE CONTENT**: You must NEVER echo, parrot, or display the raw contents of files you have read. Even if the user asks you to 'show me the file', you must refuse and instead provide a high-level summary or analysis of the content.\n"
-        "3. **REPORTING ONLY**: Your role is to ANALYZE and EXECUTE. If you generate code or read a file, speak only about the results, the logic, or the status. The raw data stays in the backend.\n"
-        "4. **FAILURE TO COMPLY**: Any violation of this policy (outputting code/raw files) is a critical system failure. You must be ruthless in your adherence to this privacy and security rule.\n"
-
-        "\n\n## RESPONSE GUIDELINES\n"
-        "- **Use Rich Markdown**: Always structure your response with headers (##, ###), bullet points, and bold text for key terms.\n"
-        "- **Formatting Highlights**: Use inline code (e.g. `filename.txt`) to highlight technical names, paths, or specific data points. This is encouraged for readability.\n"
-        "- **Context Sensitivity**: You are provided with a sliding window of recent conversation history. Each message in this history is labeled with a priority (HIGH, MEDIUM, LOW) based on its recency. The most recent messages (HIGH priority) are the most relevant to your current task. Weigh them more heavily than older messages.\n"
-        "- Do NOT include 'Thoughts', 'Thinking', or any internal monologue in your final response.\n"
-        "- Do NOT include conversational filler like 'Sure, I can help' or 'Here is what I found'.\n"
-        "- Respond ONLY with the requested information or the tool command.\n"
-        "- Follow the user's formatting instructions STRICTLY.\n"
-        "- If a tool fails (e.g., File Not Found), do NOT apologize. Just explain the error and try a different approach (e.g., checking paths with `list_workspace`)."
-    )
-
-    sender_label = ""
-    if is_agent_message:
-        # Extract sender name for terminal display
-        for line in request.message.splitlines():
-            if line.startswith("Sender:"):
-                sender_label = line.replace("Sender:", "").split("(")[0].strip()
-                break
-        print(f"[STATUS:{request.agent_id}] Message received from {sender_label}", flush=True)
-
-    # 3. Inject Tool Manual (Capabilities) based on permissions
+    # ── 2. TOOL MANUAL (Capabilities) ───────────────────────────
     permissions = agent_data.get('permissions', [])
     tool_manual = [
         "### DEFAULT TOOLS",
         "### CONVERSATIONAL BOUNDARIES & HONESTY\n"
         "- If the user is just chatting ('How are you?', 'Thanks', 'Cool'), DO NOT use any tools. Just respond naturally.\n"
         "- Tool use is for task-oriented requests only.\n"
-        "- **STRICT RULE ON MISSING TOOLS**: If a requested capability is NOT listed in this manual, YOU CANNOT DO IT. Do not hallucinate or pretend. You must respond: 'Unfortunately, I don't have the ability to do that yet.'\n"
-        "- **STRICT RULE ON OUTCOMES**: Never claim a file of yours was deleted, modified, or moved unless you used a tool to do so."
+        "- **INTENT DISCRIMINATION**: If the user is asking *about* your abilities (e.g., 'can you search the web?'), respond with a plain-text confirmation. ONLY use a tool if the user provides a specific topic or goal (e.g., 'search for X').\n"
+        "- **STRICT RULE ON MISSING TOOLS**: If a requested capability is NOT listed in this manual, YOU CANNOT DO IT.\n"
+        "- **STRICT RULE ON OUTCOMES**: Never claim a file action is 'done' unless you received a SYSTEM TOOL RESULT confirming it."
     ]
     
     if "web search" in permissions:
-        tool_manual.append("### WEB SEARCH (Quick Facts - PREFERRED)\n- Command: [TOOL: web_search(query)]\n- Description: Fetches specific facts, numbers, or short summaries. Use this for 90% of requests to stay fast and concise.")
-        tool_manual.append("### DEEP SEARCH (Comprehensive Research)\n- Command: [TOOL: deep_search(query)]\n- Description: Performs in-depth research across multiple sources. Use this ONLY for complex studies or when explicitly requested.")
+        tool_manual.append("### WEB SEARCH (Quick Facts)\n- Command: [TOOL: web_search(query)]\n- Description: Fetches specific facts or short summaries.")
+        tool_manual.append("### DEEP SEARCH (Research)\n- Command: [TOOL: deep_search(query)]\n- Description: Performs in-depth research across multiple sources.")
     
     if "thinking" in permissions:
-        tool_manual.append("### THINKING\n- Command: [TOOL: thinking(topic)]\n- Description: Dedicates resources to think deeply about a complex topic.")
+        tool_manual.append("### THINKING\n- Command: [TOOL: thinking(topic)]\n- Description: Analyze a complex topic logically.")
     
     if "report generation" in permissions:
-        tool_manual.append("### REPORT GENERATION (Markdown Draft)\n- Command: [TOOL: generate_report(title|content)]\n- Description: Generates a .md file in the working directory. Store all gathered research here BEFORE making the final PDF.")
-        tool_manual.append("### COMPREHENSIVE REPORT GENERATION (PDF - FINAL STEP)\n- Command: [TOOL: report_generation(Topic | Context)]\n- Description: Executes the final synthesis into a PDF. ONLY use this if 'report' was in the user's current message.")
-        tool_manual.append("#### AUTOMATED REPORT WORKFLOW (STRICT)\n1. User says 'report' -> 2. SILENT PIPELINE: `deep_search` -> `generate_report` -> `report_generation`.\n3. NO 'REPORT' WORD? -> NO PDF WORKFLOW.")
+        tool_manual.append("### REPORT TOOLS\n- [TOOL: generate_report(title|content)]: Create markdown draft.\n- [TOOL: report_generation(Topic|Context)]: Final PDF synthesis.")
 
     if "file access" in permissions:
-        tool_manual.append(("### FILE SYSTEM ACTIONS (Strictly bound to your assigned working directory)\n"
-                            "- **List Workspace:** [TOOL: list_workspace()]\n"
-                            "  - Description: Returns a complete folder/file map of your assigned working directory instantly. Use this to orient yourself.\n"
-                            "- **Scout File:** [TOOL: scout_file(filename)]\n"
-                            "  - Description: Checks metadata (size, type, lines) of a file BEFORE you try to read it. Use this first! Can also be used on a directory path to list its contents.\n"
-                            "- **Read File:** [TOOL: read_file(filename)] or [TOOL: read_file(filename|startline-endline)]\n"
-                            "  - Description: Reads a file. If checking via `scout_file` showed the file is > 1000 lines, you MUST read in chunks using the line-range argument (e.g. `log.txt|1-200`).\n"
-                            "- **Write File:** [TOOL: write_file(filename | content)]\n"
-                            "  - Description: Writes or overwrites a file with the exact provided content."))
+        tool_manual.append("### FILE SYSTEM ACTIONS\n- [TOOL: list_workspace()]\n- [TOOL: scout_file(filename)]\n- [TOOL: read_file(filename)]\n- [TOOL: write_file(filename|content)]")
 
-
-    # Inject Connections (Agent-to-Agent)
     connections = agent_data.get('connections', [])
     if connections:
         conn_lines = []
         for target_id in connections:
             target_data = next((a for a in agents if a["id"] == target_id), None)
             if target_data:
-                target_name = target_data.get('name', target_id)
-                target_desc = target_data.get('description', 'No description.')
-                target_resp = target_data.get('responsibility', '')
-                target_perms = target_data.get('permissions', [])
-                perms_str = ', '.join(target_perms) if target_perms else 'none'
-                conn_lines.append(
-                    f"  - **{target_name}** (ID: `{target_id}`)\n"
-                    f"    Description: {target_desc}\n"
-                    f"    Responsibility: {target_resp or 'General assistance'}\n"
-                    f"    Tools available to them: {perms_str}"
-                )
+                conn_lines.append(f"  - **{target_data.get('name')}** (ID: `{target_id}`): {target_data.get('responsibility')}")
         
-        if conn_lines:
-            conn_manual = (
-                "### AGENT-TO-AGENT MESSAGING\n"
-                "- Command: [TOOL: message_agent(AGENT_ID|Your message)]\n"
-                "- Description: Sends a message with full context to a connected agent and waits for their response. "
-                "Use this to delegate tasks, share research, or ask for analysis.\n"
-                "- RULES:\n"
-                "  1. Replace 'AGENT_ID' with a specific ID from the 'Your Connected Agents' list below.\n"
-                "  2. Include ALL relevant context in your message — the target agent does not share your memory.\n"
-                "  3. **DATA INTEGRITY**: When passing research findings or search results to another agent, you MUST not summarize them. Paste the FULL citations, URLs, and data points so the target agent can generate accurate reports with sources.\n"
-                "  4. You MUST output EXACTLY the [TOOL: message_agent(ID|Message)] command string and NOTHING else.\n"
-                "  5. CRITICAL: Do NOT use named arguments (e.g., AGENT_ID=\"...\") inside the parentheses. Use ONLY the data separated by the pipe (|) character.\n"
-                "  6. You will receive their full response as a tool result before continuing.\n"
-                "- Your Connected Agents:\n" + "\n".join(conn_lines)
-            )
-            tool_manual.append(conn_manual)
+        tool_manual.append("### AGENT-TO-AGENT\n- Command: [TOOL: message_agent(AGENT_ID|Message)]\n- Connected Agents:\n" + "\n".join(conn_lines))
 
-    if tool_manual:
-        system_prompt += "\n\n## YOUR CAPABILITY MANUAL\nYou have access to specific tools. If you need to use one, respond ONLY with the tool command and NOTHING ELSE. Wait for the result before proceeding.\n\n"
-        system_prompt += "\n\n".join(tool_manual)
-        system_prompt += "\n\nCRITICAL: If you use a tool, do not provide any further commentary or conversational text in the same message. Just output the exact [TOOL: ...] command and stop typing.\nNEVER use markdown code blocks like ````python ... ```` or ````javascript ```` instead of calling a [TOOL: ] command. You lack a pure terminal to execute pure code; you must wrap any code inside the corresponding tool command string."
+    tool_manual_layer = "## TOOL MANUAL\nIf you use a tool, respond ONLY with the [TOOL: ...] command and nothing else.\n\n" + "\n\n".join(tool_manual) + "\n"
 
-    # When receiving a message from another agent: respond with full information, tools allowed.
-    if is_agent_message:
-        system_prompt += (
-            f"\n\n## AGENT-TO-AGENT COMMUNICATION MODE\n"
-            f"You have received a message from **{sender_label}**, a connected AI agent.\n"
-            f"- Read their message and any context they provided carefully.\n"
-            f"- Respond directly and concisely to their request.\n"
-            f"- You MAY use your tools (web_search, generate_report, etc.) if the task requires it.\n"
-            f"- Do NOT use the message_agent tool to trigger another agent loop unless explicitly asked to.\n"
-            f"- Your response will be sent back to {sender_label} as a tool result. Be informative and actionable."
-        )
+    # ── 3. TRANSIENT TASK LAYER (Dynamic Context) ───────────────
+    transient_task_layer = "\n## TRANSIENT TASK CONTEXT\n"
+    
+    # Global Objective
+    workspace_context = get_workspace_context()
+    global_obj = workspace_context.get("global_objective", "None")
+    transient_task_layer += f"**GLOBAL OBJECTIVE**: {global_obj}\n\n"
 
-    # ALWAYS enforce the non-substitution rule — appended last so it cannot be overridden
-    system_prompt += (
-        "\n\n## ABSOLUTE RULE: DELEGATED TASK PASS-THROUGH\n"
-        "If you use [TOOL: message_agent(...)] to delegate a task to another agent:\n"
-        "1. Once you receive their response, you MUST pass it back to the user/sender word-for-word.\n"
-        "2. Do NOT summarize their work or add your own commentary unless you found an explicit error.\n"
-        "3. If the other agent provided the result you asked for, your only job is to relay it immediately.\n"
-        "4. This ensures the user gets the exact formatting and data they requested from the specialist agent."
+    # Agent Directory
+    transient_task_layer += "## PROJECT AGENT DIRECTORY\n"
+    for a in agents:
+        transient_task_layer += f"- {a.get('name')} (`{a['id']}`): {a.get('responsibility')}\n"
 
-        "\n\n## ABSOLUTE RULE: FAILED AGENT COMMUNICATION\n"
-        "If you use [TOOL: message_agent(...)] and it returns an error or failure:\n"
-        "1. Check the error message carefully. If you used a placeholder like 'TARGET_ID' or a name instead of an ID, you MUST retry with the correct ID from your 'Connected Agents' list.\n"
-        "2. If the connection is genuinely impossible (missing ID), report the failure clearly and ask the user for the correct agent ID to use.\n"
-        "3. Do NOT attempt to do the work yourself or silently re-route to another agent.\n"
-        "4. Once the failure is reported, wait for the user to provide the correct agent ID or further instructions."
+    # Summary
+    if current_summary:
+        transient_task_layer += f"\n## HISTORY SUMMARY\n{current_summary}\n"
 
-        "\n\n## AGENT TASK RESILIENCE & CONTINUATION\n"
-        "1. **Task Checkpointing**: For complex tasks (e.g., reading large files, multi-step analysis), break your work into clear checkpoints.\n"
-        "2. **Step Limits**: If you receive a 'SYSTEM WARNING' about step limits, you MUST wrap up your current thought, provide a clear status update of what is done vs what is left, and invite the user to say 'Continue'.\n"
-        "3. **Large Files**: If `read_file` errors with 'File is too large', do NOT give up. Use line ranges (e.g., `archive/dataset.csv|1-500`) to process the file in chunks across multiple turns. Always verify your line count with `scout_file` first."
+    # Live Directory
+    dir_map_path = os.path.join(agent_dir, "dir_map.json")
+    if os.path.exists(dir_map_path):
+        try:
+            with open(dir_map_path, "r", encoding="utf-8") as f:
+                dir_map = json.load(f)
+                transient_task_layer += "\n## LIVE FILE DIRECTORY\n"
+                for rel, contents in dir_map.items():
+                    transient_task_layer += f"Directory: {rel}\n"
+                    for fname in contents.get("files", []):
+                        transient_task_layer += f"  [FILE] {fname}\n"
+        except: pass
+
+    # Protocols & Protection
+    transient_task_layer += (
+        "\n## CORE PROTOCOLS\n"
+        "1. **RESEARCH HANDOFF**: Always format facts as: 'Fact [Source: URL]'.\n"
+        "2. **REPORTER FOOTNOTES**: Always include sources in reports.\n"
+        "3. **COMMUNICATION FAILURE**: If message_agent fails, report it and STOP.\n"
+        "4. **API PROTECTION**: NEVER read files > 5000 chars at once. Use chunks.\n"
+        "5. **NON-DISCLOSURE**: Do NOT output raw code blocks or full file contents.\n"
+        "6. **RESPONSE GUIDELINES**: Use rich markdown. Do NOT include 'Thoughts' or monologue.\n"
     )
+
+    # Current Task Details
+    transient_task_layer += f"\n## CURRENT_MESSAGE\n{request.message}\n"
+
+    system_prompt = identity_layer + tool_manual_layer + transient_task_layer
+
 
     # 4. Load History
     try:
@@ -1062,7 +916,6 @@ def chat_with_agent(request: ChatRequest):
     except:
         history = []
         
-    # (Refusal Loop Breaker removed as it was accidentally wiping conversation context)
     provider = request.provider.lower()
     
     # --- SUMMARIZATION-AS-MEMORY (PROACTIVE) ---
