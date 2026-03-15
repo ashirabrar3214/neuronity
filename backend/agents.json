@@ -32,8 +32,8 @@
     ],
     "tools": "Custom",
     "responsibility": "",
-    "x": 56.0,
-    "y": -236.0,
+    "x": -52.0,
+    "y": -71.0,
     "connections": [
       "agent-NewAgent-1773593030487"
     ]
@@ -48,8 +48,8 @@
     "permissions": [],
     "tools": "Custom",
     "responsibility": "",
-    "x": 56.0,
-    "y": 115.0,
+    "x": -41.0,
+    "y": 96.0,
     "connections": [
       "agent-NewAgent-1773593030487"
     ]
@@ -64,8 +64,8 @@
     "permissions": [],
     "tools": "Custom",
     "responsibility": "",
-    "x": 51.0,
-    "y": 361.0,
+    "x": -32.0,
+    "y": 263.0,
     "connections": [
       "agent-NewAgent-1773593030487"
     ]
@@ -82,8 +82,8 @@
     ],
     "tools": "Custom",
     "responsibility": "",
-    "x": 463.0,
-    "y": 109.0,
+    "x": 305.0,
+    "y": 105.0,
     "connections": []
   }
 ]

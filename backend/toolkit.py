@@ -483,7 +483,7 @@ FORMATTING RULES:
 # AGENT-TO-AGENT COMMUNICATION CAPABILITY
 # ─────────────────────────────────────────────────
 
-def message_agent(target_id, message, sender_id, sender_name, api_key, target_provider, context_snippet=""):
+def message_agent(target_id, message, sender_id, sender_name, api_key, target_provider, context_snippet="", intent_priority="NORMAL"):
     """
     Sends a structured, context-rich message to a connected agent.
     The payload includes:
@@ -492,13 +492,14 @@ def message_agent(target_id, message, sender_id, sender_name, api_key, target_pr
       - A snippet of the sender's recent conversation history for context
     Runs the HTTP call in a new daemon thread to avoid event-loop deadlocks.
     """
-    safe_log(f"[STATUS:{sender_id}] Messenger: Sending to '{target_id}'")
+    safe_log(f"[STATUS:{sender_id}] Messenger: Sending to '{target_id}' (Priority: {intent_priority})")
 
     # Build a rich, context-aware message envelope
     separator = "─" * 50
     payload_parts = [
         "[MESSAGE FROM ANOTHER AGENT]",
         f"Sender:   {sender_name} (ID: {sender_id})",
+        f"Priority: {intent_priority}",
         separator,
         "## Task / Request",
         message.strip(),

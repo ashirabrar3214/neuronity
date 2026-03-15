@@ -403,13 +403,21 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
                 except Exception:
                     pass
 
+            # -- 6. Handle Intent Priority (BDI Upgrade)
+            intent_priority = "NORMAL"
+            if "intent_priority" in tool_input:
+                # Simple parsing for intent_priority=USER_MANDATED
+                if "USER_MANDATED" in tool_input:
+                    intent_priority = "USER_MANDATED"
+
             # Signal the UI: who is being messaged so its canvas terminal can update
-            print(f"[AGENT_MSG:{agent_id}->{target_id}] Contacting {target_data.get('name', target_id)}", flush=True)
+            print(f"[AGENT_MSG:{agent_id}->{target_id}] Contacting {target_data.get('name', target_id)} (Priority: {intent_priority})", flush=True)
             
             return toolkit.message_agent(
                 target_id, message.strip(), agent_id, sender_name,
                 target_api_key, target_provider,
-                context_snippet=sender_context_snippet
+                context_snippet=sender_context_snippet,
+                intent_priority=intent_priority
             )
         return "Error: format must be target_id|message"
             
@@ -847,7 +855,8 @@ def get_gemini_tools_from_permissions(permissions, connections=None):
                 "type": "OBJECT",
                 "properties": {
                     "target_id": {"type": "STRING", "description": "The specific ID of the specialist agent."},
-                    "message": {"type": "STRING", "description": "The detailed request and context."}
+                    "message": {"type": "STRING", "description": "The detailed request and context."},
+                    "intent_priority": {"type": "STRING", "description": "Set to 'USER_MANDATED' if this is an explicit user command and agent delegation is forbidden.", "enum": ["NORMAL", "USER_MANDATED"]}
                 },
                 "required": ["target_id", "message"]
             }
@@ -1073,11 +1082,18 @@ def chat_with_agent(request: ChatRequest):
     global_obj = workspace_context.get("global_objective", "None")
     transient_task_layer += f"**GLOBAL OBJECTIVE**: {global_obj}\n\n"
 
-    # Agent Directory
-    transient_task_layer += "## PROJECT AGENT DIRECTORY\n"
+    # UNIVERSAL FIX: SEMANTIC NETWORK AWARENESS (Topology visibility)
+    transient_task_layer += "## PROJECT CAPABILITY MAP (Agent Network Topology)\n"
     for a in agents:
-        status = "[DIRECTLY CONNECTED]" if a['id'] in connections else "[UNREACHABLE - REQUIRE DELEGATION]"
-        transient_task_layer += f"- {a.get('name')} (`{a['id']}`): {a.get('responsibility')} {status}\n"
+        perms = ", ".join(a.get('permissions', []))
+        conns = ", ".join(a.get('connections', []))
+        status = "[DIRECTLY CONNECTED]" if a['id'] in connections else "[REACHABLE VIA DELEGATION]"
+        transient_task_layer += (
+            f"- **{a.get('name')}** (`{a['id']}`): {status}\n"
+            f"  - Responsibility: {a.get('responsibility')}\n"
+            f"  - Capabilities: {perms if perms else 'None'}\n"
+            f"  - Direct Links: {conns if conns else 'None'}\n"
+        )
 
     # Summary
     if current_summary:
@@ -1095,6 +1111,18 @@ def chat_with_agent(request: ChatRequest):
                     for fname in contents.get("files", []):
                         transient_task_layer += f"  [FILE] {fname}\n"
         except: pass
+
+    # Detect who is messaging this agent (BIDIRECTIONAL ROUTING)
+    if "[MESSAGE FROM ANOTHER AGENT]" in request.message:
+        sender_match = re.search(r"Sender:.*?\(ID: (.*?)\)", request.message)
+        priority_match = re.search(r"Priority: (.*?)\n", request.message)
+        
+        if sender_match:
+            sender_id = sender_match.group(1)
+            transient_task_layer += f"\n**COMMUNICATION RETURN PATH**: You can reply to the sender via [TOOL: message_agent({sender_id}|...)]\n"
+        
+        if priority_match and "USER_MANDATED" in priority_match.group(1):
+            transient_task_layer += "\n**STRICT MANDATE**: This task is [USER_MANDATED]. You are FORBIDDEN from delegating this task to other agents. You must either complete it yourself using your tools or report your missing capability directly back to the user.\n"
 
     # Protocols & Protection
     transient_task_layer += (

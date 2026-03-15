@@ -4,5 +4,7 @@
     "Observe Workspace",
     "Execute requested task"
   ],
-  "completed": []
+  "completed": [
+    "Task Completed"
+  ]
 }

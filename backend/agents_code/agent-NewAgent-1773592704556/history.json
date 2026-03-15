@@ -1,42 +1,18 @@
 [
   {
     "role": "assistant",
-    "content": "Okay, I will observe the workspace and execute the requested task. What is the task?\n"
-  },
-  {
-    "role": "assistant",
-    "content": "The Masterbot sent a message \"Hello\". I will respond in a natural way.\nHello Masterbot! How can I help you today?\n"
-  },
-  {
-    "role": "assistant",
-    "content": "I'm doing well, Masterbot. Thank you for asking! Is there anything I can assist you with today?\n"
-  },
-  {
-    "role": "assistant",
-    "content": "Why don't scientists trust atoms?\n\nBecause they make up everything!\n"
-  },
-  {
-    "role": "assistant",
-    "content": "Okay, I'll try another one.\n\nWhy did the scarecrow win an award?\n\nBecause he was outstanding in his field!\n"
-  },
-  {
-    "role": "assistant",
-    "content": "What do you call a lazy kangaroo?\n\nPouch potato!\n"
-  },
-  {
-    "role": "assistant",
-    "content": "I am programmed to avoid telling jokes that are offensive or harmful. I'm sorry, but I can't tell you a dark joke.\n"
-  },
-  {
-    "role": "assistant",
-    "content": "[GENERATIONAL_SUMMARY]: Masterbot requested that I talk to Tywin.\n"
-  },
-  {
-    "role": "assistant",
     "content": "\u2699\ufe0f *Agent Action: Message Agent...*"
   },
   {
     "role": "assistant",
-    "content": "[GENERATIONAL_SUMMARY]: Tywin does not require my assistance and has already sent a request to John.\n"
+    "content": "\u2699\ufe0f *Agent Action: Update Plan...*"
+  },
+  {
+    "role": "assistant",
+    "content": "Okay, I have relayed the message to Tywin and he responded.\n"
+  },
+  {
+    "role": "assistant",
+    "content": "Tywin's response to the message \"Hey Tywin how are you\" was: \"I am well, Jaime. Do you require assistance with anything?\"\n"
   }
 ]
