@@ -625,12 +625,20 @@ function initTrainingUI() {
             let responseContent = "";
             let fullThoughtText = "";
 
+            let initialStatus = document.createElement('div');
+            initialStatus.className = 'stream-status';
+            initialStatus.innerHTML = `<i>Thinking...</i>`;
+            messageDiv.appendChild(initialStatus);
+
+            let unprocessedText = "";
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
+                unprocessedText += decoder.decode(value, { stream: true });
+                const lines = unprocessedText.split('\n');
+                // Keep the last partial line in the buffer
+                unprocessedText = lines.pop();
 
                 for (let line of lines) {
                     if (!line.startsWith('data: ')) continue;
@@ -639,6 +647,8 @@ function initTrainingUI() {
 
                     try {
                         const data = JSON.parse(dataText);
+                        // Clean up initial status on first data
+                        if (initialStatus) { initialStatus.remove(); initialStatus = null; }
 
                         if (data.type === 'thought') {
                             if (!thoughtDetails) {
@@ -653,7 +663,6 @@ function initTrainingUI() {
                         }
                         else if (data.type === 'text') {
                             responseContent += data.content;
-                            // Update the main message area below/after the thoughts
                             let textSpan = messageDiv.querySelector('.response-text');
                             if (!textSpan) {
                                 textSpan = document.createElement('div');

@@ -1225,10 +1225,13 @@ async def chat_with_agent(request: ChatRequest):
 
                         async for line in r.aiter_lines():
                             if not line: continue
+                            if not line: continue
+                            # Clean up the streaming array format [{},{},...]
                             line = line.strip()
                             if line.startswith("["): line = line[1:]
-                            if line.startswith(","): line = line[1:]
                             if line.endswith("]"): line = line[:-1]
+                            if line.startswith(","): line = line[1:]
+                            line = line.strip()
                             if not line: continue
                             
                             try:
