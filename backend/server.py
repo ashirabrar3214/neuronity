@@ -684,6 +684,8 @@ class ChatRequest(BaseModel):
     agent_id: str
     message: str
     mode: Optional[str] = "work"  # 'work' or 'training'
+    api_key: Optional[str] = ""
+    provider: Optional[str] = "Gemini"
 
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -1180,7 +1182,8 @@ async def chat_with_agent(request: ChatRequest):
                 f"{training_tools_block}\n"
             )
         
-        api_key = os.getenv("GEMINI_API_KEY", "")
+        # Priority: (1) frontend key via request, (2) backend .env key
+        api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
         is_master = agent_data.get("agentType", "worker") == "master"
         is_task = plan_runner.is_task_request(request.message, api_key, "gemini")
         
@@ -1236,21 +1239,23 @@ async def chat_with_agent(request: ChatRequest):
                             
                             try:
                                 chunk = json.loads(line)
-                                part = chunk.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0]
+                                parts = chunk.get("candidates", [{}])[0].get("content", {}).get("parts", [])
                                 
-                                if "thought" in part:
-                                    thought = part.get("text", "")
-                                    current_turn_thoughts += thought
-                                    yield f"data: {json.dumps({'type': 'thought', 'content': thought})}\n\n"
-                                elif "text" in part:
-                                    text = part.get("text", "")
-                                    current_turn_text += text
-                                    yield f"data: {json.dumps({'type': 'text', 'content': text})}\n\n"
-                                elif "functionCall" in part:
-                                    fn = part["functionCall"]
-                                    tool_call_found = {"name": fn["name"], "args": fn.get("args", {})}
-                                    yield f"data: {json.dumps({'type': 'tool_start', 'content': tool_call_found['name']})}\n\n"
-                            except: pass
+                                for part in parts:
+                                    if "thought" in part:
+                                        thought = part.get("text", "")
+                                        current_turn_thoughts += thought
+                                        yield f"data: {json.dumps({'type': 'thought', 'content': thought})}\n\n"
+                                    elif "text" in part:
+                                        text = part.get("text", "")
+                                        current_turn_text += text
+                                        yield f"data: {json.dumps({'type': 'text', 'content': text})}\n\n"
+                                    elif "functionCall" in part:
+                                        fn = part["functionCall"]
+                                        tool_call_found = {"name": fn["name"], "args": fn.get("args", {})}
+                                        yield f"data: {json.dumps({'type': 'tool_start', 'content': tool_call_found['name']})}\n\n"
+                            except Exception: 
+                                pass
 
                 if tool_call_found:
                     t_name = tool_call_found["name"]
@@ -1321,8 +1326,8 @@ def run_autonomous_agent(request: ChatRequest):
     agents_info = "\n".join(agents_info_lines)
 
     # ── ROUTING: Task vs. Conversation ──────────────────────────
-    provider = "gemini"
-    api_key = os.getenv("GEMINI_API_KEY", "")
+    provider = request.provider or "gemini"
+    api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
 
     # If it's just a greeting or casual talk, bypass the planner and route to normal chat.
     if not plan_runner.is_task_request(request.message, api_key, provider):
@@ -1364,8 +1369,8 @@ def execute_autonomous(request: ChatRequest):
     Triggered by the 'Start' button in the UI. 
     Executes the pre-generated plan for an agent.
     """
-    provider = "gemini"
-    api_key = os.getenv("GEMINI_API_KEY", "")
+    provider = request.provider or "gemini"
+    api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
     result = plan_runner.run_execution_loop(
         request.agent_id,
         request.message,
