@@ -26,7 +26,17 @@
         <div class="training-container">
             <header class="chat-header">
                 <button id="close-training-btn">← Close</button>
-                <h2 id="agent-name">Agent</h2>
+                <div class="header-left">
+                    <h2 id="agent-name">Agent</h2>
+                    <div class="mode-toggle-container">
+                        <span class="mode-label">Work</span>
+                        <label class="switch">
+                            <input type="checkbox" id="work-train-toggle" checked>
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="mode-label active" id="train-label">Train</span>
+                    </div>
+                </div>
                 <div class="header-actions">
                     <div id="auto-save-status" class="save-status">Saved</div>
                     <button id="clear-chat-btn" title="Clear chat history">🗑 Clear Chat</button>
@@ -55,6 +65,13 @@
                                 placeholder="What is their main task?">
                         </div>
                         <div class="detail-item">
+                            <label>Agent Type</label>
+                            <select id="detail-agent-type" class="sidebar-select">
+                                <option value="worker">Worker — executes specific tasks</option>
+                                <option value="master">Master — autonomous plan &amp; execute</option>
+                            </select>
+                        </div>
+                        <div class="detail-item">
                             <label>Tools</label>
                             <select id="detail-tools" class="sidebar-select">
                                 <option>Gmail</option>
@@ -69,30 +86,7 @@
                         </div>
                     </div>
 
-                    <div class="sidebar-section">
-                        <div class="section-title">Intelligence</div>
-                        <div class="detail-item">
-                            <label>Brain</label>
-                            <select id="detail-brain" class="sidebar-select">
-                                <option value="" disabled selected>Select Brain</option>
-                                <option value="anthropic">Anthropic</option>
-                                <option value="gemini">Gemini</option>
-                                <option value="chatgpt">ChatGPT</option>
-                                <option value="deepseek">DeepSeek</option>
-                                <option value="grok">Grok</option>
-                            </select>
-                        </div>
-                        <div id="api-key-wrapper" style="display: none;">
-                            <div id="api-key-status"
-                                style="font-size: 11px; color: #ff4d4d; margin-bottom: 4px; display: none;">API Key not
-                                found. Please enter it below:</div>
-                            <div class="detail-item">
-                                <label>API Key</label>
-                                <input type="password" id="detail-api-key" class="sidebar-input"
-                                    placeholder="••••••••••••••••">
-                            </div>
-                        </div>
-                    </div>
+
 
                     <div class="sidebar-section">
                         <div class="section-title">Communication</div>
@@ -136,10 +130,19 @@
                 <div class="chat-main-column">
                     <div class="chat-area" id="chat-area">
                         <div class="message agent-message">
-                            Hello! I am ready to be trained. You can upload documents or give me specific instructions
-                            here.
+                            What are we learning today?
                         </div>
                     </div>
+                    <!-- Autonomous Plan Execution Area (Hidden by default) -->
+                    <div id="autonomous-plan-area" class="autonomous-plan-area" style="display: none;">
+                        <div class="plan-header">
+                            <span>📋 Execution Plan Ready</span>
+                            <button id="close-plan-btn" class="close-plan-btn">×</button>
+                        </div>
+                        <div class="plan-content" id="plan-content"></div>
+                        <button id="start-execution-btn" class="start-autonomous-btn">▶ Start Execution</button>
+                    </div>
+
                     <div class="input-area">
                         <button class="attach-btn">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -159,6 +162,17 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="custom-confirm-overlay" class="custom-modal-overlay" style="display: none;">
+        <div class="custom-modal-box">
+            <div id="custom-confirm-message" class="custom-modal-message">Are you sure?</div>
+            <div class="custom-modal-actions">
+                <button id="custom-confirm-cancel" class="custom-btn-secondary">Cancel</button>
+                <button id="custom-confirm-ok" class="custom-btn-danger">Confirm</button>
             </div>
         </div>
     </div>

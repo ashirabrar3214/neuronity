@@ -1,7 +1,10 @@
+// ─── GLOBALS & STATE ────────────────────────────────────────────────────────
 let activeAgentId = null;
 let activeAgentData = {};
 let isTrainingPanelOpen = false;
 let isTrainingUIInitialized = false;
+let saveTimeout = null;
+let autoSaveStatus = null;
 
 // ─── GLOBALS ────────────────────────────────────────────────────────────────
 window.activeTrainingAgentId = null;
@@ -17,39 +20,22 @@ window.copyToClipboard = (btn) => {
     });
 };
 
-async function updateApiKeyVisibility(brainValue) {
-    const wrapper = document.getElementById('api-key-wrapper');
-    const status = document.getElementById('api-key-status');
-    const input = document.getElementById('detail-api-key');
-
-    if (!brainValue) {
-        wrapper.style.display = 'none';
-        return;
-    }
-
-    wrapper.style.display = 'block';
-
-    try {
-        const key = await window.electronAPI.getApiKey(brainValue.toLowerCase());
-        if (key) {
-            wrapper.style.display = 'none';
-        } else {
-            status.style.display = 'block';
-            status.textContent = 'API keys not found. Please enter it below:';
-            status.style.color = '#ff4d4d';
-            input.parentElement.style.display = 'block';
-            input.placeholder = '••••••••••••••••';
-        }
-    } catch (e) {
-        console.error("Error checking API key:", e);
-    }
-}
-
 // ─── Module-level markdown renderer (Enhanced & Robust) ──────────────────────
 function _markdownToHtml(text) {
     if (!text) return "";
 
-    let html = text
+    // FIRST: Extract and preserve interactive HTML elements (buttons, divs for execution plans)
+    const interactiveElements = [];
+    let processedText = text;
+
+    // Extract button HTML before escaping
+    processedText = processedText.replace(/<div[^>]*class="[^"]*start-autonomous[^"]*"[^>]*>[\s\S]*?<\/div>/gi, (match) => {
+        const id = `__INTERACTIVE_${interactiveElements.length}__`;
+        interactiveElements.push(match);
+        return id;
+    });
+
+    let html = processedText
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
@@ -108,11 +94,22 @@ function _markdownToHtml(text) {
         html = html.replace(`__CODE_BLOCK_${i}__`, block);
     });
 
+    // 9. Restore Interactive Elements (buttons, execution plan divs)
+    interactiveElements.forEach((element, i) => {
+        html = html.replace(`__INTERACTIVE_${i}__`, element);
+    });
+
     return html;
 }
 
 // Expose open function globally so canvas.js can trigger it
 window.openTrainingPanel = async (agentId, agentName) => {
+    // 1. CANCEL PENDING SAVE from previous agent to prevent race conditions
+    if (saveTimeout) {
+        clearTimeout(saveTimeout);
+        saveTimeout = null;
+    }
+
     activeAgentId = agentId;
     window.activeTrainingAgentId = agentId;
     window.isTrainingPanelOpen = true;
@@ -140,13 +137,17 @@ window.openTrainingPanel = async (agentId, agentName) => {
     document.getElementById('detail-name').value = agentData.name || '';
     document.getElementById('detail-description').value = agentData.description || '';
     document.getElementById('detail-responsibility').value = agentData.responsibility || '';
-    document.getElementById('detail-brain').value = agentData.brain || '';
+    document.getElementById('detail-responsibility').value = agentData.responsibility || '';
     document.getElementById('detail-channel').value = agentData.channel || 'Gmail';
     document.getElementById('detail-workdir').value = agentData.workingDir || '';
     document.getElementById('detail-tools').value = agentData.tools || '';
-    document.getElementById('detail-api-key').value = ''; // Always clear on open for security/freshness
+    document.getElementById('detail-agent-type').value = agentData.agentType || 'worker';
 
-    await updateApiKeyVisibility(agentData.brain);
+    // Show/hide plan button based on agent type
+    const planBtn = document.getElementById('generate-plan-btn');
+    if (planBtn) {
+        planBtn.style.display = (agentData.agentType === 'master') ? 'block' : 'none';
+    }
 
     // Sync capability buttons
     const capBtns = document.querySelectorAll('.cap-btn');
@@ -227,7 +228,101 @@ window.openTrainingPanel = async (agentId, agentName) => {
             input.style.pointerEvents = 'auto';
         }
     }, 500);
+
+    // Sync UI with current toggle state
+    const toggle = document.getElementById('work-train-toggle');
+    if (toggle) {
+        updateModeState(toggle.checked);
+    }
 };
+
+// ─── WORK/TRAIN MODE TOGGLE ──────────────────────────────────────────────
+function updateModeState(isTrainMode) {
+    const sidebar = document.getElementById('details-sidebar');
+    const trainLabel = document.getElementById('train-label');
+    const workLabel = document.querySelector('.mode-label:not(#train-label)');
+
+    if (isTrainMode) {
+        sidebar.classList.remove('disabled');
+        trainLabel.classList.add('active');
+        if (workLabel) workLabel.classList.remove('active');
+    } else {
+        sidebar.classList.add('disabled');
+        trainLabel.classList.remove('active');
+        if (workLabel) workLabel.classList.add('active');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('work-train-toggle');
+    if (toggle) {
+        toggle.addEventListener('change', (e) => {
+            updateModeState(e.target.checked);
+        });
+    }
+});
+
+// ─── AUTO-SAVE SYSTEM ────────────────────────────────────────────────────
+async function triggerSave() {
+    if (!activeAgentId) return;
+
+    if (autoSaveStatus) {
+        autoSaveStatus.textContent = 'Saving...';
+        autoSaveStatus.style.opacity = '1';
+    }
+
+    // Collect active permissions/capabilities
+    const permissions = Array.from(document.querySelectorAll('.cap-btn.active'))
+        .map(btn => btn.getAttribute('data-cap'));
+
+    const updatedData = {
+        ...activeAgentData,
+        id: activeAgentId, // CRITICAL: Enforce ID match to prevent accidental renames/duplications
+        name: document.getElementById('detail-name').value,
+        description: document.getElementById('detail-description').value,
+        responsibility: document.getElementById('detail-responsibility').value,
+        channel: document.getElementById('detail-channel').value,
+        workingDir: document.getElementById('detail-workdir').value,
+        tools: document.getElementById('detail-tools').value,
+        agentType: document.getElementById('detail-agent-type').value,
+        permissions: permissions
+    };
+
+    try {
+
+        const response = await fetch(`http://localhost:8000/agents/${activeAgentId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedData)
+        });
+
+        if (response.ok) {
+            localStorage.setItem('agentTrainingData', JSON.stringify(updatedData));
+            activeAgentData = updatedData;
+            document.getElementById('agent-name').textContent = `Training: ${updatedData.name}`;
+
+            // Selective sync node instead of full canvas wipe
+            if (window.agentCanvasInstance && typeof window.agentCanvasInstance.updateNodeInPlace === 'function') {
+                window.agentCanvasInstance.updateNodeInPlace(activeAgentId, updatedData);
+            }
+
+            if (autoSaveStatus) {
+                autoSaveStatus.textContent = 'Saved';
+                setTimeout(() => {
+                    if (autoSaveStatus) autoSaveStatus.style.opacity = '0.6';
+                }, 2000);
+            }
+        }
+    } catch (error) {
+        console.error('Auto-save error:', error);
+        if (autoSaveStatus) autoSaveStatus.textContent = 'Error saving';
+    }
+}
+
+function queueAutoSave() {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(triggerSave, 1000); // 1 second debounce
+}
 
 function initTrainingUI() {
     if (isTrainingUIInitialized) return;
@@ -304,89 +399,24 @@ function initTrainingUI() {
         });
     });
 
-    // Brain selection change
-    const brainSelect = document.getElementById('detail-brain');
-    brainSelect.addEventListener('change', async () => {
-        await updateApiKeyVisibility(brainSelect.value);
+    // Agent Type change
+    const typeSelect = document.getElementById('detail-agent-type');
+    typeSelect.addEventListener('change', () => {
+        const planBtn = document.getElementById('generate-plan-btn');
+        if (planBtn) {
+            planBtn.style.display = (typeSelect.value === 'master') ? 'block' : 'none';
+        }
+        queueAutoSave();
     });
 
-    // ── AUTO-SAVE SYSTEM ────────────────────────────────────────────────────
-    let saveTimeout = null;
-    const autoSaveStatus = document.getElementById('auto-save-status');
-
-    async function triggerSave() {
-        if (!activeAgentId) return;
-
-        if (autoSaveStatus) {
-            autoSaveStatus.textContent = 'Saving...';
-            autoSaveStatus.style.opacity = '1';
-        }
-
-        // Collect active permissions/capabilities
-        const permissions = Array.from(document.querySelectorAll('.cap-btn.active'))
-            .map(btn => btn.getAttribute('data-cap'));
-
-        const updatedData = {
-            ...activeAgentData,
-            name: document.getElementById('detail-name').value,
-            description: document.getElementById('detail-description').value,
-            responsibility: document.getElementById('detail-responsibility').value,
-            brain: document.getElementById('detail-brain').value,
-            channel: document.getElementById('detail-channel').value,
-            workingDir: document.getElementById('detail-workdir').value,
-            tools: document.getElementById('detail-tools').value,
-            permissions: permissions
-        };
-
-        const apiKey = document.getElementById('detail-api-key').value.trim();
-
-        try {
-            // Save API Key if provided
-            if (apiKey && updatedData.brain) {
-                await window.electronAPI.setApiKey({
-                    provider: updatedData.brain.toLowerCase(),
-                    apiKey: apiKey
-                });
-                document.getElementById('detail-api-key').value = '';
-                await updateApiKeyVisibility(updatedData.brain);
-            }
-
-            const response = await fetch(`http://localhost:8000/agents/${activeAgentId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedData)
-            });
-
-            if (response.ok) {
-                localStorage.setItem('agentTrainingData', JSON.stringify(updatedData));
-                activeAgentData = updatedData;
-                document.getElementById('agent-name').textContent = `Training: ${updatedData.name}`;
-
-                // Selective sync node instead of full canvas wipe
-                if (window.agentCanvasInstance && typeof window.agentCanvasInstance.updateNodeInPlace === 'function') {
-                    window.agentCanvasInstance.updateNodeInPlace(activeAgentId, updatedData);
-                }
-
-                if (autoSaveStatus) {
-                    autoSaveStatus.textContent = 'Saved';
-                    setTimeout(() => { autoSaveStatus.style.opacity = '0.6'; }, 2000);
-                }
-            }
-        } catch (error) {
-            console.error('Auto-save error:', error);
-            if (autoSaveStatus) autoSaveStatus.textContent = 'Error saving';
-        }
-    }
-
-    function queueAutoSave() {
-        if (saveTimeout) clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(triggerSave, 1000); // 1 second debounce
-    }
+    // Link autoSaveStatus to the global
+    autoSaveStatus = document.getElementById('auto-save-status');
 
     // Attach listeners to all inputs/selects for auto-save
     const autoSaveInputs = [
         'detail-name', 'detail-description', 'detail-responsibility',
-        'detail-brain', 'detail-channel', 'detail-tools', 'detail-workdir', 'detail-api-key'
+        'detail-channel', 'detail-tools', 'detail-workdir',
+        'detail-agent-type'
     ];
 
     autoSaveInputs.forEach(id => {
@@ -397,20 +427,19 @@ function initTrainingUI() {
         }
     });
 
-    // Special case for API key - also save on blur
-    document.getElementById('detail-api-key')?.addEventListener('blur', triggerSave);
-
     // Clear Chat button
     const clearChatBtn = document.getElementById('clear-chat-btn');
     if (clearChatBtn) {
         clearChatBtn.addEventListener('click', async () => {
             if (!activeAgentId) return;
-            if (!confirm('Clear all chat history for this agent? This cannot be undone.')) return;
+            const confirmed = await window.customConfirm('Clear all chat history for this agent? This cannot be undone.');
+            if (!confirmed) return;
             try {
                 await fetch(`http://localhost:8000/history/${activeAgentId}`, { method: 'DELETE' });
             } catch (e) {
                 console.warn('Could not clear history on backend:', e);
             }
+
             // Reset UI to blank greeting
             document.getElementById('chat-area').innerHTML = `
                 <div class="message agent-message">
@@ -486,6 +515,41 @@ function initTrainingUI() {
         } else {
             msgDiv.innerHTML = markdownToHtml(text);
             chatArea.appendChild(msgDiv);
+
+            // Attach event listeners to interactive buttons
+            const startBtn = msgDiv.querySelector('.start-autonomous-btn');
+            if (startBtn) {
+                startBtn.addEventListener('click', async () => {
+                    const agentId = startBtn.getAttribute('data-agent-id');
+                    const task = startBtn.getAttribute('data-task');
+
+                    if (agentId && task) {
+                        addMessage(`Starting execution of plan for: "${task}"`, true);
+
+                        try {
+                            const response = await fetch('http://localhost:8000/execute_autonomous', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    agent_id: agentId,
+                                    message: task
+                                })
+                            });
+
+                            if (response.ok) {
+                                const result = await response.json();
+                                addMessage(result.response || "Execution completed.", false);
+                            } else {
+                                addMessage(`Error executing plan: ${response.statusText}`, false);
+                            }
+                        } catch (error) {
+                            addMessage(`Error: ${error.message}`, false);
+                        }
+                    }
+                });
+                startBtn.style.cursor = 'pointer';
+            }
+
             animateWords(msgDiv);
         }
     }
@@ -516,32 +580,28 @@ function initTrainingUI() {
         addMessage(text, true);
         messageInput.value = '';
 
-        // 1. Get Configuration
-        const brain = document.getElementById('detail-brain').value;
-        if (!brain) {
-            addMessage("Error: No Brain selected. Please configure it in the sidebar.", false);
-            return;
-        }
-
-        // 2. Get API Key
-        const apiKey = await window.electronAPI.getApiKey(brain.toLowerCase());
-        if (!apiKey) {
-            addMessage(`Error: API Key for ${brain} is missing. Please save it in the agent settings.`, false);
-            return;
-        }
-
         showTypingIndicator();
 
-        // 3. Send to Backend
+        const toggleEl = document.getElementById('work-train-toggle');
+        const isTraining = toggleEl ? toggleEl.checked : false;
+        const mode = isTraining ? 'training' : 'work';
+
+        // In training mode, always use /chat (no autonomous planning).
+        // In work mode, master agents use /run_autonomous for tasks.
+        const agentType = activeAgentData.agentType || 'worker';
+        let endpoint = 'http://localhost:8000/chat';
+        if (!isTraining && agentType === 'master' && text.length > 10) {
+            endpoint = 'http://localhost:8000/run_autonomous';
+        }
+
         try {
-            const response = await fetch('http://localhost:8000/chat', {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     agent_id: activeAgentId,
                     message: text,
-                    api_key: apiKey,
-                    provider: brain
+                    mode: mode
                 })
             });
             removeTypingIndicator();
@@ -555,7 +615,7 @@ function initTrainingUI() {
             if (data.error) {
                 addMessage(`Error: ${data.error}`, false);
             } else {
-                addMessage(data.response, false);
+                processPlanResponse(data.response || "", text);
             }
         } catch (error) {
             removeTypingIndicator();
@@ -568,6 +628,130 @@ function initTrainingUI() {
     messageInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleSend();
     });
+
+    // Generate Plan button handler
+    const generatePlanBtn = document.getElementById('generate-plan-btn');
+    if (generatePlanBtn) {
+        generatePlanBtn.addEventListener('click', async () => {
+            const text = messageInput.value.trim();
+            if (!text) {
+                addMessage("Please enter a task before generating a plan.", true);
+                return;
+            }
+
+            addMessage(`Generate master plan for: ${text}`, true);
+            messageInput.value = '';
+
+            const toggleEl = document.getElementById('work-train-toggle');
+            const mode = (toggleEl && toggleEl.checked) ? 'training' : 'work';
+
+            showTypingIndicator();
+            try {
+                const response = await fetch('http://localhost:8000/run_autonomous', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agent_id: activeAgentId,
+                        message: text,
+                        mode: mode
+                    })
+                });
+
+                removeTypingIndicator();
+                const data = await response.json();
+
+                if (data.response) {
+                    processPlanResponse(data.response, text);
+                } else {
+                    addMessage(data.error || "Failed to generate plan.", false);
+                }
+            } catch (error) {
+                removeTypingIndicator();
+                addMessage("Error connecting to planning service.", false);
+            }
+        });
+    }
+
+    function processPlanResponse(responseText, originalTask) {
+        // Check if this is an execution plan response
+        if (responseText.includes("Execution Plan Generated") || responseText.includes("### 📝")) {
+            // Extract plan steps and show in dedicated area
+            const planAreaDiv = document.getElementById('autonomous-plan-area');
+            const planContentDiv = document.getElementById('plan-content');
+
+            // Extract the steps (lines starting with number followed by period)
+            const stepsMatch = responseText.match(/(\d+\.\s+.+?)(?=\n\d+\.|Plan file|$)/gs);
+            if (stepsMatch) {
+                const stepsHtml = stepsMatch
+                    .map(step => step.trim())
+                    .map(step => `<div class="plan-step">• ${step}</div>`)
+                    .join('');
+                planContentDiv.innerHTML = stepsHtml;
+                planAreaDiv.style.display = 'block';
+
+                // Store plan info for execution button
+                planAreaDiv.dataset.agentId = activeAgentId;
+                planAreaDiv.dataset.task = originalTask;
+
+                // Don't show this in chat, only show a summary message
+                addMessage(`✓ Execution plan generated with ${stepsMatch.length} steps. Use the plan panel to execute.`, false);
+            } else {
+                addMessage(responseText, false);
+            }
+        } else {
+            addMessage(responseText, false);
+        }
+    }
+
+    // ── AUTONOMOUS EXECUTION PLAN HANDLERS ──────────────────────
+    const autonomousPlanArea = document.getElementById('autonomous-plan-area');
+    const startExecutionBtn = document.getElementById('start-execution-btn');
+    const closePlanBtn = document.getElementById('close-plan-btn');
+
+    if (startExecutionBtn) {
+        startExecutionBtn.addEventListener('click', async () => {
+            const agentId = autonomousPlanArea.dataset.agentId;
+            const task = autonomousPlanArea.dataset.task;
+
+            if (!agentId || !task) return;
+
+            // Hide the plan area immediately
+            autonomousPlanArea.style.display = 'none';
+
+            // Show loading message
+            showTypingIndicator();
+            addMessage(`▶ Starting autonomous execution...`, true);
+
+            try {
+                const response = await fetch('http://localhost:8000/execute_autonomous', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agent_id: agentId,
+                        message: task
+                    })
+                });
+
+                removeTypingIndicator();
+
+                if (response.ok) {
+                    const result = await response.json();
+                    addMessage(result.response || "Execution completed.", false);
+                } else {
+                    addMessage(`Error executing plan: ${response.statusText}`, false);
+                }
+            } catch (error) {
+                removeTypingIndicator();
+                addMessage(`Error: ${error.message}`, false);
+            }
+        });
+    }
+
+    if (closePlanBtn) {
+        closePlanBtn.addEventListener('click', () => {
+            autonomousPlanArea.style.display = 'none';
+        });
+    }
 
     // ── RESIZING LOGIC ──────────────────────────────────────────
     const panel = document.getElementById('training-overlay');

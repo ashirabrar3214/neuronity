@@ -35,27 +35,7 @@
             <button id="next-to-step-3">Configure Brain</button>
         </div>
 
-        <!-- Step 3: Brain Provider -->
-        <div id="step-3" class="step hidden">
-            <p>Select the brain provider:</p>
-            <select id="brain-provider">
-                <option value="anthropic">Anthropic</option>
-                <option value="gemini">Gemini</option>
-                <option value="chatgpt">ChatGPT</option>
-                <option value="deepseek">DeepSeek</option>
-                <option value="grok">Grok</option>
-            </select>
-            <button id="next-to-step-4">Next</button>
-        </div>
-
-        <!-- Step 4: API Key -->
-        <div id="step-4" class="step hidden">
-            <p>Enter your <span id="provider-name"></span> API Key:</p>
-            <input type="password" id="api-key-input" placeholder="••••••••••••••••••••" />
-            <button id="save-key-btn">Save & Continue</button>
-        </div>
-
-        <!-- Step 5: Final -->
+        <!-- Step 3: Final -->
         <div id="step-5" class="step hidden">
             <h1>Setup Complete</h1>
             <p>Your Easy Company agent is ready.</p>
@@ -100,16 +80,6 @@
                     </div>
                     <div class="sidebar-row">
                         <div class="sidebar-section">
-                            <label>Brain</label>
-                            <select id="detail-brain">
-                                <option value="">None</option>
-                                <option value="Gemini">Gemini</option>
-                                <option value="Anthropic">Anthropic</option>
-                                <option value="OpenAI">OpenAI</option>
-                                <option value="DeepSeek">DeepSeek</option>
-                            </select>
-                        </div>
-                        <div class="sidebar-section">
                             <label>Channel</label>
                             <select id="detail-channel">
                                 <option value="Gmail">Gmail</option>
@@ -118,12 +88,6 @@
                                 <option value="Terminal">Terminal</option>
                             </select>
                         </div>
-                    </div>
-
-                    <div id="api-key-wrapper" class="sidebar-section" style="display: none;">
-                        <label>API Key</label>
-                        <div id="api-key-status" class="api-key-status"></div>
-                        <input type="password" id="detail-api-key" placeholder="Enter API Key">
                     </div>
 
                     <div class="sidebar-section">
@@ -135,6 +99,15 @@
                             <button class="cap-btn" data-cap="email">📧 Email Tools</button>
                         </div>
                     </div>
+                    <div class="sidebar-section">
+                        <label>Persona Mode</label>
+                        <select id="detail-agent-type">
+                            <option value="worker">Worker Agent (Conversational / Direct)</option>
+                            <option value="master">Master Agent (Planning / Orchestration)</option>
+                        </select>
+                        <p class="section-help">Master agents always generate a multi-step plan before execution.</p>
+                    </div>
+
                     <div class="sidebar-section">
                         <label>Working Directory</label>
                         <div class="input-with-icon">
@@ -161,14 +134,31 @@
                             here.
                         </div>
                     </div>
+
+                    <!-- Autonomous Planning Preview Gateway -->
+                    <div id="autonomous-plan-area" class="autonomous-plan-area" style="display: none;">
+                        <div class="plan-header">
+                            <span>📋 Proposed Execution Plan</span>
+                            <button id="close-plan-btn" class="close-plan-btn">&times;</button>
+                        </div>
+                        <div id="plan-content" class="plan-content">
+                            <!-- Plan steps will be injected here -->
+                        </div>
+                        <button id="start-execution-btn" class="start-autonomous-btn">Confirm & Execute Plan</button>
+                    </div>
+
                     <div class="chat-input-wrapper">
                         <input type="text" id="message-input" placeholder="Type instructions or train the agent...">
+                        <button id="generate-plan-btn" class="plan-btn" title="Generate Execution Plan"
+                            style="display: none;">📋 Plan</button>
                         <button id="send-btn">Send</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+
 
     <!-- Styles for components -->
     <link rel="stylesheet" href="canvas.css">

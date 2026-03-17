@@ -1,10 +1,10 @@
 
-class agent_NewAgent_1773599653331:
+class agent_bot_1773719459989:
     def __init__(self):
-        self.id = "agent-NewAgent-1773599653331"
-        self.name = "John"
+        self.id = "agent-bot-1773719459989"
+        self.name = "Religion"
         self.working_dir = r""
-        self.permissions = []
+        self.permissions = ['web search']
         self.tools = "Custom"
         
     def get_personality(self):
@@ -17,5 +17,5 @@ class agent_NewAgent_1773599653331:
             return {}
 
 if __name__ == "__main__":
-    agent = agent_NewAgent_1773599653331()
+    agent = agent_bot_1773719459989()
     print(f"Agent {agent.name} initialized.")

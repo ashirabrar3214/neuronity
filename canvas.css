@@ -577,3 +577,77 @@ path.connection-line:hover {
 body.training-panel-active #agent-canvas {
     width: 100%;
 }
+
+/* Custom Confirm Modal */
+.custom-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    z-index: 99999;
+    /* Fix for being under training panel (1100) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.custom-modal-box {
+    background: var(--bg-panel, #1e1e1e);
+    border: 1px solid var(--border-subtle, #333);
+    border-radius: 6px;
+    padding: 16px 20px;
+    min-width: 250px;
+    max-width: 350px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    text-align: center;
+    color: var(--text-primary, #fff);
+    font-family: inherit;
+}
+
+.custom-modal-message {
+    margin-bottom: 20px;
+    font-size: 13px;
+    line-height: 1.4;
+    font-weight: 400;
+}
+
+.custom-modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.custom-modal-actions button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.custom-btn-secondary {
+    background: transparent;
+    color: #a0a0a0;
+    border: 1px solid #444 !important;
+}
+
+.custom-btn-secondary:hover {
+    background: #2a2a2a;
+    color: #fff;
+    border-color: #666 !important;
+}
+
+.custom-btn-danger {
+    background: transparent;
+    color: #ff4d4d;
+    border: 1px solid #ff4d4d !important;
+}
+
+.custom-btn-danger:hover {
+    background: rgba(255, 77, 77, 0.1);
+}

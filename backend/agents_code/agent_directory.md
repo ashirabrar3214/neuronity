@@ -1,11 +1,18 @@
-## PROJECT AGENT DIRECTORY
+﻿## PROJECT AGENT DIRECTORY
 Below are all agents currently in this project. Use this to identify who to delegate tasks to.
-### Researcher (ID: `agent-NewAgent-1773527895535`)
-- **Role**: 
-- **Description**: Agent description...
-- **Capabilities**: web search, thinking, file access
 
-### Reporter (ID: `agent-NewAgent-1773527922450`)
-- **Role**: 
+### Geopolitics (ID: `agent-NewAgent-1773617855597`)
+- **Role**: worker
 - **Description**: Agent description...
-- **Capabilities**: report generation
+- **Capabilities**: web search
+
+### Religion (ID: `agent-NewAgent-1773617893878`)
+- **Role**: worker
+- **Description**: Agent description...
+- **Capabilities**: web search
+
+### MasterAgent (ID: `agent-NewAgent-1773624336809`)
+- **Role**: master
+- **Description**: Agent description...
+- **Capabilities**: thinking, report generation, file access
+

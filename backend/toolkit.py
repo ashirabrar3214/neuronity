@@ -77,36 +77,6 @@ Respond with ONLY a JSON array of the index numbers to keep. Example: [0, 2, 5, 
 Select between 3 and 8 sources. Prioritize: relevance, authority (Wikipedia, major news, official sites), and recency.
 """
     
-    model = "gemini-2.0-flash"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    data = {
-        "contents": [{"role": "user", "parts": [{"text": filter_prompt}]}],
-        "generationConfig": {"temperature": 0.1}  # Low temperature for consistent JSON output
-    }
-    
-    try:
-        response = requests.post(url, headers={"Content-Type": "application/json"}, json=data, timeout=15)
-        if response.status_code == 200:
-            res_json = response.json()
-            candidates = res_json.get("candidates", [])
-            if candidates and isinstance(candidates, list) and len(candidates) > 0:
-                cand = candidates[0]
-                content = cand.get("content", {})
-                parts = content.get("parts", [])
-                if parts and isinstance(parts, list) and len(parts) > 0:
-                    raw = parts[0].get("text", "")
-                    # Extract the JSON array from the response
-                    import re
-                    match = re.search(r'\[([\d,\s]+)\]', raw)
-                    if match:
-                        indices = json.loads(match.group(0))
-                        filtered = [search_results[i] for i in indices if 0 <= i < len(search_results)]
-                        safe_log(f"+++ [CAPABILITY:filter] Kept {len(filtered)}/{len(search_results)} sources")
-                        return filtered if filtered else search_results
-    except Exception as e:
-        safe_log(f"!!! [CAPABILITY:filter] Error: {e} — using all results")
-    
-    # Fallback: return all results if filtering fails
     return search_results
 
 
@@ -114,8 +84,9 @@ Select between 3 and 8 sources. Prioritize: relevance, authority (Wikipedia, maj
 def synthesize_fact_with_gemini(query, search_results, api_key):
     """
     Specialized synthesis for quick facts, targeted data, or small snippets.
+    Returns a structured JSON object containing the fact, source URLs, and confidence.
     """
-    safe_log(f"[STATUS] Extracting specific facts")
+    safe_log(f"[STATUS] Extracting specific facts with semantic attribution")
     
     if isinstance(search_results, str):
         return search_results
@@ -129,37 +100,17 @@ USER REQUEST: {query}
 SEARCH DATA:
 {raw_context}
 
-RULES:
-1. Answer the question directly. 
-2. Be concise but complete.
-3. If it's a specific data point (e.g., oil price, date), give the fact and brief context.
-4. If it's a general question (e.g., 'What happened in the news today?'), provide a short summary paragraph.
-5. You MUST include a source URL for every major fact in the format [Source: URL].
-6. Return the answer text followed by a '### Sources' section containing all relevant links found.
-7. If the information is not found, state that clearly.
+STRICT RULE: You must return ONLY a JSON object with the following structure:
+{{
+  "fact": "The direct answer to the question.",
+  "sources": ["URL1", "URL2", ...],
+  "confidence_score": 0.0 to 1.0 based on source reliability
+}}
+
+If the information is not found, set "fact" to "Information not found" and "sources" to [].
 """
 
-    model = "gemini-2.0-flash"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    data = {
-        "contents": [{"role": "user", "parts": [{"text": fact_prompt}]}],
-    }
-    
-    try:
-        response = requests.post(url, json=data, timeout=15)
-        if response.status_code == 200:
-            res_json = response.json()
-            candidates = res_json.get("candidates", [])
-            if candidates and isinstance(candidates, list) and len(candidates) > 0:
-                cand = candidates[0]
-                content = cand.get("content", {})
-                parts = content.get("parts", [])
-                if parts and isinstance(parts, list) and len(parts) > 0:
-                    return parts[0].get("text", "").strip()
-    except Exception as e:
-        safe_log(f"!!! [INTERNAL:fact_synth] Error: {e}")
-    
-    return "Could not extract fact from search results."
+    return json.dumps({"fact": "Could not extract fact. Synthesis tool currently limited.", "sources": [], "confidence_score": 0})
 
 def web_search(query, agent_id, api_key):
     """
@@ -437,27 +388,24 @@ FORMATTING RULES:
 
         model = "gemini-2.0-flash"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        headers = {"Content-Type": "application/json"}
         data = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"response_mime_type": "application/json"}
+            "generationConfig": {"temperature": 0.2}
         }
         
-        response = requests.post(url, json=data, timeout=30)
+        response = requests.post(url, headers=headers, json=data, timeout=30)
         if response.status_code != 200:
             return f"Synthesis failed: {response.text}"
             
         res_json = response.json()
         candidates = res_json.get("candidates", [])
-        if not candidates or not isinstance(candidates, list) or len(candidates) == 0:
-            return f"Synthesis failed: No candidates in response. Payload: {json.dumps(res_json)}"
+        if not candidates:
+            return f"Synthesis failed: No candidates in response. {json.dumps(res_json)}"
             
-        cand = candidates[0]
-        content = cand.get("content", {})
-        parts = content.get("parts", [])
-        if not parts or not isinstance(parts, list) or len(parts) == 0:
-            return f"Synthesis failed: No parts in response. Payload: {json.dumps(res_json)}"
-            
-        report_data_json = parts[0].get("text", "")
+        report_data_json = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+        # Remove markdown backticks if Gemini added them
+        report_data_json = re.sub(r'```json\s*|\s*```', '', report_data_json).strip()
         report_data = json.loads(report_data_json)
         
         # Get dynamic title from LLM or fallback to topic
@@ -551,10 +499,31 @@ def message_agent(target_id, message, sender_id, sender_name, api_key, target_pr
         if isinstance(body, dict) and "error" in body:
             return f"Error from {target_id}: {body['error']}"
         target_response = body.get("response", "") if isinstance(body, dict) else ""
+
+        # Evaluate whether the agent actually executed the task or just stated intent.
+        # Intent-only responses contain future-tense promises but no evidence of tool results.
+        intent_markers = ["i will ", "i'll ", "i would ", "i plan to ", "i am going to ", "i'll start", "i need to "]
+        execution_markers = ["result:", "found:", "created:", "generated:", "completed:", "here is", "here are", "report", "error:"]
+        response_lower = target_response.lower().strip()
+        has_intent = any(m in response_lower for m in intent_markers)
+        has_execution = any(m in response_lower for m in execution_markers)
+
+        if has_intent and not has_execution:
+            instruction = (
+                "EVALUATION — TASK NOT COMPLETED: The receiving agent stated intent but did NOT execute the task "
+                "(no tool results or concrete output present). "
+                "You MUST inform the user: \"[AgentName] acknowledged the request but has not produced results. "
+                "They may lack the required permissions or connections to complete the task. "
+                "Check their capability settings or complete the task yourself.\"\n"
+                "Do NOT present this as success."
+            )
+        else:
+            instruction = "INSTRUCTION: The agent produced results. Relay their findings clearly and completely to the user."
+
         return (f"--- DATA RECEIVED FROM {target_id} ---\n"
                 f"{target_response}\n"
                 f"--- END OF DATA ---\n"
-                f"INSTRUCTION: You MUST now summarize or relay this information back to your sender.")
+                f"{instruction}")
 
     err = f"HTTP {result_container['status']}: {result_container['body']}"
     safe_log(f"!!! [CAPABILITY:message_agent] {err}")
@@ -705,11 +674,12 @@ def write_file(agent_id, input_str, working_dir):
 
 def post_finding(agent_id, tool_input):
     """
-    Writes a key insight to the Global Knowledge Base (Stigmergy).
+    Writes a key insight to the Volatile Workspace Ledger. 
+    Notes: This file is temporary and cleared after autonomous tasks.
     Format: "Insight/Fact | Source URL"
     """
     try:
-        ledger_path = os.path.join(os.path.dirname(__file__), "agents_code", "knowledge_base.json")
+        ledger_path = os.path.join(os.path.dirname(__file__), "agents_code", "volatile_findings.json")
         os.makedirs(os.path.dirname(ledger_path), exist_ok=True)
         
         data = []
@@ -731,14 +701,14 @@ def post_finding(agent_id, tool_input):
         }
         data.append(entry)
         
-        # Keep it lean (last 50 findings)
-        if len(data) > 50:
-            data = data[-50:]
+        # Keep it lean (last 100 findings)
+        if len(data) > 100:
+            data = data[-100:]
             
         with open(ledger_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
             
-        return f"Success: Insight recorded in the Workspace Ledger."
+        return f"Success: Insight recorded in the Volatile Ledger."
     except Exception as e:
         return f"Error posting finding: {e}"
 

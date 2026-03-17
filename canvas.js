@@ -69,14 +69,10 @@ class AgentCanvas {
         nodeEl.innerHTML = `
             <div class="node-port port-in"></div>
             <div class="node-header">
-                <span class="node-title" style="outline:none; min-width: 50px;">${title}</span>
+                <span class="node-title" contenteditable="true" spellcheck="false" style="outline:none; min-width: 50px;">${title}</span>
                 <span class="expand-btn" style="opacity:0.5; cursor: pointer; font-size: 12px;">▼</span>
             </div>
             <div class="node-settings" style="display:none;">
-                <div class="setting-row">
-                    <label>Brain Provider:</label>
-                    <div class="brain-provider-display">${data.brain || 'Gemini'}</div>
-                </div>
                 <div class="setting-row" style="margin-top: 10px;">
                     <label>Working Dir:</label>
                     <span class="workdir-display" title="${data.workingDir || ''}">${data.workingDir || 'Not set'}</span>
@@ -92,11 +88,6 @@ class AgentCanvas {
             <div class="node-port port-out"></div>
         `;
 
-        // Set initial provider if data exists
-        const brainDisplay = nodeEl.querySelector('.brain-provider-display');
-        if (data.brain) {
-            brainDisplay.textContent = data.brain.charAt(0).toUpperCase() + data.brain.slice(1);
-        }
 
         // Settings Toggle
         const expandBtn = nodeEl.querySelector('.expand-btn');
@@ -132,10 +123,11 @@ class AgentCanvas {
 
         // Delete Button
         const deleteBtn = nodeEl.querySelector('.delete-btn');
-        deleteBtn.addEventListener('click', (e) => {
+        deleteBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const agentName = nodeEl.querySelector('.node-title').innerText;
-            if (confirm(`Are you sure you want to delete "${agentName}"?`)) {
+            const confirmed = await window.customConfirm(`Are you sure you want to delete "${agentName}"?`);
+            if (confirmed) {
                 this.deleteAgent(id);
             }
         });
@@ -163,12 +155,28 @@ class AgentCanvas {
         });
 
         // Auto-save listeners for text and selects
-        nodeEl.querySelector('.node-title').addEventListener('blur', () => this.saveAgentData(id));
+        const titleEl = nodeEl.querySelector('.node-title');
+        titleEl.addEventListener('blur', () => this.saveAgentData(id));
+        titleEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                titleEl.blur();
+            }
+        });
         nodeEl.querySelector('.node-body').addEventListener('blur', () => this.saveAgentData(id));
 
         this.nodesLayer.appendChild(nodeEl);
         this.nodes.push({ id, el: nodeEl, data });
         return nodeEl;
+    }
+
+    deleteConnection(sourceId, targetId) {
+        const index = this.connections.findIndex(c => c.sourceId === sourceId && c.targetId === targetId);
+        if (index !== -1) {
+            this.connections[index].path.remove();
+            this.connections.splice(index, 1);
+            this.saveAgentData(sourceId); // Assuming saving source updates connections
+        }
     }
 
     connectNodes(sourceId, targetId) {
@@ -319,9 +327,9 @@ class AgentCanvas {
 
     addAgentAtMouse() {
         this.nodeIdCounter++;
-        const name = 'New Agent';
-        // Generate ID: agent-Name-Timestamp
-        const id = `agent-${name.replace(/\s+/g, '')}-${Date.now()}`;
+        const name = ''; // Empty name to start
+        // Generate ID: agent-X-Timestamp
+        const id = `agent-bot-${Date.now()}`;
         const x = this.contextMenuMousePosition.x - this.pan.x;
         const y = this.contextMenuMousePosition.y - this.pan.y;
 
@@ -332,7 +340,14 @@ class AgentCanvas {
         };
 
         // Render immediately
-        this.createNode(id, name, 'Agent description...', x, y, newAgent);
+        const nodeEl = this.createNode(id, name, 'Agent description...', x, y, newAgent);
+
+        // Put cursor in the name field immediately
+        const titleEl = nodeEl.querySelector('.node-title');
+        setTimeout(() => {
+            titleEl.focus();
+            // Optional: check if we should put a placeholder or just leave it empty
+        }, 100);
 
         // Save to Python Backend
         fetch('http://localhost:8000/agents', {
@@ -414,9 +429,16 @@ class AgentCanvas {
             if (this.draggedNode && this.draggedNode.id === agentId) {
                 this.draggedNode = null;
             }
+
+            // Fallback for Electron UI freezing after deletions
+            setTimeout(() => {
+                document.body.style.userSelect = '';
+                document.body.style.pointerEvents = '';
+            }, 50);
+
         } catch (error) {
             console.error("Error deleting agent:", error);
-            alert(`Could not delete agent: ${error.message}`);
+            await window.customConfirm(`Could not delete agent: ${error.message}`);
         }
     }
 
@@ -522,10 +544,6 @@ class AgentCanvas {
             const bodyEl = el.querySelector('.node-body');
             if (bodyEl) bodyEl.innerText = data.description;
         }
-        if (data.brain) {
-            const brainDisplay = el.querySelector('.brain-provider-display');
-            if (brainDisplay) brainDisplay.textContent = data.brain.charAt(0).toUpperCase() + data.brain.slice(1);
-        }
     }
 
     logToTerminal(agentId, message) {
@@ -540,11 +558,14 @@ class AgentCanvas {
             }
         }
 
+        // Clean trailing dots to avoid double dots with animation
+        let cleanMessage = message.replace(/\.+$/, '').trim();
+
         // Clean the terminal
-        terminal.innerHTML = `> ${message}`;
+        terminal.innerHTML = `> ${cleanMessage}`;
 
         // Add animated dots if we are performing an action
-        const lowerMsg = message.toLowerCase();
+        const lowerMsg = cleanMessage.toLowerCase();
         const keywords = ['training', 'searching', 'thinking', 'generating', 'processing', 'talking', 'message received', 'incoming', 'contacting'];
         if (keywords.some(kw => lowerMsg.includes(kw))) {
             const dots = document.createElement('span');
@@ -553,5 +574,37 @@ class AgentCanvas {
         }
     }
 }
+
+// Global Custom Confirm Modal to replace buggy Electron native confirm()
+window.customConfirm = function (message) {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('custom-confirm-overlay');
+        const msgEl = document.getElementById('custom-confirm-message');
+        const btnCancel = document.getElementById('custom-confirm-cancel');
+        const btnOk = document.getElementById('custom-confirm-ok');
+
+        if (!overlay) {
+            // Fallback if HTML is missing
+            resolve(confirm(message));
+            return;
+        }
+
+        msgEl.textContent = message;
+        overlay.style.display = 'flex';
+
+        // Cleanup function to remove listeners
+        const cleanup = () => {
+            overlay.style.display = 'none';
+            btnCancel.removeEventListener('click', onCancel);
+            btnOk.removeEventListener('click', onOk);
+        };
+
+        const onCancel = () => { cleanup(); resolve(false); };
+        const onOk = () => { cleanup(); resolve(true); };
+
+        btnCancel.addEventListener('click', onCancel);
+        btnOk.addEventListener('click', onOk);
+    });
+};
 
 window.AgentCanvas = AgentCanvas;

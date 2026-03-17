@@ -1,0 +1,13 @@
+{
+  "objective": "Objective: Research and compile a report on the Iran War",
+  "steps": [
+    "Step 1: Initial Inquiry to Political and Economic agents for background information and key aspects.",
+    "Step 2: Deep Dive into Political motivations and Economic impacts",
+    "Step 3: Gather information on religious aspects from the Religion agent",
+    "Step 4: Compile all information into a structured report with source citations.",
+    "Step 5: Review and refine the report for accuracy and completeness."
+  ],
+  "completed": [
+    "Task Completed"
+  ]
+}

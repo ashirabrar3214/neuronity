@@ -14,7 +14,7 @@
     "electron": "^40.8.0"
   },
   "dependencies": {
-    "electron-store": "^11.0.2",
+    "dotenv": "^17.3.1",
     "pyodide": "^0.29.3"
   }
 }

@@ -2,20 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
-let store;
 let pythonProcess;
-
-ipcMain.handle('set-api-key', (event, { provider, apiKey }) => {
-  if (store) {
-    store.set(`apiKeys.${provider}`, apiKey);
-  }
-});
-
-ipcMain.handle('get-api-key', (event, provider) => {
-  if (store) {
-    return store.get(`apiKeys.${provider}`);
-  }
-});
 
 ipcMain.handle('select-directory', async () => {
   const result = await dialog.showOpenDialog({
@@ -44,13 +31,18 @@ function startPythonBackend() {
 
   pythonProcess.stdout.on('data', (data) => {
     const str = data.toString();
-    console.log(`Python: ${str}`);
+    console.log(`Python: ${str.trim()}`);
     sendToRenderer(str);
   });
 
   pythonProcess.stderr.on('data', (data) => {
     const str = data.toString();
-    console.error(`Python Error: ${str}`);
+    // Only prefix as Error if it doesn't look like a standard Uvicorn INFO/WARNING log
+    if (str.includes('INFO:') || str.includes('WARNING:')) {
+      console.log(`Python backend: ${str.trim()}`);
+    } else {
+      console.error(`Python backend Error: ${str.trim()}`);
+    }
     sendToRenderer(str);
   });
 }
@@ -70,9 +62,6 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  const { default: Store } = await import('electron-store');
-  store = new Store();
-  console.log("API Keys are saved at:", store.path);
   startPythonBackend();
 
   createWindow();

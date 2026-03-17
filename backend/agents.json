@@ -1,35 +1,76 @@
 [
   {
-    "id": "agent-MasterBot-001",
-    "name": "MasterBot",
-    "description": "Main orchestrator agent.",
-    "brain": "gemini",
+    "id": "agent-bot-1773697414554",
+    "name": "Masterbot",
+    "description": "Agent description...",
+    "brain": "Gemini",
+    "channel": "Gmail",
+    "workingDir": "D:\\New folder",
+    "permissions": [
+      "report generation"
+    ],
+    "tools": "Custom",
+    "responsibility": "",
+    "agentType": "master",
+    "x": -998.0,
+    "y": 177.0,
+    "connections": []
+  },
+  {
+    "id": "agent-bot-1773719459989",
+    "name": "Religion",
+    "description": "Agent description...",
+    "brain": "",
     "channel": "Gmail",
     "workingDir": "",
     "permissions": [
-      "web search",
-      "thinking"
+      "web search"
     ],
-    "tools": "Gmail",
-    "responsibility": "Coordinate all agents",
-    "x": -343.0,
-    "y": 116.0,
+    "tools": "Custom",
+    "responsibility": "",
+    "agentType": "worker",
+    "x": -1365.0,
+    "y": -126.0,
     "connections": [
-      "agent-NewAgent-1773599653331"
+      "agent-bot-1773697414554"
     ]
   },
   {
-    "id": "agent-NewAgent-1773599653331",
-    "name": "John",
+    "id": "agent-bot-1773719477712",
+    "name": "Economics",
     "description": "Agent description...",
-    "brain": "gemini",
+    "brain": "",
     "channel": "Gmail",
     "workingDir": "",
-    "permissions": [],
+    "permissions": [
+      "web search"
+    ],
     "tools": "Custom",
     "responsibility": "",
-    "x": 45.0,
-    "y": 82.0,
-    "connections": []
+    "agentType": "worker",
+    "x": -1370.0,
+    "y": 196.0,
+    "connections": [
+      "agent-bot-1773697414554"
+    ]
+  },
+  {
+    "id": "agent-bot-1773719489513",
+    "name": "Political",
+    "description": "Agent description...",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [
+      "web search"
+    ],
+    "tools": "Custom",
+    "responsibility": "",
+    "agentType": "worker",
+    "x": -1339.0,
+    "y": 550.0,
+    "connections": [
+      "agent-bot-1773697414554"
+    ]
   }
 ]
