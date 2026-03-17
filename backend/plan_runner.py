@@ -20,7 +20,7 @@ def safe_log(message):
 def _call_llm_direct(prompt, api_key, provider):
     """One-shot LLM call for plan generation (no history, no tools)."""
     if provider == "gemini":
-        model = "gemini-2.0-flash"
+        model = "gemini-3-flash-preview"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         data = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -157,21 +157,29 @@ def execute_step(step_num, total_steps, step_text, agent_id, accumulated_context
     ctx_section = f"\n\nGATHERED RESEARCH SO FAR:\n{ctx}" if ctx else ""
 
     if is_pdf_step:
-        # Hard-code the PDF generation instruction — no ambiguity, no thinking needed
+        # Hard-code the PDF generation instruction.
+        # The PDF step MUST read from the Blackboard first to get full structured data.
         message = (
             f"[AUTO_STEP {step_num}/{total_steps}] AUTONOMOUS EXECUTION MODE — PDF GENERATION.\n\n"
-            f"All research is complete. Your ONLY job now is to call the report_generation tool to create a PDF.\n"
-            f"Do NOT use thinking, web_search, or generate_report. Use ONLY report_generation.\n"
-            f"Do NOT ask for more information or capabilities. The data below is sufficient.\n\n"
+            f"All research is complete and stored in the Blackboard. Your ONLY job now is:\n"
+            f"1. First: call [TOOL: read_blackboard({step_text})] to retrieve ALL gathered research.\n"
+            f"2. Then: call [TOOL: report_generation(topic|context)] using that blackboard data as the context.\n"
+            f"Do NOT use thinking, web_search, or generate_report. Use ONLY read_blackboard then report_generation.\n"
+            f"Do NOT skip step 1. The blackboard contains raw verified data you MUST use.\n\n"
             f"ORIGINAL TASK: {step_text}\n"
-            f"{ctx_section}"
         )
     else:
         message = (
-            f"[AUTO_STEP {step_num}/{total_steps}] AUTONOMOUS EXECUTION MODE.\n"
-            f"Execute ONLY this specific step and return the result. Do not attempt other steps.\n\n"
-            f"STEP: {step_text}"
-            f"{ctx_section}"
+            f"[AUTO_STEP {step_num}/{total_steps}] AUTONOMOUS EXECUTION MODE — EXTRACTION PHASE.\n"
+            f"Execute ONLY this specific research step. Return the result to the plan runner.\n\n"
+            f"STEP: {step_text}\n"
+            f"{ctx_section}\n\n"
+            f"## EXTRACTION MODE RULES (MANDATORY):\n"
+            f"1. Do NOT summarize findings. Store the VERBATIM text from each source.\n"
+            f"2. For EVERY fact found, make a SEPARATE [TOOL: post_finding(verbatim text. Source: URL)] call.\n"
+            f"3. Include the EXACT source URL in every post_finding call.\n"
+            f"4. After storing all facts, write a brief 2-3 line summary for the plan runner to track progress.\n"
+            f"5. You are FORBIDDEN from synthesizing or drawing conclusions. Just extract and store raw facts."
         )
 
     try:
@@ -180,12 +188,27 @@ def execute_step(step_num, total_steps, step_text, agent_id, accumulated_context
             "message": message,
             "api_key": api_key,
             "provider": provider
-        }, timeout=300)
+        }, timeout=300, stream=True)
 
         if resp.status_code == 200:
-            result = resp.json().get("response", "")
+            full_text = ""
+            for line in resp.iter_lines():
+                if not line: continue
+                decoded = line.decode('utf-8').strip()
+                if decoded.startswith("data: "):
+                    content = decoded[6:]
+                    if content == "[DONE]": break
+                    try:
+                        data = json.loads(content)
+                        if data.get("type") == "text":
+                            full_text += data.get("content", "")
+                        elif data.get("type") == "error":
+                            safe_log(f"!!! [PLAN_RUNNER] Stream Error: {data.get('content')}")
+                            return f"Step failed: {data.get('content')}"
+                    except: pass
+            
             safe_log(f"[STATUS:{agent_id}] Step {step_num} complete")
-            return result
+            return full_text
         else:
             safe_log(f"!!! [PLAN_RUNNER] Step {step_num} HTTP {resp.status_code}")
             return f"Step failed: HTTP {resp.status_code}"
@@ -211,15 +234,25 @@ def run_autonomous(agent_id, task, api_key, provider, agents_info=""):
 def run_execution_loop(agent_id, task, api_key, provider):
     """
     Phase 2: Actual step-by-step execution loop.
+    Clears the Blackboard at start, injects EXTRACTION MODE into each step,
+    and pulls from the Blackboard (not accumulated context) for the PDF step.
     """
     safe_log(f"[STATUS:{agent_id}] Autonomous execution loop started")
     
-    # CLEAR VOLATILE LEDGER: Start with a fresh slate for the new task
+    # CLEAR VOLATILE LEDGER: Start with a fresh slate
     volatile_path = os.path.join(AGENTS_CODE_DIR, "volatile_findings.json")
     if os.path.exists(volatile_path):
         try:
             os.remove(volatile_path)
             safe_log(f"--- [CLEANUP] Volatile ledger cleared for new task.")
+        except: pass
+
+    # CLEAR BLACKBOARD: Fresh research for this plan run
+    blackboard_path = os.path.join(AGENTS_CODE_DIR, "blackboard.json")
+    if os.path.exists(blackboard_path):
+        try:
+            os.remove(blackboard_path)
+            safe_log(f"--- [CLEANUP] Blackboard cleared for new task.")
         except: pass
 
     # Load steps from plan.md to ensure consistency with what the user saw

@@ -1,7 +1,9 @@
 {
-  "objective": "Objective",
+  "objective": "Objective: Research the role of religion in the Israeli-Palestinian conflict.",
   "steps": [
-    "Summarize the key findings about the domain based on the gathered research."
+    "Step 1: Conduct web searches on the role of religion in the Israeli-Palestinian conflict",
+    "Step 2: Extract key findings from search results",
+    "Step 3: Post findings to the shared workspace ledger."
   ],
   "completed": [
     "Task Completed"

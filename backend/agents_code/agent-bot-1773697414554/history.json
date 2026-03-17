@@ -1,18 +1,1 @@
-[
-  {
-    "role": "assistant",
-    "content": "*Agent Action: Report Generation...*"
-  },
-  {
-    "role": "assistant",
-    "content": "*Agent Action: Update Plan...*"
-  },
-  {
-    "role": "user",
-    "content": "SYSTEM WARNING: You are approaching your maximum step limit (1 turn remaining). Please summarize your progress and tell the user specifically what is left to do, then stop. The user can say 'Continue' to give you more steps."
-  },
-  {
-    "role": "assistant",
-    "content": "I have completed the research and generated a PDF report on the Iran-Iraq War. The report is saved in D:\\New folder as Report_The_Iran-Iraq_War_A_Multifaceted_Analysis_of_Reli.pdf.\n"
-  }
-]
+[]

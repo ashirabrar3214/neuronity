@@ -604,23 +604,94 @@ function initTrainingUI() {
                     mode: mode
                 })
             });
-            removeTypingIndicator();
-            const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                addMessage(`Error: ${data.detail || response.statusText || 'Unknown backend error'}`, false);
+                removeTypingIndicator();
+                addMessage(`Error: ${response.statusText}`, false);
                 return;
             }
 
-            if (data.error) {
-                addMessage(`Error: ${data.error}`, false);
-            } else {
-                processPlanResponse(data.response || "", text);
+            // --- STREAM HANDLING ---
+            removeTypingIndicator();
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            let messageDiv = document.createElement('div');
+            messageDiv.className = 'message agent-message';
+            chatArea.appendChild(messageDiv);
+
+            let thoughtDetails = null;
+            let thoughtContent = null;
+            let responseContent = "";
+            let fullThoughtText = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (let line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    let dataText = line.slice(6).trim();
+                    if (dataText === '[DONE]') break;
+
+                    try {
+                        const data = JSON.parse(dataText);
+
+                        if (data.type === 'thought') {
+                            if (!thoughtDetails) {
+                                thoughtDetails = document.createElement('details');
+                                thoughtDetails.className = 'thought-block';
+                                thoughtDetails.innerHTML = `<summary>🧠 <i>Thinking...</i></summary><div class="thought-content"></div>`;
+                                messageDiv.appendChild(thoughtDetails);
+                                thoughtContent = thoughtDetails.querySelector('.thought-content');
+                            }
+                            fullThoughtText += data.content;
+                            thoughtContent.textContent = fullThoughtText;
+                        }
+                        else if (data.type === 'text') {
+                            responseContent += data.content;
+                            // Update the main message area below/after the thoughts
+                            let textSpan = messageDiv.querySelector('.response-text');
+                            if (!textSpan) {
+                                textSpan = document.createElement('div');
+                                textSpan.className = 'response-text';
+                                messageDiv.appendChild(textSpan);
+                            }
+                            textSpan.innerHTML = markdownToHtml(responseContent);
+                        }
+                        else if (data.type === 'status' || data.type === 'tool_start') {
+                            let statusEl = messageDiv.querySelector('.stream-status');
+                            if (!statusEl) {
+                                statusEl = document.createElement('div');
+                                statusEl.className = 'stream-status';
+                                messageDiv.appendChild(statusEl);
+                            }
+                            statusEl.innerHTML = `<i>${data.content || 'Action...'}</i>`;
+                        }
+                        else if (data.type === 'error') {
+                            messageDiv.innerHTML += `<div class="error-text">⚠️ ${data.content}</div>`;
+                        }
+                    } catch (e) {
+                        console.error("Error parsing stream chunk:", e, dataText);
+                    }
+                }
+                chatArea.scrollTop = chatArea.scrollHeight;
             }
+
+            // Post-stream cleanup/animation
+            // Remove status once done
+            const sEl = messageDiv.querySelector('.stream-status');
+            if (sEl) sEl.remove();
+
+            // Final check for plans
+            processPlanResponse(responseContent, text);
+
         } catch (error) {
             removeTypingIndicator();
-            console.error(error);
-            addMessage("Error: Could not connect to agent backend.", false);
+            addMessage(`Error: ${error.message}`, false);
         }
     }
 

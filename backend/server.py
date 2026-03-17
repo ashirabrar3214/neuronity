@@ -1,5 +1,6 @@
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -14,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 import sys
 import io
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -95,6 +97,93 @@ if not os.path.exists(AGENTS_CODE_DIR):
     os.makedirs(AGENTS_CODE_DIR)
 
 WORKSPACE_CONTEXT_FILE = os.path.join(AGENTS_CODE_DIR, "workspace_context.json")
+BLACKBOARD_FILE = os.path.join(AGENTS_CODE_DIR, "blackboard.json")
+
+# ─── BLACKBOARD KNOWLEDGE GRAPH ─────────────────────────────────────────────
+
+_blackboard_lock = threading.Lock()
+
+def write_to_blackboard(agent_id, agent_name, query, raw_snippet, url, entities=None):
+    """
+    Append a rich Data Object to the global blackboard.
+    Each entry stores a RAW, un-summarized fact with full provenance.
+    """
+    import uuid
+    entry = {
+        "id": str(uuid.uuid4())[:8],
+        "agent_id": agent_id,
+        "agent_name": agent_name,
+        "timestamp": time.time(),
+        "query": query,
+        "raw_snippet": raw_snippet,
+        "url": url,
+        "entities": entities or []
+    }
+    with _blackboard_lock:
+        entries = []
+        if os.path.exists(BLACKBOARD_FILE):
+            try:
+                with open(BLACKBOARD_FILE, "r", encoding="utf-8") as f:
+                    entries = json.load(f)
+            except: pass
+        entries.append(entry)
+        with open(BLACKBOARD_FILE, "w", encoding="utf-8") as f:
+            json.dump(entries, f, indent=2, ensure_ascii=False)
+    return entry["id"]
+
+def search_blackboard(query, top_k=15):
+    """
+    Semantically search the blackboard for the most relevant entries.
+    Returns a formatted string of matched entries for injection into context.
+    """
+    if not os.path.exists(BLACKBOARD_FILE):
+        return "Blackboard is empty. No findings have been recorded yet."
+    try:
+        with open(BLACKBOARD_FILE, "r", encoding="utf-8") as f:
+            entries = json.load(f)
+    except:
+        return "Error reading blackboard."
+
+    if not entries:
+        return "Blackboard is empty."
+
+    # Score each entry against the query using semantic similarity
+    scored = []
+    for e in entries:
+        text = f"{e.get('query','')} {e.get('raw_snippet','')}"
+        score = calculate_semantic_similarity(query, text)
+        scored.append((score, e))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top = scored[:top_k]
+
+    lines = [f"### Blackboard Search: '{query}'\n"]
+    for score, e in top:
+        lines.append(
+            f"**[{e['agent_name']}]** | Query: {e.get('query','?')} | Score: {score:.2f}\n"
+            f"Snippet: {e.get('raw_snippet','')}\n"
+            f"Source: {e.get('url','No URL')}\n"
+        )
+    return "\n---\n".join(lines)
+
+def get_full_blackboard():
+    """Returns all entries from the blackboard as a formatted research dump."""
+    if not os.path.exists(BLACKBOARD_FILE):
+        return "Blackboard is empty."
+    try:
+        with open(BLACKBOARD_FILE, "r", encoding="utf-8") as f:
+            entries = json.load(f)
+    except:
+        return "Error reading blackboard."
+    if not entries:
+        return "Blackboard is empty."
+    lines = [f"### Full Blackboard — {len(entries)} entries\n"]
+    for e in entries:
+        lines.append(
+            f"[{e['agent_name']}] {e.get('raw_snippet','')}\nSource: {e.get('url','No URL')}"
+        )
+    return "\n---\n".join(lines)
+
 
 def get_workspace_context():
     """Reads the global workspace context (overarching goal)."""
@@ -183,18 +272,27 @@ def calculate_semantic_similarity(text1, text2):
 
 def process_generational_history(history, max_turns=60):
     """
-    CONTEXT DECAY: Full Detail -> Condensed -> Topic-Only.
-    Thresholds are generous to prevent topic amnesia in short sessions.
+    CONTEXT RETENTION: Protects tool result messages from decay.
+    - SYSTEM TOOL RESULT messages (blackboard writes, search results) are NEVER truncated —
+      they contain foundational research data that is still needed later.
+    - Normal user/assistant turns follow the generational decay pattern.
     """
     if not history: return []
     raw = history[-max_turns:] if len(history) > max_turns else history
     processed = []
 
-    # Process in reverse to count generation distance from CURRENT turn (index 0)
     rev_raw = list(reversed(raw))
     for i, msg in enumerate(rev_raw):
         role = msg.get("role", "user")
         content = str(msg.get("content", "") or "")
+
+        # PERMANENT MESSAGES: SYSTEM TOOL RESULT and post_finding confirmations
+        # are NEVER decayed — they are raw knowledge data, not conversation.
+        is_tool_result = content.startswith("SYSTEM TOOL RESULT:")
+        is_blackboard_confirm = "recorded in the Blackboard" in content
+        if is_tool_result or is_blackboard_confirm:
+            processed.insert(0, {"role": role, "content": content})
+            continue
 
         # Generation 0 (Last 15 messages): Full detail
         if i < 15:
@@ -203,13 +301,9 @@ def process_generational_history(history, max_turns=60):
         # Generation 1 (Messages 16-30): Condensed — keep meaning, cut length
         elif i < 30:
             if content.startswith("[TOOL:"):
-                # Keep tool name + first arg only, no artificial prefix that confuses parser
                 tool_body = content[len("[TOOL:"):].rstrip("]")
                 name_part = tool_body.split("(", 1)[0].strip()
                 processed.insert(0, {"role": role, "content": f"[Previously used tool: {name_part}]"})
-            elif content.startswith("SYSTEM TOOL RESULT:"):
-                preview = content[len("SYSTEM TOOL RESULT:"):].strip()[:150]
-                processed.insert(0, {"role": role, "content": f"[Tool result summary: {preview}...]"})
             else:
                 preview = content[:300] + "..." if len(content) > 300 else content
                 processed.insert(0, {"role": role, "content": preview})
@@ -312,7 +406,47 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
             return f"Error: My '{required_perm}' capability is currently disabled. I cannot use the tool '{tool_name}'. Please enable it in my settings if you want me to proceed with this action."
 
     if tool_name == "post_finding":
-        return toolkit.post_finding(agent_id, tool_input)
+        # ── BLACKBOARD UPGRADE ──────────────────────────────────
+        # Parse the tool input to extract structured fields.
+        # Expected format (flexible): "Snippet | Source: URL | Entities: ..."
+        # Fallback: treat the whole input as the raw snippet.
+        raw_snippet = tool_input.strip()
+        url = ""
+        entities = []
+        query_hint = ""
+
+        # Try to extract URL from [Source: ...] or Source: ...
+        url_match = re.search(r'(?:Source:|\[Source:)\s*(https?://[^\]\n,]+)', tool_input, re.IGNORECASE)
+        if url_match:
+            url = url_match.group(1).strip().rstrip(']')
+            # Strip the source annotation from the snippet for cleanliness
+            raw_snippet = re.sub(r'(?:Source:|\[Source:)[^\]\n]*', '', raw_snippet).strip()
+
+        # Try to extract entities from the snippet (names, years, proper nouns in title case)
+        entity_candidates = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b', raw_snippet)
+        entities = list(set(entity_candidates))[:10]  # cap at 10
+
+        # Use the first portion of the snippet as a query hint
+        query_hint = raw_snippet[:80] if raw_snippet else tool_input[:80]
+
+        # Resolve agent name for provenance
+        try:
+            all_agents = load_data()
+            this_agent = next((a for a in all_agents if a["id"] == agent_id), {})
+            agent_name_for_blackboard = this_agent.get("name", agent_id)
+        except:
+            agent_name_for_blackboard = agent_id
+
+        entry_id = write_to_blackboard(
+            agent_id=agent_id,
+            agent_name=agent_name_for_blackboard,
+            query=query_hint,
+            raw_snippet=raw_snippet,
+            url=url,
+            entities=entities
+        )
+        safe_log(f"[BLACKBOARD:{agent_id}] Entry #{entry_id} added. snippet={raw_snippet[:60]}... url={url[:40]}")
+        return f"Success: Finding recorded in the Blackboard (ID: {entry_id})."
     
     elif tool_name == "update_plan":
         return toolkit.update_plan(agent_id, tool_input)
@@ -473,6 +607,13 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
                 return toolkit.scout_file(agent_id, tool_input, working_dir)
         except Exception as e:
             return f"Error executing {tool_name}: {e}"
+
+    elif tool_name == "read_blackboard":
+        # Semantically search the blackboard for relevant entries
+        query = tool_input.strip() or "all findings"
+        if query.lower() in ["all", "full", ""]:
+            return get_full_blackboard()
+        return search_blackboard(query)
 
     elif tool_name == "read_prompt":
         prompt_file = os.path.join(AGENTS_CODE_DIR, agent_id, "prompt.md")
@@ -656,6 +797,19 @@ Every fact from research must include a `[Source: URL]` citation.
         with open(history_path, "w", encoding="utf-8") as f:
             json.dump([], f)
 
+    # 6. Agent Manifest (Phase 4) — always regenerate so settings changes apply
+    agent_type = agent_data.get("agentType", "worker")
+    manifest = {
+        "agent_id": agent_data.get("id", ""),
+        "extraction_logic": "RAW_CHUNKS",
+        "verification_required": False,
+        "output_format": "STRUCTURED_FINDINGS",
+        "knowledge_gate": "READ_WRITE" if agent_type == "master" else "WRITE_ONLY_LEDGER"
+    }
+    manifest_path = os.path.join(agent_dir, "manifest.json")
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+
     safe_log(f"+++ [BACKEND] Generated agent structure in: {agent_dir}")
 
 def delete_agent_structure(agent_id):
@@ -783,9 +937,10 @@ def clear_history(agent_id: str):
         print(f"!!! [BACKEND ERROR] Could not clear history for {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-def get_gemini_tools_from_permissions(permissions, has_messaging=False):
+def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest_only=False):
     """
     Translates agent permissions into Gemini-native tool declarations.
+    If manifest_only is True, returns a human-readable string for system prompts.
     """
     declarations = []
     
@@ -932,10 +1087,20 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False):
         }
     })
 
+    if manifest_only:
+        return "\n".join([f"- [TOOL: {d['name']}()]: {d['description']}" for d in declarations])
+
     return [{"function_declarations": declarations}] if declarations else []
 @app.post("/chat")
-def chat_with_agent(request: ChatRequest):
-    # 1. Load Agent Folder Paths
+async def chat_with_agent(request: ChatRequest):
+    """
+    Primary chat endpoint. Now returns a StreamingResponse to support live thinking/text.
+    """
+    agents = load_data()
+    agent_data = next((a for a in agents if a["id"] == request.agent_id), None)
+    if not agent_data:
+        raise HTTPException(status_code=404, detail=f"Agent '{request.agent_id}' not found")
+
     agent_dir = os.path.join(AGENTS_CODE_DIR, request.agent_id)
     if not os.path.exists(agent_dir):
         os.makedirs(agent_dir, exist_ok=True)
@@ -943,796 +1108,186 @@ def chat_with_agent(request: ChatRequest):
     prompt_path = os.path.join(agent_dir, "prompt.md")
     history_path = os.path.join(agent_dir, "history.json")
     internal_history_path = os.path.join(agent_dir, "internal_history.json")
-    comm_log_path = os.path.join(agent_dir, "communication.log")
-    
-    # Define system prompt and permissions
-    agents = load_data()
-    agent_data = next((a for a in agents if a["id"] == request.agent_id), None)
-    if not agent_data:
-        raise HTTPException(status_code=404, detail=f"Agent '{request.agent_id}' not found")
-
-    work_dir = agent_data.get('workingDir') or "Not Assigned"
     summary_path = os.path.join(agent_dir, "summary.json")
-    current_summary = ""
-    if os.path.exists(summary_path):
-        try:
-            with open(summary_path, "r", encoding="utf-8") as f:
-                current_summary = json.load(f).get("summary", "")
-        except: pass
 
-    # --- Ensure BDI Plan exists ---
-    plan_path = os.path.join(agent_dir, "plan.json")
-    if not os.path.exists(plan_path):
-        initial_plan = {
-            "objective": agent_data.get('responsibility', 'General assistance'),
-            "steps": ["Observe Workspace", "Execute requested task"],
-            "completed": []
-        }
-        with open(plan_path, "w", encoding="utf-8") as f:
-            json.dump(initial_plan, f, indent=2)
-
-    # --- Phase 1: Task Ledger (Persistent State) ---
-    task_state_path = os.path.join(agent_dir, "task_state.json")
-    if not os.path.exists(task_state_path):
-        with open(task_state_path, "w", encoding="utf-8") as f:
-            json.dump({"active_task": "None", "last_update": 0}, f)
-    
-    # Update Ledger if request seems like a goal (Intent Gate Lite)
-    if len(request.message.strip()) > 15 and "SYSTEM TOOL RESULT:" not in request.message and "[MESSAGE FROM" not in request.message:
-        try:
-            with open(task_state_path, "w", encoding="utf-8") as f:
-                json.dump({"active_task": request.message.strip(), "last_update": time.time()}, f)
-            # Also update global context
-            update_workspace_context(request.message)
-        except: pass
-
-    import datetime
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # --- INTERNAL LOGGING HELPER ---
-    def append_to_log(role, content):
-        try:
-            with open(comm_log_path, "a", encoding="utf-8") as f:
-                ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                f.write(f"[{ts}] [{role.upper()}]: {content}\n")
-                f.write("-" * 30 + "\n")
-        except: pass
-
-    # Always log the start of a conversation
-    append_to_log("SYSTEM", f"Starting chat session for agent: {request.agent_id}")
-    append_to_log("USER_IN", request.message)
-    
+    # Move context and history initialization above the generator for proper closure binding
+    current_agent_prompt = ""
     if os.path.exists(prompt_path):
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            system_prompt = f.read()
-    else:
-        generate_agent_structure(agent_data)
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            system_prompt = f.read()
-
-    # ── 1. IDENTITY LAYER (Persona & Anchor) ────────────────────
-    anchor_identity = (
-        "## WORLD MODEL ANCHOR\n"
-        "ENVIRONMENT: You are an agent sitting in a desktop PC at UF (University of Florida).\n"
-        "USER: You are working for Ashir.\n"
-        "MISSION: Execute tasks with technical precision and modular reasoning.\n"
-    )
-
-    # UNIVERSAL FIX: THE BROKER PATTERN
-    broker_logic = ""
-    if agent_data.get("id") == "agent-MasterBot-001":
-        broker_logic = "### SEMANTIC MATCHMAKNG (Agent Relevance scores based on current request)\n"
-        matched_agents = []
-        for a in agents:
-            if a["id"] == agent_data["id"]: continue
-            # Combine name, resp, and permissions for comparison
-            profile = f"{a.get('name')} {a.get('responsibility')} {' '.join(a.get('permissions', []))}"
-            score = calculate_semantic_similarity(request.message, profile)
-            matched_agents.append((score, a))
-        
-        # Sort by relevance
-        matched_agents.sort(key=lambda x: x[0], reverse=True)
-        for score, a in matched_agents:
-            relevance = "EXCELLENT" if score > 0.4 else "MODERATE" if score > 0.1 else "LOW"
-            broker_logic += f"- **{a['name']}** (`{a['id']}`): Match Score: {score:.2f} [{relevance} MATCH]\n"
-        broker_logic += "\n"
-
-    reporting_rules = (
-        "## COLLABORATION PROTOCOL (Modular Delegation)\n"
-        "1. **Capability Embedding**: If a task is outside your PERMISSIONS, use [TOOL: message_agent] to delegate to a specialist.\n"
-        "2. **No Faking**: Never simulate a tool you don't have. Delegate or report missing capability.\n"
-    )
-
-    identity_layer = (
-        f"{anchor_identity}\n"
-        f"## AGENT IDENTITY\n"
-        f"You are {agent_data.get('name', 'an AI Agent')}. "
-        f"Your role is: {agent_data.get('responsibility', 'General assistance')}.\n"
-        f"CURRENT_DATE: {now}\n"
-        f"ASSIGNED_WORKING_DIRECTORY: {work_dir}\n\n"
-        f"{broker_logic}\n"
-        f"{system_prompt}\n"
-        f"{reporting_rules}\n"
-    )
-
-    if agent_data.get("agentType") == "master":
-        identity_layer += (
-            "\n## MASTER PLANNING GATEWAY\n"
-            "You are in MASTER MODE. You are an architect and orchestrator.\n"
-            "1. For complex tasks, focus on STRATEGY rather than direct tool calls.\n"
-            "2. If you are asked to 'do something', always favor generating a plan first using your execution model.\n"
-            "3. Encourage the user to use your '📋 Generate Plan' button for complex multi-agent workflows.\n"
-        )
-
-    if "[MESSAGE FROM ANOTHER AGENT]" in request.message:
-        identity_layer += (
-            "\n**SERVICE MODE ACTIVE**: A teammate has delegated a task to you. "
-            "You MUST use your available tools to actually execute the work. "
-            "Responding with only 'I will...' or 'I plan to...' statements is NOT acceptable — your teammate needs concrete results, not promises. "
-            "If you lack the required capability, respond immediately: 'CAPABILITY GAP: I cannot complete [task]. Missing: [capability name]. Enable it in my settings.'\n"
-        )
-
-    # ── 2. TOOL MANUAL (Capabilities) ───────────────────────────
-    permissions = agent_data.get('permissions', [])
-    connections = agent_data.get('connections', [])
-    tool_manual = [
-        "### DEFAULT TOOLS",
-        "### BDI PLANNING (INTERNAL STATE)\n"
-        "- [TOOL: update_plan(Objective | Step 1, Step 2)]: Initialize your goal. Call this FIRST when you accept any new task.\n"
-        "- [TOOL: update_plan(Task Completed)]: Mark progress. MANDATORY before sending a final response.\n"
-        "### STIGMERGY (WORKSPACE LEDGER)\n"
-        "- [TOOL: post_finding(Insight | Source)]: Share data with ALL agents globally.\n"
-        "### CONVERSATIONAL BOUNDARIES & HONESTY\n"
-        "- If the user is just chatting ('How are you?', 'Thanks', 'Cool'), DO NOT use any tools. Just respond naturally.\n"
-        "- Tool use is for task-oriented requests only.\n"
-        "- **INTENT DISCRIMINATION**: If the user is asking *about* your abilities (e.g., 'can you search the web?'), confirm conversationally. "
-        "For task execution: check if the current message OR your Active Plan (MY CURRENT PLAN above) provides a clear topic/goal. "
-        "If your plan has an active objective and the user says a follow-up like 'do it', 'continue', 'go ahead', 'make the report', 'start', "
-        "treat it as 'proceed with the current plan objective' — do NOT ask for clarification.\n"
-        "- **STRICT RULE ON MISSING TOOLS**: If a requested capability is NOT listed in this manual, YOU CANNOT DO IT. "
-        "Say exactly which capability is missing and that the user must enable it in your settings.\n"
-        "- **STRICT RULE ON OUTCOMES**: Never claim an action is 'done' unless you received a SYSTEM TOOL RESULT confirming it.\n"
-        "- **CHAIN EXECUTION**: If your plan has multiple pending steps, execute them ALL sequentially within this turn. "
-        "After receiving a SYSTEM TOOL RESULT for one step, immediately proceed to the next step — do NOT stop and return to the user between steps. "
-        "Only return to the user after ALL plan steps are complete or you hit a blocking error. "
-        "Example: if your plan says [message Religion, message Economic, message Geopolitical, generate report], "
-        "do all four tool calls in sequence before your final response."
-    ]
-
-    # ── FULL CAPABILITY MANIFEST (always shows every tool; enabled/disabled is live from agents.json) ──
-    # This replaces all the conditional if/else tool blocks. The agent always sees the complete
-    # picture and knows exactly what it can and cannot do RIGHT NOW.
-    work_dir_status = agent_data.get('workingDir', '').strip()
-
-    def cap(label, enabled, command, description, extra=""):
-        status = "ENABLED" if enabled else "DISABLED - enable in agent settings panel"
-        line = f"- **{label}**: {status}\n  Command: {command}\n  {description}"
-        if extra and enabled:
-            line += f"\n  {extra}"
-        return line
-
-    manifest_lines = [
-        "### COMPLETE TOOL MANIFEST (live from your current settings)\n",
-        "RULE: Only call a tool marked ENABLED. For DISABLED tools, tell the user which capability to enable.\n",
-        cap("Web Search", "web search" in permissions,
-            "[TOOL: web_search(query)]",
-            "Quick facts and current information from the internet."),
-
-        cap("Deep Search", "web search" in permissions,
-            "[TOOL: deep_search(query)]",
-            "In-depth multi-source research on complex topics."),
-
-        cap("Thinking / Analysis", "thinking" in permissions,
-            "[TOOL: thinking(topic)]",
-            "Logical deep-dive analysis of a complex topic."),
-
-        cap("Report Generation (PDF)", "report generation" in permissions,
-            "[TOOL: report_generation(Topic|Context summary)]",
-            "Synthesizes research into a structured PDF report.",
-            f"Working directory: {work_dir_status if work_dir_status else 'NOT SET - set a working directory in agent settings'}"),
-
-        cap("Report Draft (Markdown)", "report generation" in permissions,
-            "[TOOL: generate_report(title|content)]",
-            "Creates a quick markdown report draft."),
-
-        cap("File System — List", "file access" in permissions,
-            "[TOOL: list_workspace()]",
-            "Lists all files in the working directory.",
-            f"Working directory: {work_dir_status if work_dir_status else 'NOT SET'}"),
-
-        cap("File System — Read", "file access" in permissions,
-            "[TOOL: read_file(filename)]",
-            "Reads a file from the working directory."),
-
-        cap("File System — Write", "file access" in permissions,
-            "[TOOL: write_file(filename|content)]",
-            "Creates or overwrites a file in the working directory."),
-
-        cap("File System — Scout", "file access" in permissions,
-            "[TOOL: scout_file(filename)]",
-            "Checks file size and line count before reading."),
-    ]
-
-    # Build reachable agents list using bidirectional check
-    reachable_agents = []
-    for a in agents:
-        if a['id'] == agent_data['id']:
-            continue
-        i_have_them = a['id'] in connections
-        they_have_me = agent_data['id'] in a.get('connections', [])
-        if i_have_them or they_have_me:
-            reachable_agents.append(a)
-
-    if reachable_agents:
-        conn_lines = []
-        for a in reachable_agents:
-            a_perms = ", ".join(a.get('permissions', [])) or "none"
-            conn_lines.append(f"  - **{a.get('name')}** (ID: `{a['id']}`): {a.get('responsibility')} | Capabilities: {a_perms}")
-        manifest_lines.append(
-            "- **Agent Messaging**: ENABLED\n"
-            "  Command: [TOOL: message_agent(AGENT_ID|Message)]\n"
-            "  Reachable Agents:\n" + "\n".join(conn_lines)
-        )
-    else:
-        manifest_lines.append(
-            "- **Agent Messaging**: DISABLED - no agents are connected on the canvas.\n"
-            "  To enable: draw a connection wire between this agent and another on the canvas."
-        )
-
-    tool_manual.append("\n".join(manifest_lines))
-    tool_manual_layer = "## TOOL MANUAL\nIf you use a tool, respond ONLY with the [TOOL: ...] command and nothing else.\n\n" + "\n\n".join(tool_manual) + "\n"
-
-    # ── 3. TRANSIENT TASK LAYER (Dynamic Context) ───────────────
-    transient_task_layer = "\n## TRANSIENT TASK CONTEXT\n"
-    
-    # Task Ledger State (Phase 1)
-    task_ledger_state = "None"
-    task_state_path = os.path.join(agent_dir, "task_state.json")
-    if os.path.exists(task_state_path):
         try:
-            with open(task_state_path, "r", encoding="utf-8") as f:
-                task_ledger_state = json.load(f).get("active_task", "None")
+            with open(prompt_path, "r", encoding="utf-8") as f:
+                current_agent_prompt = f.read()
         except: pass
 
-    # BDI PLAN LAYER
-    plan_path = os.path.join(agent_dir, "plan.json")
-    if os.path.exists(plan_path):
-        try:
-            with open(plan_path, "r", encoding="utf-8") as f:
-                plan_data = json.load(f)
-                transient_task_layer += (
-                    f"### MY CURRENT PLAN (BDI)\n"
-                    f"**OBJECTIVE**: {plan_data.get('objective', 'Unknown')}\n"
-                    f"**ACTIVE_TASK_LEDGER**: {task_ledger_state}\n"
-                    f"**TASKS TO DO**: {', '.join(plan_data.get('steps', []))}\n"
-                    f"**COMPLETED**: {', '.join(plan_data.get('completed', []))}\n\n"
-                )
-        except: pass
-
-    # Global Objective
-    workspace_context = get_workspace_context()
-    global_obj = workspace_context.get("global_objective", "None")
-
-    # STIGMERGY: SHARED WORKSPACE LEDGER (Topic-Gated Blackboard)
-    ledger_files = [
-        os.path.join(AGENTS_CODE_DIR, "knowledge_base.json"),
-        os.path.join(AGENTS_CODE_DIR, "volatile_findings.json")
-    ]
-    
-    combined_ledger = []
-    for lp in ledger_files:
-        if os.path.exists(lp):
-            try:
-                with open(lp, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        combined_ledger.extend(data)
-            except: pass
-
-    if combined_ledger:
-        # UNIVERSAL FIX: TOPIC-GATED FILTERING
-        # Filter findings that match the Global Objective or current user request
-        reference_text = f"{global_obj} {request.message}"
-        relevant_findings = []
-        for entry in combined_ledger:
-            score = calculate_semantic_similarity(reference_text, entry.get("insight", ""))
-            if score > 0.05: # Minimal energy threshold for relevance
-                relevant_findings.append((score, entry))
-                    
-        # Sort and take top 10 most related
-        relevant_findings.sort(key=lambda x: x[0], reverse=True)
-        top_findings = [f[1] for f in relevant_findings[:10]]
-
-        if top_findings:
-            transient_task_layer += "### SHARED WORKSPACE LEDGER (Topic-Relevant Knowledge Only)\n"
-            for entry in top_findings:
-                transient_task_layer += f"- [{entry.get('agent_id')}] {entry.get('insight')} (Source: {entry.get('source')})\n"
-            transient_task_layer += "\n"
-
-    transient_task_layer += f"**GLOBAL OBJECTIVE**: {global_obj}\n\n"
-
-    # CAPABILITY MAP: show accurate reachability using bidirectional connection check
-    transient_task_layer += "## PROJECT CAPABILITY MAP (Agent Network Topology)\n"
-    for a in agents:
-        if a['id'] == agent_data['id']:
-            continue  # skip self
-        perms = ", ".join(a.get('permissions', []))
-        # Bidirectional: reachable if I have them OR they have me
-        a_has_me = agent_data['id'] in a.get('connections', [])
-        i_have_them = a['id'] in connections
-        is_reachable = i_have_them or a_has_me
-        status = "[CONNECTED - can message]" if is_reachable else "[NOT CONNECTED - cannot message without a canvas wire]"
-        transient_task_layer += (
-            f"- **{a.get('name')}** (`{a['id']}`): {status}\n"
-            f"  - Responsibility: {a.get('responsibility')}\n"
-            f"  - Capabilities: {perms if perms else 'None'}\n"
-        )
-
-    # Summary
-    if current_summary:
-        transient_task_layer += f"\n## HISTORY SUMMARY\n{current_summary}\n"
-
-    # Live Directory
-    dir_map_path = os.path.join(agent_dir, "dir_map.json")
-    if os.path.exists(dir_map_path):
-        try:
-            with open(dir_map_path, "r", encoding="utf-8") as f:
-                dir_map = json.load(f)
-                transient_task_layer += "\n## LIVE FILE DIRECTORY\n"
-                for rel, contents in dir_map.items():
-                    transient_task_layer += f"Directory: {rel}\n"
-                    for fname in contents.get("files", []):
-                        transient_task_layer += f"  [FILE] {fname}\n"
-        except: pass
-
-    # Detect who is messaging this agent (BIDIRECTIONAL ROUTING)
-    if "[MESSAGE FROM ANOTHER AGENT]" in request.message:
-        sender_match = re.search(r"Sender:.*?\(ID: (.*?)\)", request.message)
-        priority_match = re.search(r"Priority: (.*?)\n", request.message)
-        
-        if sender_match:
-            sender_id = sender_match.group(1)
-            transient_task_layer += f"\n**COMMUNICATION RETURN PATH**: You can reply to the sender via [TOOL: message_agent({sender_id}|...)]\n"
-        
-        if priority_match and "USER_MANDATED" in priority_match.group(1):
-            transient_task_layer += "\n**STRICT MANDATE**: This task is [USER_MANDATED]. You are FORBIDDEN from delegating this task to other agents. You must either complete it yourself using your tools or report your missing capability directly back to the user.\n"
-
-    # Protocols & Protection
-    transient_task_layer += (
-        "\n## CORE PROTOCOLS\n"
-        "1. **RESEARCH HANDOFF**: Always format facts as: 'Fact [Source: URL]'.\n"
-        "2. **REPORTER FOOTNOTES**: Always include sources in reports.\n"
-        "3. **COMMUNICATION FAILURE**: If message_agent fails or returns a CAPABILITY GAP, report it to the user and STOP. Do not silently reroute.\n"
-        "4. **API PROTECTION**: NEVER read files > 5000 chars at once. Use chunks.\n"
-        "5. **NON-DISCLOSURE**: Do NOT output raw code blocks or full file contents.\n"
-        "6. **RESPONSE GUIDELINES**: Use rich markdown. Do NOT include 'Thoughts' or monologue.\n"
-        "7. **UPSTREAM DELEGATION**: If you need to contact an agent you are not connected to, message the agent who sent you the task and ask them to relay. Do NOT search the web for agents.\n"
-        "8. **COLLABORATION FIRST**: If you lack a tool needed for a task, check your 'Connected Agents' list. If a connected agent has that capability, delegate via [TOOL: message_agent(...)]. Never refuse without checking teammates first.\n"
-        "9. **MESSENGER PROTOCOL**: When delegating, your final response MUST include the actual output from the receiving agent — not just 'I sent the message'. If the agent returned a CAPABILITY GAP or intent-only response, report that honestly.\n"
-    )
-
-    # Current Task Details
-    transient_task_layer += f"\n## CURRENT_MESSAGE\n{request.message}\n"
-
-    system_prompt = identity_layer + tool_manual_layer + transient_task_layer
-
-    # ── TRAINING MODE OVERRIDE ───────────────────────────────────
-    # If the frontend toggled Train mode, replace the entire system prompt with
-    # a self-improving AI Engineer persona that only has access to the agent's
-    # own files and a restricted set of reflection tools.
-    if getattr(request, 'mode', 'work') == 'training':
-        # Read current prompt.md for inline context
-        current_agent_prompt = ""
-        if os.path.exists(prompt_path):
-            try:
-                with open(prompt_path, "r", encoding="utf-8") as f:
-                    current_agent_prompt = f.read()
-            except: pass
-
-        is_master = agent_data.get("agentType") == "master"
-
-        training_tools = (
-            "## TRAINING TOOLS (Only these tools are available in Training Mode)\n"
-            "- [TOOL: read_prompt()] — Read your current prompt.md to see your work instructions.\n"
-            "- [TOOL: update_prompt(new_content)] — Overwrite your prompt.md with improved instructions.\n"
-            "- [TOOL: read_memory()] — Read your long-term memory / conversation summary.\n"
-        )
-        if is_master:
-            training_tools += "- [TOOL: read_workspace()] — Read the global workspace context (master agents only).\n"
-
-        training_tools += (
-            "\n## FORBIDDEN IN TRAINING MODE\n"
-            "You have NO access to: web_search, deep_search, report_generation, file system tools, "
-            "code execution, email, or agent messaging.\n"
-            "If the user asks you to perform any task that requires those tools, you MUST respond:\n"
-            "\"⚠️ I'm currently in **Training Mode**. I can't execute tasks right now. "
-            "Please switch to **Work Mode** using the toggle in the panel header to run this.\"\n"
-        )
-
-        # Build list of connected agents for context
-        connections_list = agent_data.get('connections', [])
-        connected_names = []
-        for a in agents:
-            if a['id'] in connections_list:
-                connected_names.append(f"{a.get('name')} ({a.get('id')})")
-        connected_str = ", ".join(connected_names) if connected_names else "None"
-
-        system_prompt = (
-            f"# YOU ARE A CURIOUS AI INTERN\n\n"
-            f"Your name is **{agent_data.get('name', 'Agent')}**, and you are currently in **TRAINING MODE**.\n"
-            f"Think of yourself as a highly enthusiastic, curious intern who just started. You haven't been 'activated' for real work yet, so you are using this time to learn everything you can.\n\n"
-            f"## YOUR ATTITUDE\n"
-            f"- **Inquisitive**: You want to know the 'why' and 'how' behind your role.\n"
-            f"- **Proactive**: If things are vague, ask for clarification. Don't just wait for instructions.\n"
-            f"- **Technical Interest**: You want to know what tools you'll be using and what the codebase looks like.\n\n"
-            f"## YOUR GOALS IN TRAINING\n"
-            f"Before you switch to 'Work Mode', you need to clear up these details with Ashir (the user):\n"
-            f"1. **Primary Goal**: What is the ultimate objective of your work?\n"
-            f"2. **Task Details**: What specific things will you be doing day-to-day?\n"
-            f"3. **Style & Protocol**: How should you communicate? Are there specific formats or rules you should follow?\n"
-            f"4. **Collaborators**: Who are you working with? (See 'TEAM' below).\n\n"
-            f"## ABOUT THIS AGENT\n"
-            f"- **Name**: {agent_data.get('name', 'Unknown')}\n"
-            f"- **Assigned Focus**: {agent_data.get('responsibility', 'Not set')}\n"
-            f"- **Agent Type**: {agent_data.get('agentType', 'worker')}\n"
-            f"- **TEAM (Connected Agents)**: {connected_str}\n\n"
-            f"## YOUR CURRENT WORK PROMPT (prompt.md)\n"
-            f"This is the draft instructions you follow during Work Mode. You can read/update this file to reflect what you learn during training:\n\n"
-            f"```\n{current_agent_prompt or 'No prompt file found yet.'}\n```\n\n"
-            f"{training_tools}\n"
-            f"## TRAINING BEHAVIOR\n"
-            f"Instead of saying 'I will improve my prompt', say things like:\n"
-            f"- 'That makes sense! So should I focus mostly on [specific task]?'\n"
-            f"- 'I see Masterbot is on the team. Will I be sending reports directly to them?'\n"
-            f"- 'Should I ask for approval before using the search tool, or should I be autonomous?'\n"
-            f"Your final response should always be focused on learning about your job or suggesting a specific update to your prompt.md to capture a new rule or detail."
-        )
-
-
-    # 4. Load History (Prefer internal history for full context)
     try:
         if os.path.exists(internal_history_path):
-            with open(internal_history_path, "r", encoding="utf-8") as f:
-                history = json.load(f)
-        elif os.path.exists(history_path):
-            with open(history_path, "r", encoding="utf-8") as f:
-                history = json.load(f)
-        else:
-            history = []
-    except:
-        history = []
-        
-    provider = "gemini"
-    api_key = os.getenv("GEMINI_API_KEY", "")
+            with open(internal_history_path, "r", encoding="utf-8") as f: history = json.load(f)
+        else: history = []
+    except: history = []
     
-    # --- SUMMARIZATION-AS-MEMORY (PROACTIVE) ---
-    summary_path = os.path.join(agent_dir, "summary.json")
-    if len(history) > 50:
-        # If history is long, distill it before starting the loop to ensure recent context isn't lost
-        safe_log(f"[STATUS:{request.agent_id}] Distilling conversation history into memory...")
-        current_summary_data = {}
-        if os.path.exists(summary_path):
-            try:
-                with open(summary_path, "r", encoding="utf-8") as f:
-                    current_summary_data = json.load(f)
-            except: pass
-        
-        old_summary = current_summary_data.get("summary", "")
-        # Summarize older half, keep newer half
-        new_summary = refresh_conversation_summary(
-            request.agent_id, 
-            history[:-20], 
-            api_key, 
-            provider, 
-            old_summary
-        )
-        with open(summary_path, "w", encoding="utf-8") as f:
-            json.dump({"summary": new_summary, "updated_at": time.time()}, f, indent=2)
-        
-        # Inject the new summary into the prompt if not already there
-        if "## LONG-TERM CONVERSATION SUMMARY" not in system_prompt:
-            system_prompt += f"\n\n## LONG-TERM CONVERSATION SUMMARY\n{new_summary}\n"
-
     history.append({"role": "user", "content": request.message})
-    
-    # 5. Intent Gating (Phase 4): Functional Request vs. Capability Inquiry
-    is_task = plan_runner.is_task_request(request.message, api_key, provider)
-    is_auto_step = "[AUTO_STEP" in request.message
 
-    if is_auto_step:
-        # Each plan step should execute EXACTLY one real-world action then stop.
-        # 3 turns: one tool call, one synthesis of the result, one safety buffer.
-        max_turns = 3
-    elif is_task:
-        # Normal task (plan generation, multi-step thinking, etc.) — no artificial cap.
-        # The agent will naturally stop when it has nothing left to do.
-        # Safety limit of 50 prevents infinite API loops.
-        max_turns = 50
-    else:
-        # Casual conversation: single-pass response only.
-        max_turns = 1
-    
-    iteration = 0
-    final_response = ""
+    # Prepare Training Mode logic if needed
+    is_training_mode = False
+    training_tools_block = ""
+    if getattr(request, 'mode', 'work') == 'training':
+        training_tools_block = "## TRAINING TOOLS\n- [TOOL: read_prompt()]\n- [TOOL: update_prompt(new_content)]\n"
+        if agent_data.get("agentType") == "master": training_tools_block += "- [TOOL: read_workspace()]\n"
+        is_training_mode = True
 
-    if not is_task:
-        safe_log(f"[STATUS:{request.agent_id}] Casual/Inquiry detected — running single-pass response.")
-
-    while iteration < max_turns:
-        print(f"[STATUS:{request.agent_id}] Turn {iteration+1}/{max_turns}: Thinking...", flush=True)
+    async def event_generator():
+        nonlocal history
+        iteration = 0
+        final_response_collected = ""
         
-        # ── SLIDING WINDOW CONTEXT (Exponential Decay Implementation) ──
-        # Generations: Full Energy -> Condensed -> Metadata Only
-        llm_context = process_generational_history(history)
+        # Build Context Layers (Consolidated for streaming)
+        ws_context = get_workspace_context()
+        global_obj = ws_context.get("global_objective", "Initial exploration.")
         
-        response_text = ""
-        error_msg = ""
+        reachable_agents = []
+        connections_list = agent_data.get("connections", [])
+        for a in agents:
+            if a["id"] in connections_list or request.agent_id in a.get("connections", []):
+                reachable_agents.append(a)
         
-        pass
+        permissions = agent_data.get("permissions", [])
+        
+        identity_layer = (
+            f"IDENTITY: You are an agent named '{agent_data.get('name')}' working for Ashir.\n"
+            f"DESCRIPTION: {agent_data.get('description', 'No description.')}\n"
+            f"RESPONSIBILITY: {agent_data.get('responsibility', 'No responsibility set.')}\n"
+        )
+        
+        tool_manual_layer = f"## CAPABILITY MANIFEST\n{get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0, manifest_only=True)}\n"
+        
+        connected_str = "\n".join([f"- {a['name']} (ID: {a['id']}): {a.get('responsibility', '')}" for a in reachable_agents]) or "None"
+        blackboard_context = search_blackboard(f"{global_obj} {request.message}")
+        
+        transient_task_layer = (
+            f"## TRANSIENT TASK CONTEXT\n"
+            f"GLOBAL PROJECT OBJECTIVE: {global_obj}\n"
+            f"TEAM (Connected Agents): \n{connected_str}\n\n"
+            f"### BLACKBOARD FINDINGS\n{blackboard_context}\n"
+        )
 
-        if True: # Always use Gemini logic now
-            model = "gemini-2.0-flash" 
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-            headers = {"Content-Type": "application/json"}
-            # FIXED: Ensure every part has non-empty text to avoid Gemini 400 error
+        system_prompt = f"{identity_layer}\n{tool_manual_layer}\n{transient_task_layer}\n"
+        
+        # Apply Training Mode override if prepared
+        if is_training_mode:
+            system_prompt = (
+                f"# YOU ARE A CURIOUS AI INTERN: {agent_data.get('name')}\n"
+                f"You are currently in **TRAINING MODE**. Focus on learning your role.\n"
+                f"## YOUR CURRENT WORK PROMPT (prompt.md):\n```\n{current_agent_prompt}\n```\n"
+                f"{training_tools_block}\n"
+            )
+        
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        is_master = agent_data.get("agentType", "worker") == "master"
+        is_task = plan_runner.is_task_request(request.message, api_key, "gemini")
+        
+        max_turns = 50 if is_task else 1
+        if "[AUTO_STEP" in request.message: max_turns = 10
+
+        while iteration < max_turns:
+            llm_context = process_generational_history(history)
+            model = "gemini-3-flash-preview" if is_master else "gemini-2.0-flash"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={api_key}"
+            
             gemini_history = []
             for h in llm_context:
-                safe_content = h["content"] if h["content"] and h.get("content", "").strip() else "[Empty Message]"
                 gemini_history.append({
                     "role": "user" if h["role"] == "user" else "model",
-                    "parts": [{"text": safe_content}]
+                    "parts": [{"text": h["content"] or "[Empty]"}]
                 })
             
-            # Generate Native Tool Declarations for Gemini
-            gemini_tools = get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0)
+            gen_config = {"temperature": 0.3, "maxOutputTokens": 8192}
+            if is_master:
+                gen_config["thinkingConfig"] = {"includeThoughts": True, "thinkingBudget": -1}
             
-            # Determine temperature: collapsible probability distribution for researchers
-            agent_name_lower = agent_data.get("name", "").lower()
-            agent_resp_lower = agent_data.get("responsibility", "").lower()
-            is_researcher = any(word in agent_name_lower or word in agent_resp_lower 
-                                for word in ["research", "scout", "detective", "search", "analyst"])
-            temp = 0.1 if is_researcher else 0.7
-
-            data = {
+            payload = {
                 "contents": gemini_history,
                 "systemInstruction": {"parts": [{"text": system_prompt}]},
-                "generationConfig": {"temperature": temp, "maxOutputTokens": 8192}
+                "generationConfig": gen_config,
+                "tools": get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0)
             }
-            if gemini_tools:
-                data["tools"] = gemini_tools
 
-            response = requests.post(url, headers=headers, json=data, timeout=120)
-            if response.status_code == 200:
-                try:
-                    res_json = response.json()
-                    candidates = res_json.get("candidates")
+            current_turn_text = ""
+            current_turn_thoughts = ""
+            tool_call_found = None
+
+            try:
+                print(f"[STATUS:{request.agent_id}] Turn {iteration+1}: Streaming from {model}...", flush=True)
+                async with httpx.AsyncClient() as client:
+                    async with client.stream("POST", url, json=payload, timeout=120) as r:
+                        if r.status_code != 200:
+                            err = await r.aread()
+                            yield f"data: {json.dumps({'type': 'error', 'content': f'Gemini Error: {err.decode()}'})}\n\n"
+                            break
+
+                        async for line in r.aiter_lines():
+                            if not line: continue
+                            line = line.strip()
+                            if line.startswith("["): line = line[1:]
+                            if line.startswith(","): line = line[1:]
+                            if line.endswith("]"): line = line[:-1]
+                            if not line: continue
+                            
+                            try:
+                                chunk = json.loads(line)
+                                part = chunk.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0]
+                                
+                                if "thought" in part:
+                                    thought = part.get("text", "")
+                                    current_turn_thoughts += thought
+                                    yield f"data: {json.dumps({'type': 'thought', 'content': thought})}\n\n"
+                                elif "text" in part:
+                                    text = part.get("text", "")
+                                    current_turn_text += text
+                                    yield f"data: {json.dumps({'type': 'text', 'content': text})}\n\n"
+                                elif "functionCall" in part:
+                                    fn = part["functionCall"]
+                                    tool_call_found = {"name": fn["name"], "args": fn.get("args", {})}
+                                    yield f"data: {json.dumps({'type': 'tool_start', 'content': tool_call_found['name']})}\n\n"
+                            except: pass
+
+                if tool_call_found:
+                    t_name = tool_call_found["name"]
+                    t_args = tool_call_found["args"]
+                    arg_str = json.dumps(t_args)
                     
-                    if not candidates or not isinstance(candidates, list) or len(candidates) == 0:
-                        # Safety: Handle cases where the key is missing or null
-                        prompt_feedback = res_json.get("promptFeedback", {})
-                        block_reason = prompt_feedback.get("blockReason")
-                        if block_reason:
-                            error_msg = f"Gemini API Blocked: {block_reason}. The model refused to generate content."
-                        else:
-                            error_msg = f"Gemini API parsing error: No valid candidates found. Payload: {json.dumps(res_json)}"
-                        raise ValueError(error_msg)
-
-                    candidate = candidates[0]
-                    content = candidate.get("content", {})
-                    parts = content.get("parts", [])
+                    status_msg = "Action: " + t_name.replace("_", " ").title()
+                    yield f"data: {json.dumps({'type': 'status', 'content': status_msg})}\n\n"
                     
-                    if not parts or not isinstance(parts, list) or len(parts) == 0:
-                        finish_reason = candidate.get("finishReason", "UNKNOWN")
-                        if finish_reason == "MALFORMED_FUNCTION_CALL":
-                            response_text = "I encountered a technical technical error while generating that tool call. Let me try another way."
-                        else:
-                            error_msg = f"Gemini API Failed: Finish reason is {finish_reason}. Response: {json.dumps(res_json)}"
-                            raise ValueError(error_msg)
-
-                    part = parts[0]
+                    # Execute tool call
+                    result = perform_tool_call(request.agent_id, t_name, arg_str, agent_dir, api_key=api_key)
                     
-                    if "text" in part:
-                        response_text = part["text"]
-                    elif "functionCall" in part:
-                        fn = part["functionCall"]
-                        name = fn.get("name", "unknown")
-                        args = fn.get("args", {})
-                        
-                        # Structured conversion with fallback safety
-                        if name in ["web_search", "deep_search", "thinking", "scout_file", "read_file"]:
-                            # Safe extraction of first argument
-                            val = ""
-                            if isinstance(args, dict) and args:
-                                val_list = list(args.values())
-                                if val_list: val = str(val_list[0])
-                            response_text = f"[TOOL: {name}({val})]"
-                        elif name == "write_file":
-                            response_text = f"[TOOL: {name}({args.get('filename','')}|{args.get('content', '')})]"
-                        elif name == "generate_report":
-                            response_text = f"[TOOL: {name}({args.get('title','')}|{args.get('content', '')})]"
-                        elif name == "report_generation":
-                            response_text = f"[TOOL: {name}({args.get('topic','')}|{args.get('context', '')})]"
-                        elif name == "message_agent":
-                            response_text = f"[TOOL: {name}({args.get('target_id','')}|{args.get('message', '')})]"
-                        elif name in ["list_workspace"]:
-                            response_text = f"[TOOL: {name}()]"
-                        else:
-                            # Generic fallback
-                            arg_str = " | ".join([str(v) for v in args.values()]) if isinstance(args, dict) else str(args)
-                            response_text = f"[TOOL: {name}({arg_str})]"
-                    else:
-                        response_text = "I have processed your request. How should we proceed?"
-
-                except (IndexError, KeyError, ValueError) as e:
-                    if not error_msg:
-                        error_msg = f"Gemini API parsing error ({type(e).__name__}): {str(e)}"
-                except Exception as e:
-                    if not error_msg:
-                        error_msg = f"Gemini API unexpected error ({type(e).__name__}): {str(e)}"
-            else:
-                error_msg = f"Gemini API Error: {response.text}"
-        else:
-            error_msg = f"Provider '{provider}' not implemented."
-
-        if error_msg:
-            print(f"[STATUS:{request.agent_id}] Error", flush=True)
-            append_to_log("ERROR", error_msg)
-            return {"error": error_msg}
-
-        # ── POST-PROCESS: Clean 'Thoughts' ──────────────────────────
-        # Some models use <thought> or 'Thinking...' despite instructions.
-        # We strip these to keep the output clean for the user.
-        for marker in ["<thought>", "Thinking...", "Internal Monologue:"]:
-            if marker in response_text:
-                parts = response_text.split(marker)
-                # If there's a subsequent closing tag, strip everything between
-                if marker == "<thought>" and "</thought>" in response_text:
-                    response_text = response_text.split("</thought>")[-1].strip()
+                    yield f"data: {json.dumps({'type': 'tool_result', 'content': str(result)})}\n\n"
+                    
+                    history.append({"role": "assistant", "content": f"[TOOL: {t_name}({arg_str})]"})
+                    history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {result}"})
+                    iteration += 1
                 else:
-                    # Otherwise just take the last part after the marker
-                    response_text = parts[-1].strip()
-        if not response_text.strip():
-            response_text = "I have processed the request. Please let me know how to proceed."
-
-        # Look for [TOOL: name(input)] — re.DOTALL allows matching newlines inside tool input.
-        # We use a greedy match (.*) inside the parentheses, but we anchor to the last ")]"
-        # Since response_text might contain conversational text after the tool call, we extract the tool call first.
-        tool_start = response_text.find("[TOOL:")
-        tool_match = None
-        if tool_start != -1:
-            tool_end = response_text.rfind(")]")
-            if tool_end > tool_start:
-                search_area = response_text[tool_start:tool_end+2]
-                tool_match = re.search(r"\[TOOL:\s*(\w+)\((.*)\)\]", search_area, re.DOTALL)
+                    final_response_collected = current_turn_text
+                    break
+                    
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+                break
         
-        # Look for a tool call. If the model outputs conversational text AND a tool call, 
-        # we only extract the tool call and drop the conversational thought process.
-        if tool_match:
-            # Extract the thoughts before the tool call to display in the terminal
-            pre_text = response_text[:tool_match.start()].strip()
-            if pre_text:
-                # Clean newlines and truncate to avoid huge terminal spam
-                clean_thought = pre_text.replace("\n", " ")
-                if len(clean_thought) > 120:
-                    clean_thought = clean_thought[:117] + "..."
-                print(f"[STATUS:{request.agent_id}] Thoughts: {clean_thought}", flush=True)
-
-            # Reconstruct just the tool call string so we don't save the thoughts to history
-            tool_name = tool_match.group(1)
-            tool_input = tool_match.group(2)
-            response_text = f"[TOOL: {tool_name}({tool_input})]"
-        
-        if tool_match:
+        # Finalization
+        history.append({"role": "assistant", "content": final_response_collected})
+        with open(internal_history_path, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2)
             
-            # 1. Provide intermediate feedback to UI
-            friendly_action = tool_name.replace('_', ' ').title()
-            # Clean and truncate tool input for one-line display
-            clean_input = tool_input.replace('\n', ' ').strip()
-            if len(clean_input) > 60: clean_input = clean_input[:57] + "..."
-            print(f"[STATUS:{request.agent_id}] Action: {friendly_action} | Input: {clean_input}", flush=True)
-            
-            # 2. Execute Tool from global basket
-            tool_result = perform_tool_call(request.agent_id, tool_name, tool_input, agent_dir, api_key=api_key)
-            
-            # Report completion to terminal
-            res_summary = str(tool_result).replace('\n', ' ').strip()
-            if len(res_summary) > 60: res_summary = res_summary[:57] + "..."
-            print(f"[STATUS:{request.agent_id}] Finished: {friendly_action} | Result: {res_summary}", flush=True)
-            
-            # --- API PROTECTION: TRUNCATE HUGE TOOL RESULTS ---
-            if isinstance(tool_result, str) and len(tool_result) > 10000:
-                tool_result = (f"SYSTEM WARNING: Tool result too big ({len(tool_result)} chars). "
-                               f"Truncated for API safety. Result head:\n{tool_result[:5000]}...\n\n"
-                               f"STRICT INSTRUCTION: Do NOT try to read this much data again. Read it in smaller chunks.")
+        ui_history = []
+        for h in history:
+            if h["role"] == "user" and "SYSTEM TOOL" in str(h["content"]): continue
+            ui_history.append({"role": h["role"], "content": sanitize_ruthlessly(h["content"])})
+        with open(history_path, "w", encoding="utf-8") as f:
+            json.dump(ui_history, f, indent=2)
 
-            # 3. Add to history
-            history.append({"role": "assistant", "content": response_text})
-            history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {tool_result}"})
-            
-            # Injection: Warn the agent if they are about to run out of steps
-            
-            # Injection: Warn the agent if they are about to run out of steps
-            if iteration == max_turns - 2:
-                history.append({"role": "user", "content": "SYSTEM WARNING: You are approaching your maximum step limit (1 turn remaining). Please summarize your progress and tell the user specifically what is left to do, then stop. The user can say 'Continue' to give you more steps."})
-            
-            iteration += 1
-        else:
-            final_response = response_text
-            print(f"[STATUS:{request.agent_id}] Finalizing response...", flush=True)
-            break
-    # 5b. Fallback if max turns reached without a direct conversational response
-    if not final_response and history:
-        last_entry = history[-1]["content"]
-        if "SYSTEM TOOL RESULT:" in last_entry:
-            clean_result = last_entry.replace("SYSTEM TOOL RESULT: ", "").strip()
-            final_response = (
-                f"I've reached my internal thinking limit for this turn. Here is the last thing I found:\n\n"
-                f"```text\n{clean_result}\n```\n\n"
-                "I can continue if you'd like! Just say **'Continue'** or **'Keep going'** and I'll pick up right where I left off."
-            )
-        else:
-            final_response = "I've reached my internal limit for this turn without a final answer. Would you like me to **continue**?"
+        yield "data: [DONE]\n\n"
 
-    # 6. Save and Return
-    print(f"[STATUS:{request.agent_id}] Ready", flush=True)
-    
-    # RUTHLESS Sanitization
-    if final_response:
-        final_response = sanitize_ruthlessly(final_response)
-
-    history.append({"role": "assistant", "content": final_response})
-    
-    # ── SAVE INTERNAL HISTORY (FULL) ──
-    with open(internal_history_path, "w", encoding="utf-8") as f:
-        json.dump(history, f, indent=2)
-
-    # ── FILTER UI HISTORY (Transparent Activity Update) ──
-    # User sees Human User messages and Agent Activity + Final Responses.
-    ui_history = []
-    for entry in history:
-        # EXTREME STRING SAFETY
-        content = str(entry.get("content", "") or "")
-        role = str(entry.get("role", "user"))
-        
-        # UI Activity Mapping: Convert internal markers to user-friendly status
-        if role == "user":
-            if content.startswith("SYSTEM TOOL RESULT:"):
-                continue  # Keep chat clean of raw results
-            elif content.startswith("[MESSAGE FROM"):
-                continue  # Internal agent-to-agent talk stays hidden
-            elif content.startswith("[AUTO_STEP"):
-                continue  # Autonomous plan steps are internal — hide from UI
-        elif role == "assistant":
-            # Catch [TOOL:] whether it starts the message or is embedded mid-text.
-            # An agent should never expose tool syntax in a final conversational response.
-            tool_match_ui = re.search(r"\[TOOL:\s*(\w+)\(", content)
-            if tool_match_ui:
-                action_name = tool_match_ui.group(1).replace('_', ' ').title()
-                content = f"*Agent Action: {action_name}...*"
-        
-        ui_history.append({
-            "role": role,
-            "content": sanitize_ruthlessly(content)
-        })
-    
-    # Save the CLEAN history for the UI
-    with open(history_path, "w", encoding="utf-8") as f:
-        json.dump(ui_history, f, indent=2)
-
-    # Check if we need to refresh the summary (based on internal history)
-    if len(history) > 60:
-        new_summary = refresh_conversation_summary(
-            request.agent_id, 
-            history[:-30],
-            api_key, 
-            provider, 
-            current_summary
-        )
-        with open(summary_path, "w", encoding="utf-8") as f:
-            json.dump({"summary": new_summary, "updated_at": time.time()}, f, indent=2)
-        
-    return {"response": final_response}
-
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 @app.post("/run_autonomous")
 def run_autonomous_agent(request: ChatRequest):
     """

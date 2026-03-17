@@ -1,8 +1,9 @@
 {
-  "objective": "Objective: Summarize key findings about the economic aspects of the Iran-Iraq War",
+  "objective": "Objective: Analyze the impact of the Iran-Iraq War on agricultural production.",
   "steps": [
-    "Step 1: Review previous findings",
-    "Step 2: Consolidate and summarize key points"
+    "Step 1: Research impact on Iran's agricultural production",
+    "Step 2: Research impact on Iraq's agricultural production",
+    "Step 3: Summarize overall impact"
   ],
   "completed": [
     "Task Completed"

@@ -12,8 +12,8 @@
     "tools": "Custom",
     "responsibility": "",
     "agentType": "master",
-    "x": -998.0,
-    "y": 177.0,
+    "x": -798.0,
+    "y": 180.0,
     "connections": []
   },
   {
@@ -29,8 +29,8 @@
     "tools": "Custom",
     "responsibility": "",
     "agentType": "worker",
-    "x": -1365.0,
-    "y": -126.0,
+    "x": -1125.0,
+    "y": 56.0,
     "connections": [
       "agent-bot-1773697414554"
     ]
@@ -48,8 +48,8 @@
     "tools": "Custom",
     "responsibility": "",
     "agentType": "worker",
-    "x": -1370.0,
-    "y": 196.0,
+    "x": -1132.0,
+    "y": 234.0,
     "connections": [
       "agent-bot-1773697414554"
     ]
@@ -67,8 +67,8 @@
     "tools": "Custom",
     "responsibility": "",
     "agentType": "worker",
-    "x": -1339.0,
-    "y": 550.0,
+    "x": -1142.0,
+    "y": 443.0,
     "connections": [
       "agent-bot-1773697414554"
     ]
