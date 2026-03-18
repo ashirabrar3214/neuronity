@@ -376,7 +376,7 @@ input:checked+.slider:before {
 
 /* iMessage / Modern Style Bubbles */
 .message {
-    padding: 12px 18px;
+    padding: 10px 16px;
     max-width: 75%;
     line-height: 1.6;
     font-size: 14.5px;
@@ -585,14 +585,64 @@ input:checked+.slider:before {
     }
 }
 
+.stream-status {
+    min-height: 12px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-bottom: 2px;
+    gap: 4px;
+}
+
+.loading-dots::after {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    text-align: left;
+    animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+
+    0%,
+    20% {
+        content: '';
+    }
+
+    40% {
+        content: '.';
+    }
+
+    60% {
+        content: '..';
+    }
+
+    80% {
+        content: '...';
+    }
+}
+
 .typing-indicator {
     display: flex;
     gap: 5px;
-    padding: 12px 18px;
+    padding: 8px 14px;
     background: var(--message-agent);
-    border-radius: 20px;
+    border-radius: 18px;
     border-bottom-left-radius: 4px;
     align-self: flex-start;
+}
+
+.typing-indicator-mini {
+    display: inline-flex;
+    gap: 3px;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    height: 10px;
 }
 
 .typing-dot {
@@ -807,11 +857,50 @@ input:checked+.slider:before {
     gap: 12px;
     align-items: center;
 }
+
 /* STREAMING STYLES */
-.thought-block { background: rgba(255,255,255,0.03); border-left: 2px solid var(--accent-color); margin: 8px 0; border-radius: 8px; }
-.thought-block summary { padding: 10px; cursor: pointer; color: var(--accent-color); font-weight: 600; }
-.thought-content { padding: 10px; font-size: 13px; color: #b0bec5; white-space: pre-wrap; font-family: monospace; }
-.response-text { margin-top: 10px; }
-.stream-status { font-size: 12px; color: var(--text-secondary); margin-top: 5px; }
-@keyframes pulse-s { 0%{opacity:0.5} 50%{opacity:1} 100%{opacity:0.5} }
-.stream-status:before { content:'?'; margin-right:5px; color:var(--accent-color); animation:pulse-s 1.5s infinite; }
+.thought-block {
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 2px solid var(--accent-color);
+    margin: 8px 0;
+    border-radius: 8px;
+}
+
+.thought-block summary {
+    padding: 10px;
+    cursor: pointer;
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.thought-content {
+    padding: 10px;
+    font-size: 13px;
+    color: #b0bec5;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+
+.response-text {
+    margin-top: 10px;
+}
+
+.stream-status {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 5px;
+}
+
+@keyframes pulse-s {
+    0% {
+        opacity: 0.5
+    }
+
+    50% {
+        opacity: 1
+    }
+
+    100% {
+        opacity: 0.5
+    }
+}

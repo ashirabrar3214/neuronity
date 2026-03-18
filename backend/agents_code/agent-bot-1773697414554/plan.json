@@ -1,11 +1,10 @@
 {
-  "objective": "{\"tool_input\": \"Objective",
+  "objective": "{\"tool_input\": \"Research hypothetical Iran war 2026",
   "steps": [
-    "Gather information on the political",
-    "economic",
-    "and religious aspects of a hypothetical Iran war in 2026",
-    "synthesize the information",
-    "and generate a report.\"}"
+    "1. Message Political agent for geopolitical triggers",
+    "2. Message Economics agent for global economic impact",
+    "3. Message Religion agent for ideological factors",
+    "4. Synthesize findings into a report.\"}"
   ],
   "completed": []
 }

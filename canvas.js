@@ -66,10 +66,15 @@ class AgentCanvas {
         nodeEl.style.left = `${x}px`;
         nodeEl.style.top = `${y}px`;
 
+        const agentType = data.agentType || 'worker';
+        const isMaster = agentType === 'master';
+        if (isMaster) nodeEl.classList.add('master-role');
+
         nodeEl.innerHTML = `
             <div class="node-port port-in"></div>
             <div class="node-header">
                 <span class="node-title" contenteditable="true" spellcheck="false" style="outline:none; min-width: 50px;">${title}</span>
+                <span class="agent-type-badge ${isMaster ? '' : 'worker'}" data-type="${agentType}" title="Click to toggle Master/Worker role">${isMaster ? 'MASTER' : 'WORKER'}</span>
                 <span class="expand-btn" style="opacity:0.5; cursor: pointer; font-size: 12px;">▼</span>
             </div>
             <div class="node-settings" style="display:none;">
@@ -88,6 +93,44 @@ class AgentCanvas {
             <div class="node-port port-out"></div>
         `;
 
+        // Agent Type Toggle
+        const typeBadge = nodeEl.innerHTML !== "" ? nodeEl.querySelector('.agent-type-badge') : null;
+        if (typeBadge) {
+            typeBadge.addEventListener('mousedown', (e) => e.stopPropagation());
+            typeBadge.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const currentType = typeBadge.getAttribute('data-type');
+                const newType = (currentType === 'master') ? 'worker' : 'master';
+
+                // UI Update
+                typeBadge.setAttribute('data-type', newType);
+                typeBadge.innerText = newType.toUpperCase();
+                if (newType === 'master') {
+                    typeBadge.classList.remove('worker');
+                    nodeEl.classList.add('master-role');
+                } else {
+                    typeBadge.classList.add('worker');
+                    nodeEl.classList.remove('master-role');
+                }
+
+                // Data Update
+                const nodeObj = this.nodes.find(n => n.id === id);
+                if (nodeObj) {
+                    nodeObj.data.agentType = newType;
+
+                    // Save to Backend
+                    await this.saveAgentData(id);
+
+                    // If this agent is currently open in training panel, sync it
+                    if (window.activeTrainingAgentId === id) {
+                        const planBtn = document.getElementById('generate-plan-btn');
+                        if (planBtn) {
+                            planBtn.style.display = (newType === 'master') ? 'block' : 'none';
+                        }
+                    }
+                }
+            });
+        }
 
         // Settings Toggle
         const expandBtn = nodeEl.querySelector('.expand-btn');

@@ -1191,8 +1191,17 @@ async def chat_with_agent(request: ChatRequest):
 
         while iteration < max_turns:
             llm_context = process_generational_history(history)
-            # 1. Force everything hitting this normal chat endpoint to use fast Flash
+            
+            # UPGRADE: Master agents in production 'work' mode use Gemini 3 Thinking for complex reasoning.
+            # All other cases (workers, training mode) use Gemini 2.0 Flash for speed/efficiency.
             model = "gemini-2.0-flash"
+            gen_config = {"temperature": 0.3, "maxOutputTokens": 8192}
+            
+            if is_master and not is_training_mode:
+                model = "gemini-3-flash-preview"
+                # Enable specialized thinking budget for high-quality plans/responses
+                gen_config["thinkingConfig"] = {"includeThoughts": True, "thinkingBudget": -1}
+                
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={api_key}&alt=sse"
             
             gemini_history = []
@@ -1201,9 +1210,6 @@ async def chat_with_agent(request: ChatRequest):
                     "role": "user" if h["role"] == "user" else "model",
                     "parts": [{"text": h["content"] or "[Empty]"}]
                 })
-            
-            # 2. Standard config only. No thinking config here!
-            gen_config = {"temperature": 0.3, "maxOutputTokens": 8192}
             
             payload = {
                 "contents": gemini_history,

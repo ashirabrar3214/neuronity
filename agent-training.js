@@ -141,7 +141,8 @@ window.openTrainingPanel = async (agentId, agentName) => {
     document.getElementById('detail-channel').value = agentData.channel || 'Gmail';
     document.getElementById('detail-workdir').value = agentData.workingDir || '';
     document.getElementById('detail-tools').value = agentData.tools || '';
-    document.getElementById('detail-agent-type').value = agentData.agentType || 'worker';
+    const typeEl = document.getElementById('detail-agent-type');
+    if (typeEl) typeEl.value = agentData.agentType || 'worker';
 
     // Show/hide plan button based on agent type
     const planBtn = document.getElementById('generate-plan-btn');
@@ -284,7 +285,7 @@ async function triggerSave() {
         channel: document.getElementById('detail-channel').value,
         workingDir: document.getElementById('detail-workdir').value,
         tools: document.getElementById('detail-tools').value,
-        agentType: document.getElementById('detail-agent-type').value,
+        agentType: document.getElementById('detail-agent-type')?.value || activeAgentData.agentType || 'worker',
         permissions: permissions
     };
 
@@ -401,13 +402,15 @@ function initTrainingUI() {
 
     // Agent Type change
     const typeSelect = document.getElementById('detail-agent-type');
-    typeSelect.addEventListener('change', () => {
-        const planBtn = document.getElementById('generate-plan-btn');
-        if (planBtn) {
-            planBtn.style.display = (typeSelect.value === 'master') ? 'block' : 'none';
-        }
-        queueAutoSave();
-    });
+    if (typeSelect) {
+        typeSelect.addEventListener('change', () => {
+            const planBtn = document.getElementById('generate-plan-btn');
+            if (planBtn) {
+                planBtn.style.display = (typeSelect.value === 'master') ? 'block' : 'none';
+            }
+            queueAutoSave();
+        });
+    }
 
     // Link autoSaveStatus to the global
     autoSaveStatus = document.getElementById('auto-save-status');
@@ -415,8 +418,7 @@ function initTrainingUI() {
     // Attach listeners to all inputs/selects for auto-save
     const autoSaveInputs = [
         'detail-name', 'detail-description', 'detail-responsibility',
-        'detail-channel', 'detail-tools', 'detail-workdir',
-        'detail-agent-type'
+        'detail-channel', 'detail-tools', 'detail-workdir'
     ];
 
     autoSaveInputs.forEach(id => {
@@ -629,7 +631,7 @@ function initTrainingUI() {
 
                 let initialStatus = document.createElement('div');
                 initialStatus.className = 'stream-status';
-                initialStatus.innerHTML = `<i>Thinking...</i>`;
+                initialStatus.innerHTML = `<div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
                 messageDiv.appendChild(initialStatus);
 
                 let unprocessedText = "";
@@ -642,9 +644,14 @@ function initTrainingUI() {
                     unprocessedText = lines.pop();
 
                     for (let line of lines) {
-                        if (!line.startsWith('data: ')) continue;
+                        if (!line.trim() || !line.startsWith('data: ')) continue;
                         let dataText = line.slice(6).trim();
                         if (dataText === '[DONE]') break;
+
+                        // Safeguard: some SSE engines accidentally duplicate the prefix
+                        if (dataText.startsWith('data: ')) {
+                            dataText = dataText.slice(6).trim();
+                        }
 
                         try {
                             const data = JSON.parse(dataText);
@@ -654,7 +661,7 @@ function initTrainingUI() {
                                 if (!thoughtDetails) {
                                     thoughtDetails = document.createElement('details');
                                     thoughtDetails.className = 'thought-block';
-                                    thoughtDetails.innerHTML = `<summary>🧠 <i>Thinking...</i></summary><div class="thought-content"></div>`;
+                                    thoughtDetails.innerHTML = `<summary>🧠 <div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></summary><div class="thought-content"></div>`;
                                     messageDiv.appendChild(thoughtDetails);
                                     thoughtContent = thoughtDetails.querySelector('.thought-content');
                                 }
