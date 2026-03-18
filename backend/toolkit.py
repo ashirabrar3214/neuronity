@@ -251,7 +251,8 @@ def thinking(agent_id, topic):
 
     safe_log(f"[STATUS:{agent_id}] Thinking: Analyzing '{topic[:40]}...'")
     time.sleep(3)
-    return f"Thinking complete on '{topic}'. Ready to respond with deeper analysis."
+    # FIX: Explicitly instruct the agent to stop looping and output the response
+    return f"SYSTEM INSTRUCTION: The thinking pause for '{topic}' is complete. Do NOT call the thinking tool again. Use your internal knowledge to generate a deep, detailed analysis and respond directly to the user."
 
 
 # ─────────────────────────────────────────────────
