@@ -1,12 +1,11 @@
 {
-  "objective": "{\"tool_input\": \"Explore the meaning of life",
+  "objective": "{\"tool_input\": \"Objective",
   "steps": [
-    "Define philosophical perspectives",
-    "Research biological and existential viewpoints",
-    "Post findings to ledger",
-    "Generate a summary report\"}"
+    "Gather information on the political",
+    "economic",
+    "and religious aspects of a hypothetical Iran war in 2026",
+    "synthesize the information",
+    "and generate a report.\"}"
   ],
-  "completed": [
-    "{\"tool_input\": \"Task Completed\"}"
-  ]
+  "completed": []
 }

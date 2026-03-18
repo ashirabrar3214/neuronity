@@ -16,6 +16,10 @@
     "content": "[TOOL: update_plan({\"tool_input\": \"Objective | Gather information on the political, economic, and religious aspects of a hypothetical Iran war in 2026, synthesize the information, and generate a report.\"})]"
   },
   {
+    "role": "user",
+    "content": "SYSTEM TOOL RESULT: Success: Internal plan updated. Objective: {\"tool_input\": \"Objective"
+  },
+  {
     "role": "assistant",
     "content": "Okay, I will create a report on a hypothetical Iran war in 2026. To provide a comprehensive analysis, I need to gather information on the political, economic, and religious factors that could contribute to such a conflict. I will start by messaging the specialist agents for their insights.\n"
   }

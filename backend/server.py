@@ -924,9 +924,16 @@ def clear_history(agent_id: str):
         # Re-initialize main history as empty
         with open(history_path, "w", encoding="utf-8") as f:
             json.dump([], f)
+
+        if os.path.exists(BLACKBOARD_FILE):
+            os.remove(BLACKBOARD_FILE)
             
-        print(f"--- [BACKEND] Cleared history for agent: {agent_id}")
-        return {"status": "success", "message": "History and logs cleared"}
+        volatile_path = os.path.join(AGENTS_CODE_DIR, "volatile_findings.json")
+        if os.path.exists(volatile_path):
+            os.remove(volatile_path)
+
+        print(f"--- [BACKEND] Cleared history, blackboard and volatile ledger for agent: {agent_id}")
+        return {"status": "success", "message": "History, logs, and blackboard cleared"}
     except Exception as e:
         print(f"!!! [BACKEND ERROR] Could not clear history for {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

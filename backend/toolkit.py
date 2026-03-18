@@ -740,7 +740,25 @@ def update_plan(agent_id, tool_input):
             item = tool_input.strip()
             if item not in plan["completed"]:
                 plan["completed"].append(item)
-            
+
+            if item.lower() == "task completed":
+                # CLEAR BLACKBOARD & VOLATILE LEDGER ON COMPLETION
+                agents_code_dir = os.path.join(os.path.dirname(__file__), "agents_code")
+                blackboard_path = os.path.join(agents_code_dir, "blackboard.json")
+                volatile_path = os.path.join(agents_code_dir, "volatile_findings.json")
+                
+                if os.path.exists(blackboard_path):
+                    try:
+                        os.remove(blackboard_path)
+                        safe_log("--- [CLEANUP] Blackboard cleared (Task Completed).")
+                    except: pass
+                    
+                if os.path.exists(volatile_path):
+                    try:
+                        os.remove(volatile_path)
+                        safe_log("--- [CLEANUP] Volatile ledger cleared (Task Completed).")
+                    except: pass
+
         with open(plan_path, "w", encoding="utf-8") as f:
             json.dump(plan, f, indent=2)
             
