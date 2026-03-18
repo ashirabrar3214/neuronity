@@ -611,92 +611,99 @@ function initTrainingUI() {
                 return;
             }
 
-            // --- STREAM HANDLING ---
             removeTypingIndicator();
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
 
-            let messageDiv = document.createElement('div');
-            messageDiv.className = 'message agent-message';
-            chatArea.appendChild(messageDiv);
+            // --- STREAM HANDLING (for /chat) ---
+            if (endpoint.includes('/chat')) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
 
-            let thoughtDetails = null;
-            let thoughtContent = null;
-            let responseContent = "";
-            let fullThoughtText = "";
+                let messageDiv = document.createElement('div');
+                messageDiv.className = 'message agent-message';
+                chatArea.appendChild(messageDiv);
 
-            let initialStatus = document.createElement('div');
-            initialStatus.className = 'stream-status';
-            initialStatus.innerHTML = `<i>Thinking...</i>`;
-            messageDiv.appendChild(initialStatus);
+                let thoughtDetails = null;
+                let thoughtContent = null;
+                let responseContent = "";
+                let fullThoughtText = "";
 
-            let unprocessedText = "";
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+                let initialStatus = document.createElement('div');
+                initialStatus.className = 'stream-status';
+                initialStatus.innerHTML = `<i>Thinking...</i>`;
+                messageDiv.appendChild(initialStatus);
 
-                unprocessedText += decoder.decode(value, { stream: true });
-                const lines = unprocessedText.split('\n');
-                // Keep the last partial line in the buffer
-                unprocessedText = lines.pop();
+                let unprocessedText = "";
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                for (let line of lines) {
-                    if (!line.startsWith('data: ')) continue;
-                    let dataText = line.slice(6).trim();
-                    if (dataText === '[DONE]') break;
+                    unprocessedText += decoder.decode(value, { stream: true });
+                    const lines = unprocessedText.split('\n');
+                    unprocessedText = lines.pop();
 
-                    try {
-                        const data = JSON.parse(dataText);
-                        // Clean up initial status on first data
-                        if (initialStatus) { initialStatus.remove(); initialStatus = null; }
+                    for (let line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        let dataText = line.slice(6).trim();
+                        if (dataText === '[DONE]') break;
 
-                        if (data.type === 'thought') {
-                            if (!thoughtDetails) {
-                                thoughtDetails = document.createElement('details');
-                                thoughtDetails.className = 'thought-block';
-                                thoughtDetails.innerHTML = `<summary>🧠 <i>Thinking...</i></summary><div class="thought-content"></div>`;
-                                messageDiv.appendChild(thoughtDetails);
-                                thoughtContent = thoughtDetails.querySelector('.thought-content');
+                        try {
+                            const data = JSON.parse(dataText);
+                            if (initialStatus) { initialStatus.remove(); initialStatus = null; }
+
+                            if (data.type === 'thought') {
+                                if (!thoughtDetails) {
+                                    thoughtDetails = document.createElement('details');
+                                    thoughtDetails.className = 'thought-block';
+                                    thoughtDetails.innerHTML = `<summary>🧠 <i>Thinking...</i></summary><div class="thought-content"></div>`;
+                                    messageDiv.appendChild(thoughtDetails);
+                                    thoughtContent = thoughtDetails.querySelector('.thought-content');
+                                }
+                                fullThoughtText += data.content;
+                                thoughtContent.textContent = fullThoughtText;
                             }
-                            fullThoughtText += data.content;
-                            thoughtContent.textContent = fullThoughtText;
-                        }
-                        else if (data.type === 'text') {
-                            responseContent += data.content;
-                            let textSpan = messageDiv.querySelector('.response-text');
-                            if (!textSpan) {
-                                textSpan = document.createElement('div');
-                                textSpan.className = 'response-text';
-                                messageDiv.appendChild(textSpan);
+                            else if (data.type === 'text') {
+                                responseContent += data.content;
+                                let textSpan = messageDiv.querySelector('.response-text');
+                                if (!textSpan) {
+                                    textSpan = document.createElement('div');
+                                    textSpan.className = 'response-text';
+                                    messageDiv.appendChild(textSpan);
+                                }
+                                textSpan.innerHTML = markdownToHtml(responseContent);
                             }
-                            textSpan.innerHTML = markdownToHtml(responseContent);
-                        }
-                        else if (data.type === 'status' || data.type === 'tool_start') {
-                            let statusEl = messageDiv.querySelector('.stream-status');
-                            if (!statusEl) {
-                                statusEl = document.createElement('div');
-                                statusEl.className = 'stream-status';
-                                messageDiv.appendChild(statusEl);
+                            else if (data.type === 'status' || data.type === 'tool_start') {
+                                let statusEl = messageDiv.querySelector('.stream-status');
+                                if (!statusEl) {
+                                    statusEl = document.createElement('div');
+                                    statusEl.className = 'stream-status';
+                                    messageDiv.appendChild(statusEl);
+                                }
+                                statusEl.innerHTML = `<i>${data.content || 'Action...'}</i>`;
                             }
-                            statusEl.innerHTML = `<i>${data.content || 'Action...'}</i>`;
+                            else if (data.type === 'error') {
+                                messageDiv.innerHTML += `<div class="error-text">⚠️ ${data.content}</div>`;
+                            }
+                        } catch (e) {
+                            console.error("Error parsing stream chunk:", e, dataText);
                         }
-                        else if (data.type === 'error') {
-                            messageDiv.innerHTML += `<div class="error-text">⚠️ ${data.content}</div>`;
-                        }
-                    } catch (e) {
-                        console.error("Error parsing stream chunk:", e, dataText);
                     }
+                    chatArea.scrollTop = chatArea.scrollHeight;
                 }
-                chatArea.scrollTop = chatArea.scrollHeight;
+
+                const sEl = messageDiv.querySelector('.stream-status');
+                if (sEl) sEl.remove();
+
+                processPlanResponse(responseContent, text, true); // true = already displayed
             }
-
-            // Post-stream cleanup/animation
-            // Remove status once done
-            const sEl = messageDiv.querySelector('.stream-status');
-            if (sEl) sEl.remove();
-
-            // Final check for plans
-            processPlanResponse(responseContent, text);
+            // --- REGULAR JSON HANDLING (for /run_autonomous) ---
+            else {
+                const data = await response.json();
+                if (data.response) {
+                    processPlanResponse(data.response, text, false); // false = not displayed yet
+                } else if (data.error) {
+                    addMessage(`Error: ${data.error}`, false);
+                }
+            }
 
         } catch (error) {
             removeTypingIndicator();
@@ -752,7 +759,7 @@ function initTrainingUI() {
         });
     }
 
-    function processPlanResponse(responseText, originalTask) {
+    function processPlanResponse(responseText, originalTask, isAlreadyDisplayed = false) {
         // Check if this is an execution plan response
         if (responseText.includes("Execution Plan Generated") || responseText.includes("### 📝")) {
             // Extract plan steps and show in dedicated area
@@ -775,10 +782,10 @@ function initTrainingUI() {
 
                 // Don't show this in chat, only show a summary message
                 addMessage(`✓ Execution plan generated with ${stepsMatch.length} steps. Use the plan panel to execute.`, false);
-            } else {
+            } else if (!isAlreadyDisplayed) {
                 addMessage(responseText, false);
             }
-        } else {
+        } else if (!isAlreadyDisplayed) {
             addMessage(responseText, false);
         }
     }

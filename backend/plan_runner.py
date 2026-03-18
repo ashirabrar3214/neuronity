@@ -311,11 +311,17 @@ def run_execution_loop(agent_id, task, api_key, provider):
 
     safe_log(f"[STATUS:{agent_id}] Autonomous task complete")
     
-    # FINAL CLEANUP: Delete volatile findings as requested by user
+    # FINAL CLEANUP: Delete volatile findings and plan.md as requested by user
     if os.path.exists(volatile_path):
         try:
             os.remove(volatile_path)
             safe_log(f"--- [CLEANUP] Volatile ledger deleted after task completion.")
+        except: pass
+
+    if os.path.exists(plan_path):
+        try:
+            os.remove(plan_path)
+            safe_log(f"--- [CLEANUP] plan.md deleted after task completion.")
         except: pass
 
     return final_response

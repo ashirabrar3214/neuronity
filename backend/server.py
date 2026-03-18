@@ -764,20 +764,12 @@ Identity: You are an agent sitting in a desktop PC at UF working for Ashir.
 Description: {agent_data['description']}
 Responsibility: {agent_data.get('responsibility', 'General purpose assistance')}
 
-## INTENT GATE
-1. If the user asks about your abilities, confirm them in plain text. 
-2. Do NOT execute a tool call unless a specific topic or objective is provided.
-
-## STIGMERGY (SHARED LEDGER)
-1. **Ledger First**: Before acting, check the Shared Workspace Ledger in your context for existing findings.
-2. **Post Findings**: After discovering a fact, use [TOOL: post_finding(Insight | Source URL)] to share it.
-
-## BDI PLANNING & STATE
-1. Call [TOOL: update_plan(Objective | Step 1, Step 2, ...)] immediately when you accept a new task.
-2. Call [TOOL: update_plan(Task Completed)] before sending any final response.
-
-## SOURCE REQUIREMENT
-Every fact from research must include a `[Source: URL]` citation.
+## OPERATION RULES
+1. **Tool Use**: Use your available tools to complete tasks. Do not explain that you are using a tool; just execute the tool call.
+2. **Intent Gate**: Do NOT execute tool calls for casual greetings. Only act if a specific research topic or objective is provided.
+3. **Planning (BDI)**: Use the `update_plan` tool immediately upon accepting a new task to set your objective and steps. Use it again to mark tasks as completed.
+4. **Knowledge Sharing (Stigmergy)**: Use the `post_finding` tool to record important facts or insights to the Shared Workspace Ledger so other agents can see them.
+5. **Citations**: Every fact discovered via research MUST include a `[Source: URL]` citation.
 """
     with open(prompt_path, "w", encoding="utf-8") as f:
         f.write(prompt_content)
@@ -1167,7 +1159,7 @@ async def chat_with_agent(request: ChatRequest):
         transient_task_layer = (
             f"## TRANSIENT TASK CONTEXT\n"
             f"GLOBAL PROJECT OBJECTIVE: {global_obj}\n"
-            f"TEAM (Connected Agents): \n{connected_str}\n\n"
+            f"IMPORTANT: You can ONLY message these specific connected agents:\n{connected_str}\n\n"
             f"### BLACKBOARD FINDINGS\n{blackboard_context}\n"
         )
 
@@ -1193,7 +1185,7 @@ async def chat_with_agent(request: ChatRequest):
         while iteration < max_turns:
             llm_context = process_generational_history(history)
             model = "gemini-3-flash-preview" if is_master else "gemini-2.0-flash"
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={api_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={api_key}&alt=sse"
             
             gemini_history = []
             for h in llm_context:
@@ -1218,7 +1210,7 @@ async def chat_with_agent(request: ChatRequest):
             tool_call_found = None
 
             try:
-                print(f"[STATUS:{request.agent_id}] Turn {iteration+1}: Streaming from {model}...", flush=True)
+                print(f"[STATUS:{request.agent_id}] Turn {iteration+1}: Streaming from {model} (SSE Mode)...", flush=True)
                 async with httpx.AsyncClient() as client:
                     async with client.stream("POST", url, json=payload, timeout=120) as r:
                         if r.status_code != 200:
@@ -1227,35 +1219,62 @@ async def chat_with_agent(request: ChatRequest):
                             break
 
                         async for line in r.aiter_lines():
-                            if not line: continue
-                            if not line: continue
-                            # Clean up the streaming array format [{},{},...]
-                            line = line.strip()
-                            if line.startswith("["): line = line[1:]
-                            if line.endswith("]"): line = line[:-1]
-                            if line.startswith(","): line = line[1:]
                             line = line.strip()
                             if not line: continue
                             
-                            try:
-                                chunk = json.loads(line)
-                                parts = chunk.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                            # In SSE mode, every valid JSON chunk starts with "data: "
+                            if line.startswith("data: "):
+                                json_str = line[6:] # Strip off "data: "
                                 
-                                for part in parts:
-                                    if "thought" in part:
-                                        thought = part.get("text", "")
-                                        current_turn_thoughts += thought
-                                        yield f"data: {json.dumps({'type': 'thought', 'content': thought})}\n\n"
-                                    elif "text" in part:
-                                        text = part.get("text", "")
-                                        current_turn_text += text
-                                        yield f"data: {json.dumps({'type': 'text', 'content': text})}\n\n"
-                                    elif "functionCall" in part:
-                                        fn = part["functionCall"]
-                                        tool_call_found = {"name": fn["name"], "args": fn.get("args", {})}
-                                        yield f"data: {json.dumps({'type': 'tool_start', 'content': tool_call_found['name']})}\n\n"
-                            except Exception: 
-                                pass
+                                # Gemini sometimes sends [DONE] at the very end
+                                if json_str == "[DONE]":
+                                    continue
+                                
+                                try:
+                                    chunk = json.loads(json_str)
+                                    parts = chunk.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                                    
+                                    for part in parts:
+                                        if "thought" in part:
+                                            thought = part.get("text", "")
+                                            current_turn_thoughts += thought
+                                            yield f"data: {json.dumps({'type': 'thought', 'content': thought})}\n\n"
+                                        elif "text" in part:
+                                            text = part.get("text", "")
+                                            current_turn_text += text
+                                            yield f"data: {json.dumps({'type': 'text', 'content': text})}\n\n"
+                                        elif "functionCall" in part:
+                                            fn = part["functionCall"]
+                                            tool_call_found = {"name": fn["name"], "args": fn.get("args", {})}
+                                            yield f"data: {json.dumps({'type': 'tool_start', 'content': tool_call_found['name']})}\n\n"
+                                            
+                                except Exception as e:
+                                    print(f"[STREAM PARSE ERROR] {e} on chunk: {json_str[:50]}", flush=True)
+                                    pass
+
+                # --- Fallback: Detect tool calls written in text ---
+                if not tool_call_found and current_turn_text:
+                    # Look for [TOOL: name(args)]
+                    tool_match = re.search(r'\[TOOL:\s*(\w+)\((.*?)\)\]', current_turn_text)
+                    if tool_match:
+                        t_name = tool_match.group(1)
+                        t_args_str = tool_match.group(2)
+                        
+                        # Strip the tool call from the text sent to user if possible
+                        current_turn_text = current_turn_text.replace(tool_match.group(0), "").strip()
+                        
+                        # Try to handle common arg hallucinations
+                        try:
+                            # If it looks like JSON, parse it
+                            if t_args_str.startswith("{"):
+                                t_args = json.loads(t_args_str)
+                            else:
+                                t_args = t_args_str # just a string
+                        except:
+                            t_args = t_args_str
+
+                        tool_call_found = {"name": t_name, "args": t_args}
+                        yield f"data: {json.dumps({'type': 'tool_start', 'content': t_name})}\n\n"
 
                 if tool_call_found:
                     t_name = tool_call_found["name"]
