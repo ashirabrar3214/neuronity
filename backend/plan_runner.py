@@ -17,24 +17,38 @@ def safe_log(message):
         pass
 
 
-def _call_llm_direct(prompt, api_key, provider):
-    """One-shot LLM call for plan generation (no history, no tools)."""
+def _call_llm_direct(prompt, api_key, provider, mode="fast"):
+    """One-shot LLM call for plan generation or task classification."""
     if provider == "gemini":
-        model = "gemini-3-flash-preview"
+        if mode == "think":
+            model = "gemini-3-flash-preview"
+            # Enable deep reasoning ONLY for plan generation
+            generation_config = {
+                "temperature": 0.2,
+                "thinkingConfig": {"includeThoughts": True, "thinkingBudget": -1}
+            }
+        else:
+            model = "gemini-2.0-flash"
+            # Fast, standard generation for simple routing
+            generation_config = {"temperature": 0.2}
+
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         data = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.2}
+            "generationConfig": generation_config
         }
         try:
-            resp = requests.post(url, json=data, timeout=30)
+            # Increased timeout slightly for deep thinking
+            resp = requests.post(url, json=data, timeout=90) 
             if resp.status_code == 200:
-                return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                parts = resp.json()["candidates"][0]["content"]["parts"]
+                # Gemini 3 returns multiple parts (thoughts, then text). 
+                # The final text plan is always the last part in the array.
+                return parts[-1]["text"].strip()
+            else:
+                safe_log(f"!!! [PLAN_RUNNER] API Error: {resp.text}")
         except Exception as e:
             safe_log(f"!!! [PLAN_RUNNER] LLM error: {e}")
-
-    pass # Anthropic removed
-    return ""
 
     return ""
 
@@ -53,7 +67,7 @@ MESSAGE: "{text}"
 
 Return ONLY 'TASK' or 'CHAT'."""
 
-    res = _call_llm_direct(prompt, api_key, provider)
+    res = _call_llm_direct(prompt, api_key, provider, mode="fast")
     return "TASK" in res.upper()
 
 
@@ -89,7 +103,7 @@ Return ONLY a numbered list, nothing else. Example of a 6-step multi-agent plan:
 
 YOUR PLAN:"""
 
-    text = _call_llm_direct(prompt, api_key, provider)
+    text = _call_llm_direct(prompt, api_key, provider, mode="think")
 
     steps = []
     for line in text.strip().split('\n'):
