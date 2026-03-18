@@ -1316,7 +1316,7 @@ async def chat_with_agent(request: ChatRequest):
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 @app.post("/run_autonomous")
-def run_autonomous_agent(request: ChatRequest):
+async def run_autonomous_agent(request: ChatRequest):
     """
     Autonomous execution endpoint for master agents.
     Generates a step-by-step plan, executes each step via /chat, and returns the final result.
@@ -1327,7 +1327,7 @@ def run_autonomous_agent(request: ChatRequest):
 
     # Fall back to regular chat if agent not found or not a master agent
     if not agent_data or agent_data.get("agentType", "worker") != "master":
-        return chat_with_agent(request)
+        return await chat_with_agent(request)
 
     # Build a summary of connected agents to help plan generation
     connections = agent_data.get("connections", [])
@@ -1351,7 +1351,7 @@ def run_autonomous_agent(request: ChatRequest):
     # If it's just a greeting or casual talk, bypass the planner and route to normal chat.
     if not plan_runner.is_task_request(request.message, api_key, provider):
         safe_log(f"[STATUS:{request.agent_id}] Casual conversation detected - routing to standard chat")
-        return chat_with_agent(request)
+        return await chat_with_agent(request)
 
     # Phase 1: Generate the plan
     steps = plan_runner.run_autonomous(
@@ -1364,7 +1364,7 @@ def run_autonomous_agent(request: ChatRequest):
 
     if not steps:
         # Fallback to normal chat if planning fails
-        return chat_with_agent(request)
+        return await chat_with_agent(request)
 
     # Save plan location for the UI
     plan_path = os.path.join(AGENTS_CODE_DIR, request.agent_id, "plan.md")
