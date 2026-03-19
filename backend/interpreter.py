@@ -752,8 +752,8 @@ Responsibility: {agent_data.get('responsibility', 'General purpose assistance')}
 ## OPERATION RULES
 1. **Tool Use**: Use your available tools to complete tasks. Do not explain that you are using a tool; just execute the tool call.
 2. **Intent Gate**: Do NOT execute tool calls for casual greetings. Only act if a specific research topic or objective is provided.
-3. **Intentions (BDI)**: If you are NOT in autonomous extraction mode, use `update_plan` to record your objective and steps. If you ARE in autonomous mode, just execute the provided step. Use `update_plan` to mark steps as 'Completed' once you finish them.
-4. **Knowledge Sharing (BRF)**: Use the `post_finding` tool to record important facts to the Shared Belief Base so other agents can see them.
+3. **Intentions (BDI)**: Use `update_plan` ONLY when starting a complex multi-step task, or when crossing off a completed step. Do not use it for simple conversational replies.
+4. **Knowledge Sharing (BRF)**: Use the `post_finding` tool to record important facts to the Shared Belief Base.
 5. **Citations**: Every fact discovered via research MUST include a `[Source: URL]` citation.
 """
     with open(prompt_path, "w", encoding="utf-8") as f:
@@ -923,7 +923,7 @@ def clear_history(agent_id: str):
         print(f"!!! [BACKEND ERROR] Could not clear history for {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest_only=False):
+def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest_only=False, is_training=False):
     """
     Translates agent permissions into Gemini-native tool declarations.
     If manifest_only is True, returns a human-readable string for system prompts.
@@ -1060,9 +1060,10 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest
             "required": ["tool_input"]
         }
     })
+    # FIX: Relax the description so it doesn't spam it on every conversational turn
     declarations.append({
         "name": "update_plan",
-        "description": "Updates your internal BDI intentions. Mandated before messaging the user.",
+        "description": "Updates your internal BDI intentions. Use ONLY when tracking steps for a complex multi-step task.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -1071,6 +1072,29 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest
             "required": ["tool_input"]
         }
     })
+
+    # FIX: Inject Training Tools into the actual Gemini API manifest
+    if is_training:
+        declarations.append({
+            "name": "update_prompt",
+            "description": "Directly rewrite your system instructions (prompt.md) to fix bugs or refine identity.",
+            "parameters": {"type": "OBJECT", "properties": {"new_content": {"type": "STRING"}}, "required": ["new_content"]}
+        })
+        declarations.append({
+            "name": "read_prompt",
+            "description": "Read your current identity and behavioral rules.",
+            "parameters": {"type": "OBJECT", "properties": {}}
+        })
+        declarations.append({
+            "name": "read_memory",
+            "description": "Read your long-term memory summary.",
+            "parameters": {"type": "OBJECT", "properties": {}}
+        })
+        declarations.append({
+            "name": "read_beliefs_context",
+            "description": "Read the project's overarching objective.",
+            "parameters": {"type": "OBJECT", "properties": {}}
+        })
 
     if manifest_only:
         return "\n".join([f"- [TOOL: {d['name']}()]: {d['description']}" for d in declarations])
@@ -1210,6 +1234,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
             f"You are currently in **TRAINING MODE**. Focus on learning your role.\n"
             f"## YOUR CURRENT WORK PROMPT (prompt.md):\n```\n{current_agent_prompt}\n```\n"
             f"{training_tools_block}\n"
+            f"{tool_manual_layer}\n"  # FIX: Also remind it of its standard tools
         )
     
     api_key = api_key_input or os.getenv("GEMINI_API_KEY", "")
@@ -1255,7 +1280,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
             "contents": gemini_history,
             "systemInstruction": {"parts": [{"text": system_prompt}]},
             "generationConfig": gen_config,
-            "tools": get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0)
+            "tools": get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0, is_training=is_training_mode)
         }
         
         yield f"data: {json.dumps({'type': 'status', 'content': f'Generating response (Turn {iteration+1})...'})}\n\n"
@@ -1328,17 +1353,14 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
                 result = await perform_tool_call(agent_id, t_name, arg_str, agent_dir, api_key=api_key, session_id=session_id)
                 yield f"data: {json.dumps({'type': 'tool_result', 'content': str(result)})}\n\n"
                 
-                # BDI EARLY EXIT: If the agent committed to a plan or posted a finding,
-                # we yield the result and break the turn loop. This prevents the
-                # "Thinking about thoughts" stall and deep thinking recursion.
-                if t_name in ["update_plan", "post_finding", "report_generation"]:
+                # FIX: Remove `update_plan` and `post_finding` from early exit.
+                # Allow the loop to continue so the agent sees the result and responds to the user.
+                if t_name in ["report_generation"]:
                     safe_log(f"[BDI:EXIT] Agent called {t_name} — terminating Turn {iteration+1} and yielding.")
                     
                     # Yield as text so the UI accumulates it in responseContent
                     # and processPlanResponse can detect the intention header.
                     display_result = str(result)
-                    if t_name == "update_plan":
-                        display_result = f"### 🎯 Intentions Updated\n\n{result}"
                     
                     # Yield ONLY the clean display result to the UI, not the raw tool call
                     yield f"data: {json.dumps({'type': 'text', 'content': f'\n\n{display_result}'})}\n\n"
@@ -1348,6 +1370,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
                     final_response_collected = f"Committed action: {t_name}. Result: {result}"
                     break
                 
+                # If it was an update_plan or post_finding, append to history and let the loop iterate again!
                 history.append({"role": "assistant", "content": f"[TOOL: {t_name}({arg_str})]"})
                 history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {result}"})
                 iteration += 1
