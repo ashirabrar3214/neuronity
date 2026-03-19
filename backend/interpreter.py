@@ -343,7 +343,36 @@ STRICT RULE: The output must be a clean, bulleted markdown summary. Do not inclu
     
 # Tool Implementations
 async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key="", session_id=None):
-    # --- Resolve workingDir for file-saving tools ---
+    # --- FIX: Normalize Native Tool Dicts to Legacy Strings ---
+    try:
+        parsed_args = json.loads(tool_input)
+    except:
+        parsed_args = tool_input
+
+    extracted_arg = ""
+    if isinstance(parsed_args, dict):
+        if tool_name == "message_agent" and "target_id" in parsed_args and "message" in parsed_args:
+            extracted_arg = f"{parsed_args['target_id']}|{parsed_args['message']}"
+        elif tool_name in ["report_generation", "generate_report"]:
+             if "topic" in parsed_args and "context" in parsed_args:
+                 extracted_arg = f"{parsed_args['topic']}|{parsed_args['context']}"
+             elif "title" in parsed_args and "content" in parsed_args:
+                 extracted_arg = f"{parsed_args['title']}|{parsed_args['content']}"
+             else:
+                 extracted_arg = list(parsed_args.values())[0] if parsed_args else ""
+        elif tool_name == "write_file" and "filename" in parsed_args and "content" in parsed_args:
+             extracted_arg = f"{parsed_args['filename']}|{parsed_args['content']}"
+        else:
+            if len(parsed_args) >= 1:
+                extracted_arg = list(parsed_args.values())[0]
+    elif isinstance(parsed_args, str):
+        extracted_arg = parsed_args
+    else:
+        extracted_arg = str(parsed_args)
+
+    tool_input = str(extracted_arg).strip()
+    
+    # --- Proceed with resolved workingDir ---
     agents = load_data()
     sender_data = next((a for a in agents if a["id"] == agent_id), None)
     working_dir = sender_data.get("working_dir", "") if sender_data else ""
@@ -393,6 +422,9 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
     elif tool_name == "deep_search":
         return await toolkit.deep_search(tool_input, agent_id, api_key=api_key)
     
+    elif tool_name == "report_generation":
+        # Pass agent_name from sender_data
+        agent_name = sender_data.get("name", "Agent") if sender_data else "Agent"
         # report_generation is now async in toolkit.py
         return await toolkit.report_generation(agent_id, tool_input, working_dir, api_key, agent_name=agent_name)
     

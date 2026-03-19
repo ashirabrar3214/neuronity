@@ -684,7 +684,7 @@ async def post_finding(agent_id, tool_input, session_id=None):
 async def update_intentions(agent_id, tool_input):
     """
     Atomic updates to the agent's committed intentions (BDI).
-    Format: "Task completed" OR "Objective | Intention 1, Intention 2"
+    Handles format hallucinations (missing '|', newlines instead of commas).
     """
     try:
         intentions_path = os.path.join(os.path.dirname(__file__), "agents_code", agent_id, "intentions.json")
@@ -697,19 +697,31 @@ async def update_intentions(agent_id, tool_input):
                     intentions = json.load(f)
             except: pass
 
+        tool_input = tool_input.strip()
+
         if "|" in tool_input:
             obj, steps_str = tool_input.split("|", 1)
             intentions["objective"] = obj.strip()
-            intentions["steps"] = [s.strip() for s in steps_str.split(",") if s.strip()]
+            # Handle newlines OR commas
+            raw_steps = steps_str.split("\n") if "\n" in steps_str else steps_str.split(",")
+            intentions["steps"] = [re.sub(r'^\d+[\.\)]\s*', '', s.strip()) for s in raw_steps if s.strip()]
             intentions["completed"] = []
         else:
-            item = tool_input.strip()
-            if item not in intentions["completed"]:
-                intentions["completed"].append(item)
-
-            if item.lower() == "task completed":
-                # Final BDI Cleanup - (User-requested removal removed to keep persistence)
-                pass
+            if "completed" in tool_input.lower() and len(tool_input) < 50:
+                intentions["completed"].append("Task Completed")
+            else:
+                # LLM forgot the '|' and just passed newlines
+                if "\n" in tool_input:
+                    raw_steps = tool_input.split("\n")
+                    intentions["objective"] = raw_steps[0].strip()
+                    intentions["steps"] = [re.sub(r'^\d+[\.\)]\s*', '', s.strip()) for s in raw_steps[1:] if s.strip()]
+                    if not intentions["steps"]:
+                        intentions["steps"] = [intentions["objective"]]
+                    intentions["completed"] = []
+                else:
+                    intentions["objective"] = tool_input
+                    intentions["steps"] = [tool_input]
+                    intentions["completed"] = []
 
         with open(intentions_path, "w", encoding="utf-8") as f:
             json.dump(intentions, f, indent=2)
