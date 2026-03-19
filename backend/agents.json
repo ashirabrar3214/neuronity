@@ -1,58 +1,34 @@
 [
   {
-    "id": "agent-bot-1773902255400",
-    "name": "MainAgent",
-    "description": "Agent description...",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "D:\\New folder",
-    "permissions": [
-      "report generation",
-      "file access"
-    ],
-    "tools": "Custom",
-    "responsibility": "",
+    "id": "agent-MasterBot-001",
+    "name": "MasterBot",
+    "description": "Main orchestrator agent.",
     "agentType": "master",
-    "x": -994.0,
-    "y": -33.0,
-    "connections": []
-  },
-  {
-    "id": "agent-bot-1773903633083",
-    "name": "Geopolitics Researcher",
-    "description": "Agent description...",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "",
+    "x": 100,
+    "y": 150,
+    "brain": "Gemini",
+    "tools": "Gmail",
+    "responsibility": "Coordinate all agents",
     "permissions": [
-      "web search"
-    ],
-    "tools": "Custom",
-    "responsibility": "",
-    "agentType": "worker",
-    "x": -1370.0,
-    "y": -62.0,
-    "connections": [
-      "agent-bot-1773902255400"
+      "web search",
+      "thinking"
     ]
   },
   {
-    "id": "agent-bot-1773903640364",
-    "name": "Military Historian",
+    "id": "agent-bot-1773947472648",
+    "name": "A",
     "description": "Agent description...",
     "brain": "",
     "channel": "Gmail",
     "workingDir": "",
-    "permissions": [
-      "web search"
-    ],
+    "permissions": [],
     "tools": "Custom",
     "responsibility": "",
     "agentType": "worker",
-    "x": -1369.0,
-    "y": 131.0,
+    "x": -263.0,
+    "y": 108.0,
     "connections": [
-      "agent-bot-1773902255400"
+      "agent-MasterBot-001"
     ]
   }
 ]

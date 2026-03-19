@@ -103,19 +103,12 @@ app.add_middleware(
 DATA_FILE = os.path.join(os.path.dirname(__file__), "agents.json")
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(__file__), "agents_code")
 
-# â”€â”€â”€ BDI BELIEF BASE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-BELIEFS_CONTEXT_FILE = os.path.join(AGENTS_CODE_DIR, "beliefs_context.json")
-BELIEFS_BASE_FILE = os.path.join(AGENTS_CODE_DIR, "beliefs_base.json")
 
 def get_beliefs_context():
     """Reads the global identity beliefs (overarching goal)."""
-    if not os.path.exists(BELIEFS_CONTEXT_FILE):
-        return {"global_objective": "No specific objective set yet.", "last_update": 0}
-    try:
-        with open(BELIEFS_CONTEXT_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {"global_objective": "Error reading context.", "last_update": 0}
+    import brf
+    context, _ = brf.get_beliefs()
+    return context
 
 def update_beliefs_context(new_goal):
     """Updates the identity beliefs with a new objective."""
@@ -129,16 +122,11 @@ def search_beliefs_base(query, top_k=15):
     Semantically search the belief base (Shared Ledger) for the most relevant entries.
     Returns a formatted string of matched entries for injection into context.
     """
-    if not os.path.exists(BELIEFS_BASE_FILE):
-        return "Belief Base is empty. No findings have been recorded yet."
-    try:
-        with open(BELIEFS_BASE_FILE, "r", encoding="utf-8") as f:
-            entries = json.load(f)
-    except:
-        return "Error reading belief base."
+    import brf
+    _, entries = brf.get_beliefs()
 
     if not entries:
-        return "Belief Base is empty."
+        return "Belief Base is empty. No findings have been recorded yet."
 
     # Score each entry against the query using semantic similarity
     scored = []
@@ -161,13 +149,9 @@ def search_beliefs_base(query, top_k=15):
 
 def get_beliefs_base_all():
     """Returns all entries from the belief base as a formatted research dump."""
-    if not os.path.exists(BELIEFS_BASE_FILE):
-        return "Belief Base is empty."
-    try:
-        with open(BELIEFS_BASE_FILE, "r", encoding="utf-8") as f:
-            entries = json.load(f)
-    except:
-        return "Error reading belief base."
+    import brf
+    _, entries = brf.get_beliefs()
+    
     if not entries:
         return "Belief Base is empty."
     lines = [f"### Full Belief Base â€” {len(entries)} entries\n"]
@@ -418,7 +402,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
         return f"Success: Fact recorded in Belief Base."
     
     elif tool_name == "update_plan":
-        return await toolkit.update_intentions(agent_id, tool_input)
+        return await toolkit.update_plan(agent_id, tool_input)
 
     elif tool_name == "ask_user":
         return await toolkit.ask_user(agent_id, tool_input)
@@ -672,10 +656,42 @@ def load_data():
         print(f"!!! [BACKEND ERROR] An unexpected error occurred in load_data: {e}")
         return None
 
+def update_agent_directory_md(agents_data):
+    """
+    Synchronizes the 'agent_directory.md' file with the latest agent list.
+    This provides agents with a global view of all potential collaborators.
+    """
+    try:
+        dir_path = os.path.join(AGENTS_CODE_DIR, "agent_directory.md")
+        os.makedirs(os.path.dirname(dir_path), exist_ok=True)
+        
+        content = "## PROJECT AGENT DIRECTORY\n"
+        content += "Below are all agents currently in this project. Use this to identify who to delegate tasks to.\n\n"
+        
+        if not agents_data:
+            content += "*No agents currently configured.*"
+        else:
+            for a in agents_data:
+                name = a.get("name", "Unknown Agent")
+                aid = a.get("id", "Unknown ID")
+                resp = a.get("responsibility", "No responsibility set.")
+                content += f"- **{name}** (ID: `{aid}`): {resp}\n"
+                perms = ", ".join(a.get("permissions", []))
+                if perms:
+                    content += f"  Capabilities: {perms}\n"
+                content += "\n"
+        
+        with open(dir_path, "w", encoding="utf-8") as f:
+            f.write(content)
+    except Exception as e:
+        safe_log(f"!!! [BACKEND ERROR] Failed to update agent_directory.md: {e}")
+
 def save_data(data):
     try:
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+        # Synchronize the markdown directory file whenever data changes
+        update_agent_directory_md(data)
     except Exception as e:
         print(f"!!! [BACKEND ERROR] An unexpected error occurred in save_data: {e}")
 
@@ -736,23 +752,23 @@ Responsibility: {agent_data.get('responsibility', 'General purpose assistance')}
 ## OPERATION RULES
 1. **Tool Use**: Use your available tools to complete tasks. Do not explain that you are using a tool; just execute the tool call.
 2. **Intent Gate**: Do NOT execute tool calls for casual greetings. Only act if a specific research topic or objective is provided.
-3. **Intentions (BDI)**: Use the `update_plan` tool immediately upon accepting a new task to set your objective and steps. Use it again to mark steps as completed.
+3. **Intentions (BDI)**: If you are NOT in autonomous extraction mode, use `update_plan` to record your objective and steps. If you ARE in autonomous mode, just execute the provided step. Use `update_plan` to mark steps as 'Completed' once you finish them.
 4. **Knowledge Sharing (BRF)**: Use the `post_finding` tool to record important facts to the Shared Belief Base so other agents can see them.
 5. **Citations**: Every fact discovered via research MUST include a `[Source: URL]` citation.
 """
     with open(prompt_path, "w", encoding="utf-8") as f:
         f.write(prompt_content)
 
-    # 4. Phase 2: Intentions (BDI) - Initialize if not exists
-    intentions_path = os.path.join(agent_dir, "intentions.json")
-    if not os.path.exists(intentions_path):
-        initial_intentions = {
+    # 4. Phase 2: BDI Plan - Initialize if not exists
+    plan_path = os.path.join(agent_dir, "plan.json")
+    if not os.path.exists(plan_path):
+        initial_plan = {
             "objective": agent_data.get('responsibility', 'General assistance'),
             "steps": ["Observe Workspace", "Execute requested task"],
             "completed": []
         }
-        with open(intentions_path, "w", encoding="utf-8") as f:
-            json.dump(initial_intentions, f, indent=2)
+        with open(plan_path, "w", encoding="utf-8") as f:
+            json.dump(initial_plan, f, indent=2)
 
     # 5. Short term memory (History) - Initialize if not exists
     history_path = os.path.join(agent_dir, "history.json")
@@ -1156,13 +1172,24 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
     
     tool_manual_layer = f"## CAPABILITY MANIFEST\n{get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0, manifest_only=True)}\n"
     
+    # Injection: Agent Directory (Project-wide awareness)
+    agent_dir_content = ""
+    dir_path = os.path.join(AGENTS_CODE_DIR, "agent_directory.md")
+    if os.path.exists(dir_path):
+        try:
+            with open(dir_path, "r", encoding="utf-8") as f:
+                agent_dir_content = f.read()
+        except: pass
+
     connected_str = "\n".join([f"- {a['name']} (ID: {a['id']}): {a.get('responsibility', '')}" for a in reachable_agents]) or "None"
     belief_base_context = search_beliefs_base(f"{global_obj} {message}")
     
     transient_task_layer = (
         f"## TRANSIENT TASK CONTEXT\n"
-        f"GLOBAL PROJECT OBJECTIVE: {global_obj}\n"
-        f"IMPORTANT: You can ONLY message these specific connected agents:\n{connected_str}\n\n"
+        f"GLOBAL PROJECT OBJECTIVE: {global_obj}\n\n"
+        f"{agent_dir_content}\n\n"
+        f"IMPORTANT (COLLABORATION RULE): You can ONLY message agents you are DIRECTLY connected to on the canvas.\n"
+        f"Reachable Connected Agents:\n{connected_str}\n\n"
         f"### BELIEF BASE FINDINGS (Shared Ledger)\n{belief_base_context}\n"
     )
 
@@ -1186,8 +1213,8 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
         )
     
     api_key = api_key_input or os.getenv("GEMINI_API_KEY", "")
-    import planner
-    is_task = await planner.is_task_request(message, api_key, "gemini")
+    # ROUTING: Classify by explicit mode rather than LLM guessing
+    is_task = (mode == "work")
     
     # â”€â”€â”€ BDI REASONING CYCLE: DELIBERATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if not is_training_mode:
@@ -1209,15 +1236,12 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
     while iteration < max_turns:
         yield f"data: {json.dumps({'type': 'status', 'content': f'Turn {iteration+1}: Observing context...'})}\n\n"
         llm_context = process_generational_history(history)
+        # --- FIX: ALL agents (even Masters) use FAST_MODEL for execution turns ---
+        # The Master already did its heavy thinking in planner.py and deliberator.py.
+        # Now it just needs to quickly execute the tools and synthesize text.
         model = FAST_MODEL
         gen_config = {"temperature": 0.3, "maxOutputTokens": 8192}
-        
-        if is_master and not is_training_mode:
-            model = REASONING_MODEL
-            # Only apply thinkingConfig if using Gemini 3/Thinking-compatible models
-            if "gemini-3" in REASONING_MODEL or "thinking" in REASONING_MODEL.lower():
-                gen_config["thinkingConfig"] = {"includeThoughts": True, "thinkingBudget": -1}
-            
+
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={api_key}&alt=sse"
         
         gemini_history = []
@@ -1316,6 +1340,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
                     if t_name == "update_plan":
                         display_result = f"### 🎯 Intentions Updated\n\n{result}"
                     
+                    # Yield ONLY the clean display result to the UI, not the raw tool call
                     yield f"data: {json.dumps({'type': 'text', 'content': f'\n\n{display_result}'})}\n\n"
                     
                     history.append({"role": "assistant", "content": f"[TOOL: {t_name}({arg_str})]"})
@@ -1341,7 +1366,13 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
     ui_history = []
     for h in history:
         if h["role"] == "user" and "SYSTEM TOOL" in str(h["content"]): continue
-        ui_history.append({"role": h["role"], "content": sanitize_ruthlessly(h["content"])})
+        
+        content = str(h["content"])
+        if h["role"] == "assistant":
+            # Sanitize: replace [TOOL: name(args)] with Executed: name to keep UI clean
+            content = re.sub(r'\[TOOL:\s*(\w+)\(.*?\)]', r'Executed: \1', content)
+
+        ui_history.append({"role": h["role"], "content": sanitize_ruthlessly(content)})
     with open(history_path, "w", encoding="utf-8") as f:
         json.dump(ui_history, f, indent=2)
 
@@ -1380,10 +1411,8 @@ async def run_autonomous_agent(request: ChatRequest):
     provider = request.provider or "gemini"
     api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
 
-    # If it's just a greeting or casual talk, bypass the planner and route to normal chat.
-    import planner
-    if not await planner.is_task_request(request.message, api_key, provider):
-        safe_log(f"[STATUS:{request.agent_id}] Casual conversation detected - routing to standard chat")
+    # If we are in training mode, bypass the autonomous planner entirely.
+    if request.mode != "work":
         return await chat_with_agent(request)
 
     # Phase 1: Generate the intentions

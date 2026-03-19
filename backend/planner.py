@@ -61,31 +61,6 @@ async def _call_llm_direct(prompt, api_key, provider, mode="fast"):
     return ""
 
 
-async def is_task_request(text, api_key, provider):
-    """
-    Asks the LLM if the message is a complex task/command or just casual conversation.
-    Returns True if it's a task, False if it's chat.
-    """
-    if not text or len(text.strip()) < 3:
-        return False
-
-    prompt = f"""You are an Intent Classifier. Analyze the message below and decide if it is a 'TASK' (requires research, file access, report generation, or multi-step action) or 'CHAT' (simple greeting, thanks, or conversation with no specific objective).
-
-EXAMPLES:
-"hello there" -> CHAT
-"make a report on the iran war" -> TASK
-"research the history of rome" -> TASK
-"generate a pdf report on solar energy" -> TASK
-"thank you so much" -> CHAT
-"what can you do?" -> CHAT
-"help me write a plan for a new startup" -> TASK
-
-MESSAGE: "{text}"
-
-Return ONLY the word 'TASK' or 'CHAT'."""
-
-    res = await _call_llm_direct(prompt, api_key, provider, mode="fast")
-    return "TASK" in res.upper()
 
 
 async def generate_plan(task, agent_id, api_key, provider, agents_info=""):
@@ -127,23 +102,22 @@ YOUR PLAN:"""
     return steps
 
 
-def save_intentions_md(steps, task, agent_id):
-    """Save the committed intentions as JSON to unify with the update_plan tool."""
+def save_plan_json(steps, task, agent_id):
+    """Save the committed plan as JSON for the BDI state."""
     agent_dir = os.path.join(AGENTS_CODE_DIR, agent_id)
     os.makedirs(agent_dir, exist_ok=True)
-    intentions_path = os.path.join(agent_dir, "intentions.json")
+    plan_path = os.path.join(agent_dir, "plan.json")
 
     # Format it exactly like the toolkit.py update_plan does
-    intentions = {
+    plan = {
         "objective": task,
         "steps": steps,
         "completed": []
     }
-    with open(intentions_path, "w", encoding="utf-8") as f:
-        import json
-        json.dump(intentions, f, indent=2)
+    with open(plan_path, "w", encoding="utf-8") as f:
+        json.dump(plan, f, indent=2)
 
-    return intentions_path
+    return plan_path
 
 
 def _clear_internal_history(agent_id):
@@ -245,10 +219,10 @@ async def run_autonomous(agent_id, task, api_key, provider, agents_info=""):
     """
     Phase 1: Generate the intentions only.
     """
-    safe_log(f"[STATUS:{agent_id}] Autonomous deliberation complete: Intentions generated")
+    safe_log(f"[STATUS:{agent_id}] Autonomous deliberation complete: Plan generated")
     steps = await generate_plan(task, agent_id, api_key, provider, agents_info)
     if steps:
-        save_intentions_md(steps, task, agent_id)
+        save_plan_json(steps, task, agent_id)
     return steps
 
 async def run_execution_loop(agent_id, task, api_key, provider):
@@ -260,12 +234,9 @@ async def run_execution_loop(agent_id, task, api_key, provider):
     safe_log(f"[STATUS:{agent_id}] Autonomous execution loop started")
     
     # CLEAR VOLATILE LEDGER: Start with a fresh slate
-    volatile_path = os.path.join(AGENTS_CODE_DIR, "volatile_findings.json")
-    if os.path.exists(volatile_path):
-        try:
-            os.remove(volatile_path)
-            safe_log(f"--- [CLEANUP] Volatile ledger cleared for new task.")
-        except: pass
+    import brf
+    brf.clear_volatile_beliefs()
+    safe_log(f"--- [CLEANUP] Volatile ledger (base_facts) cleared for new task.")
 
     # TIERED BELIEF PERSISTENCE: beliefs_base.json is NOT cleared.
     # Instead, brf.py handles session-based relevance and promotions.
@@ -273,19 +244,19 @@ async def run_execution_loop(agent_id, task, api_key, provider):
     session_id = f"sess_{int(time.time())}"
     safe_log(f"--- [BDI] Session initialized: {session_id}")
 
-    # Load from intentions.json (Unified Source)
+    # Load from plan.json (Unified BDI Source)
     agent_dir = os.path.join(AGENTS_CODE_DIR, agent_id)
-    intentions_path = os.path.join(agent_dir, "intentions.json")
+    plan_path = os.path.join(agent_dir, "plan.json")
     
     steps = []
-    if os.path.exists(intentions_path):
+    if os.path.exists(plan_path):
         try:
-            with open(intentions_path, "r", encoding="utf-8") as f:
+            with open(plan_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 steps = data.get("steps", [])
-                task = data.get("objective", task) # Adopt the objective from the file
+                task = data.get("objective", task) 
         except Exception as e:
-            safe_log(f"!!! [PLAN_RUNNER] Error reading intentions.json: {e}")
+            safe_log(f"!!! [PLAN_RUNNER] Error reading plan.json: {e}")
 
     if not steps:
         return "Failed to locate an execution plan. Please try generating the plan again."
@@ -342,8 +313,8 @@ async def run_execution_loop(agent_id, task, api_key, provider):
             safe_log(f"[STATUS:{agent_id}] Autonomous loop paused by agent. Waiting for user.")
             
             # Delete the remaining intentions because the plan is paused
-            if os.path.exists(intentions_path): 
-                try: os.remove(intentions_path)
+            if os.path.exists(plan_path): 
+                try: os.remove(plan_path)
                 except: pass
             
             return f"### 🛑 Pausing for Your Direction\n\n**Agent asks:** {question}\n\n*(Reply to this message to steer the agent and it will generate a new plan based on your feedback.)*"

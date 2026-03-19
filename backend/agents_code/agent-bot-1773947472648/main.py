@@ -1,10 +1,10 @@
 
-class agent_bot_1773902255400:
+class agent_bot_1773947472648:
     def __init__(self):
-        self.id = "agent-bot-1773902255400"
-        self.name = "MainAgent"
-        self.working_dir = r"D:\New folder"
-        self.permissions = ['report generation', 'file access']
+        self.id = "agent-bot-1773947472648"
+        self.name = "A"
+        self.working_dir = r""
+        self.permissions = []
         self.tools = "Custom"
         
     def get_personality(self):
@@ -17,5 +17,5 @@ class agent_bot_1773902255400:
             return {}
 
 if __name__ == "__main__":
-    agent = agent_bot_1773902255400()
+    agent = agent_bot_1773947472648()
     print(f"Agent {agent.name} initialized.")

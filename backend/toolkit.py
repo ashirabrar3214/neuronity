@@ -29,17 +29,24 @@ def get_training_context():
 import sys
 import io
 
-def safe_log(message):
-    """Prints a message safely, handling potential Unicode encoding issues on Windows consoles."""
+def safe_log(message, agent_id=None):
+    """Prints a message safely, and writes to communication.log if agent_id is provided."""
     try:
         print(message, flush=True)
-    except UnicodeEncodeError:
-        try:
-            print(message.encode('ascii', 'replace').decode('ascii'), flush=True)
-        except:
-            pass
     except Exception:
         pass
+    
+    # NEW: Log to the specific agent's communication audit log
+    if agent_id:
+        log_dir = os.path.join(os.path.dirname(__file__), "agents_code", agent_id)
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, "communication.log")
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"[{timestamp}] {message}\n")
+        except:
+            pass
 
 async def _ddgs_search_raw(query, agent_id):
     """
@@ -268,7 +275,7 @@ async def generate_report(agent_id, tool_input, working_dir):
     Generates a structured markdown report file in the agent's working directory.
     Usage: [TOOL: generate_report(Title|Content)]
     """
-    safe_log(f"[STATUS:{agent_id}] Report: Draft for '{tool_input[:40]}...'")
+    safe_log(f"[STATUS:{agent_id}] Report: Draft for '{tool_input[:40]}...'", agent_id=agent_id)
     await asyncio.sleep(1)
     try:
         if not working_dir:
@@ -315,11 +322,11 @@ Date: {time.strftime("%Y-%m-%d %H:%M:%S")}
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(full_report)
             
-        safe_log(f"+++ [CAPABILITY:generate_report] Saved to: {report_path}")
+        safe_log(f"+++ [CAPABILITY:generate_report] Saved to: {report_path}", agent_id=agent_id)
         return f"Report successfully generated: {filename}"
         
     except Exception as e:
-        safe_log(f"!!! [CAPABILITY:generate_report] {str(e)}")
+        safe_log(f"!!! [CAPABILITY:generate_report] {str(e)}", agent_id=agent_id)
         return f"Error generating report: {str(e)}"
 
 # ─────────────────────────────────────────────────
@@ -335,7 +342,7 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
     Advanced tool for creating a detailed PDF research report in the working directory.
     Usage: [TOOL: report_generation(Topic | Context/Sources)]
     """
-    safe_log(f"[STATUS:{agent_id}] PDF: Synthesis for '{tool_input[:40]}...'")
+    safe_log(f"[STATUS:{agent_id}] PDF: Synthesis for '{tool_input[:40]}...'", agent_id=agent_id)
     
     try:
         if not working_dir:
@@ -426,11 +433,11 @@ FORMATTING RULES:
         pdf_gen = ReportPDFGenerator(report_path, display_title)
         pdf_gen.generate(report_data, agent_name=agent_name, agent_id=agent_id)
         
-        safe_log(f"+++ [CAPABILITY:report_generation] Saved PDF to: {report_path}")
+        safe_log(f"+++ [CAPABILITY:report_generation] Saved PDF to: {report_path}", agent_id=agent_id)
         return f"Report generated: {safe_filename}. (Saved in {working_dir})"
 
     except Exception as e:
-        safe_log(f"!!! [CAPABILITY:report_generation] Error: {e}")
+        safe_log(f"!!! [CAPABILITY:report_generation] Error: {e}", agent_id=agent_id)
         return f"Failed to generate report: {str(e)}"
 
 # ─────────────────────────────────────────────────
@@ -441,7 +448,7 @@ async def message_agent(target_id, message, sender_id, sender_name, api_key, tar
     """
     Sends a structured, context-rich message to a connected agent.
     """
-    safe_log(f"[STATUS:{sender_id}] Messenger: Sending to '{target_id}' (Priority: {intent_priority})")
+    safe_log(f"[STATUS:{sender_id}] Messenger: Sending to '{target_id}' (Priority: {intent_priority})", agent_id=sender_id)
 
     # Build a rich, context-aware message envelope
     separator = "─" * 50
@@ -519,12 +526,8 @@ async def message_agent(target_id, message, sender_id, sender_name, api_key, tar
                     f"--- END OF DATA ---\n"
                     f"{instruction}")
 
-            err = f"HTTP {resp.status_code}: {resp.text}"
-            safe_log(f"!!! [CAPABILITY:message_agent] {err}")
-            return f"Failed to message agent {target_id}. Error: {err}"
-
     except Exception as e:
-        safe_log(f"!!! [CAPABILITY:message_agent] {e}")
+        safe_log(f"!!! [CAPABILITY:message_agent] {e}", agent_id=sender_id)
         return f"Failed to message agent {target_id}. Error: {str(e)}"
 
 
@@ -552,7 +555,7 @@ def _resolve_safe_path(working_dir, file_path):
 
 def scout_file(agent_id, file_path, working_dir):
     """Returns metadata about a file within the working directory."""
-    safe_log(f"[STATUS:{agent_id}] FS: Scouting '{file_path}'")
+    safe_log(f"[STATUS:{agent_id}] FS: Scouting '{file_path}'", agent_id=agent_id)
     try:
         safe_path = _resolve_safe_path(working_dir, file_path)
         if not os.path.exists(safe_path):
@@ -685,55 +688,57 @@ async def post_finding(agent_id, tool_input, session_id=None):
     except Exception as e:
         return f"Error posting finding: {e}"
 
-async def update_intentions(agent_id, tool_input):
+async def update_plan(agent_id, tool_input):
     """
     Atomic updates to the agent's committed intentions (BDI).
     Handles format hallucinations (missing '|', newlines instead of commas).
     """
     try:
-        intentions_path = os.path.join(os.path.dirname(__file__), "agents_code", agent_id, "intentions.json")
-        os.makedirs(os.path.dirname(intentions_path), exist_ok=True)
+        # CHANGE 1: Use plan.json instead of intentions.json
+        plan_path = os.path.join(os.path.dirname(__file__), "agents_code", agent_id, "plan.json")
+        os.makedirs(os.path.dirname(plan_path), exist_ok=True)
         
-        intentions = {"objective": "Not Set", "steps": [], "completed": []}
-        if os.path.exists(intentions_path):
+        plan = {"objective": "Not Set", "steps": [], "completed": []}
+        if os.path.exists(plan_path):
             try:
-                with open(intentions_path, "r", encoding="utf-8") as f:
-                    intentions = json.load(f)
+                with open(plan_path, "r", encoding="utf-8") as f:
+                    plan = json.load(f)
             except: pass
 
         tool_input = tool_input.strip()
 
         if "|" in tool_input:
             obj, steps_str = tool_input.split("|", 1)
-            intentions["objective"] = obj.strip()
+            plan["objective"] = obj.strip()
             # Handle newlines OR commas
             raw_steps = steps_str.split("\n") if "\n" in steps_str else steps_str.split(",")
-            intentions["steps"] = [re.sub(r'^\d+[\.\)]\s*', '', s.strip()) for s in raw_steps if s.strip()]
-            intentions["completed"] = []
+            plan["steps"] = [re.sub(r'^\d+[\.\)]\s*', '', s.strip()) for s in raw_steps if s.strip()]
+            plan["completed"] = []
         else:
             if "completed" in tool_input.lower() and len(tool_input) < 50:
-                intentions["completed"].append("Task Completed")
+                plan["completed"].append("Task Completed")
             else:
                 # LLM forgot the '|' and just passed newlines
                 if "\n" in tool_input:
                     raw_steps = tool_input.split("\n")
-                    intentions["objective"] = raw_steps[0].strip()
-                    intentions["steps"] = [re.sub(r'^\d+[\.\)]\s*', '', s.strip()) for s in raw_steps[1:] if s.strip()]
-                    if not intentions["steps"]:
-                        intentions["steps"] = [intentions["objective"]]
-                    intentions["completed"] = []
+                    plan["objective"] = raw_steps[0].strip()
+                    plan["steps"] = [re.sub(r'^\d+[\.\)]\s*', '', s.strip()) for s in raw_steps[1:] if s.strip()]
+                    if not plan["steps"]:
+                        plan["steps"] = [plan["objective"]]
+                    plan["completed"] = []
                 else:
-                    intentions["objective"] = tool_input
-                    intentions["steps"] = [tool_input]
-                    intentions["completed"] = []
+                    plan["objective"] = tool_input
+                    plan["steps"] = [tool_input]
+                    plan["completed"] = []
 
-        with open(intentions_path, "w", encoding="utf-8") as f:
-            json.dump(intentions, f, indent=2)
+        # CHANGE 2: Save back to plan.json
+        with open(plan_path, "w", encoding="utf-8") as f:
+            json.dump(plan, f, indent=2)
             
-        steps_md = "\n".join([f"{i+1}. {s}" for i, s in enumerate(intentions['steps'])])
-        return f"Objective: {intentions['objective']}\n\n{steps_md}"
+        steps_md = "\n".join([f"{i+1}. {s}" for i, s in enumerate(plan['steps'])])
+        return f"Objective: {plan['objective']}\n\n{steps_md}"
     except Exception as e:
-        return f"Error updating intentions: {e}"
+        return f"Error updating plan: {e}"
 
 async def ask_user(agent_id, tool_input):
     """

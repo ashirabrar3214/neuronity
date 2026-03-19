@@ -1,0 +1,18 @@
+[
+  {
+    "role": "user",
+    "content": "yo"
+  },
+  {
+    "role": "assistant",
+    "content": "[TOOL: update_plan({\"tool_input\": \"Objective: Awaiting user instruction | Step 1: Receive user instruction, Step 2: Execute user instruction\"})]"
+  },
+  {
+    "role": "user",
+    "content": "SYSTEM TOOL RESULT: Objective: Objective: Awaiting user instruction\n\n1. Step 1: Receive user instruction\n2. Step 2: Execute user instruction"
+  },
+  {
+    "role": "assistant",
+    "content": "Committed action: update_plan. Result: Objective: Objective: Awaiting user instruction\n\n1. Step 1: Receive user instruction\n2. Step 2: Execute user instruction"
+  }
+]

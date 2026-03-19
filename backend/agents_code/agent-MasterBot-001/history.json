@@ -1,0 +1,14 @@
+[
+  {
+    "role": "user",
+    "content": "yo"
+  },
+  {
+    "role": "assistant",
+    "content": "Executed: update_plan"
+  },
+  {
+    "role": "assistant",
+    "content": "Committed action: update_plan. Result: Objective: Objective: Awaiting user instruction\n\n1. Step 1: Receive user instruction\n2. Step 2: Execute user instruction"
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "objective": "Objective: Awaiting user instruction",
+  "steps": [
+    "Step 1: Receive user instruction",
+    "Step 2: Execute user instruction"
+  ],
+  "completed": []
+}
