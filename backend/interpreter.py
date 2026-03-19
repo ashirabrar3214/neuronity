@@ -19,6 +19,10 @@ import httpx
 from dotenv import load_dotenv
 load_dotenv()
 
+# -- LLM Models (Abstracting for easy upgrades) --
+FAST_MODEL = os.getenv("FAST_MODEL", "gemini-2.0-flash")
+REASONING_MODEL = os.getenv("REASONING_MODEL", "gemini-3-flash-preview")
+
 import shutil
 import toolkit
 import response_formatter
@@ -318,7 +322,7 @@ STRICT RULE: The output must be a clean, bulleted markdown summary. Do not inclu
 
     response_text = ""
     try:
-        model = "gemini-2.0-flash" 
+        model = FAST_MODEL
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         headers = {"Content-Type": "application/json"}
         payload = {
@@ -375,7 +379,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
     # --- Proceed with resolved workingDir ---
     agents = load_data()
     sender_data = next((a for a in agents if a["id"] == agent_id), None)
-    working_dir = sender_data.get("working_dir", "") if sender_data else ""
+    working_dir = sender_data.get("workingDir") or sender_data.get("working_dir", "") if sender_data else ""
 
     if sender_data:
         permissions = sender_data.get("permissions", [])
@@ -415,6 +419,9 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
     
     elif tool_name == "update_plan":
         return await toolkit.update_intentions(agent_id, tool_input)
+
+    elif tool_name == "ask_user":
+        return await toolkit.ask_user(agent_id, tool_input)
 
     elif tool_name == "web_search":
         return await toolkit.web_search(tool_input, agent_id, api_key=api_key)
@@ -1016,6 +1023,17 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest
 
     # Global/BDI Tools (Always Available)
     declarations.append({
+        "name": "ask_user",
+        "description": "Stops your current work and asks the user a question to get direction, clarification, or approval to proceed.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "tool_input": {"type": "STRING", "description": "The specific question or summary of findings to present to the user."}
+            },
+            "required": ["tool_input"]
+        }
+    })
+    declarations.append({
         "name": "post_finding",
         "description": "Writes a key fact or insight to the Shared Workspace Ledger for all agents to see.",
         "parameters": {
@@ -1191,12 +1209,14 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
     while iteration < max_turns:
         yield f"data: {json.dumps({'type': 'status', 'content': f'Turn {iteration+1}: Observing context...'})}\n\n"
         llm_context = process_generational_history(history)
-        model = "gemini-2.0-flash"
+        model = FAST_MODEL
         gen_config = {"temperature": 0.3, "maxOutputTokens": 8192}
         
         if is_master and not is_training_mode:
-            model = "gemini-3-flash-preview"
-            gen_config["thinkingConfig"] = {"includeThoughts": True, "thinkingBudget": -1}
+            model = REASONING_MODEL
+            # Only apply thinkingConfig if using Gemini 3/Thinking-compatible models
+            if "gemini-3" in REASONING_MODEL or "thinking" in REASONING_MODEL.lower():
+                gen_config["thinkingConfig"] = {"includeThoughts": True, "thinkingBudget": -1}
             
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={api_key}&alt=sse"
         

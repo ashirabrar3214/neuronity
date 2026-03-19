@@ -2,6 +2,10 @@ import httpx
 import json
 import os
 
+# -- LLM Models (Abstracting for easy upgrades) --
+FAST_MODEL = os.getenv("FAST_MODEL", "gemini-2.0-flash")
+REASONING_MODEL = os.getenv("REASONING_MODEL", "gemini-3-flash-preview")
+
 # Constants from interpreter (or similar)
 DATA_FILE = os.path.join(os.path.dirname(__file__), "agents.json")
 
@@ -92,7 +96,7 @@ Return ONLY a JSON object:
 }}
 """
 
-    model = "gemini-2.0-flash"
+    model = FAST_MODEL
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}

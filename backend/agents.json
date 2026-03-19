@@ -7,13 +7,14 @@
     "channel": "Gmail",
     "workingDir": "D:\\New folder",
     "permissions": [
-      "report generation"
+      "report generation",
+      "file access"
     ],
     "tools": "Custom",
     "responsibility": "",
     "agentType": "master",
-    "x": -1010.0,
-    "y": 47.0,
+    "x": -994.0,
+    "y": -33.0,
     "connections": []
   },
   {
@@ -29,8 +30,8 @@
     "tools": "Custom",
     "responsibility": "",
     "agentType": "worker",
-    "x": -1368.0,
-    "y": -216.0,
+    "x": -1370.0,
+    "y": -62.0,
     "connections": [
       "agent-bot-1773902255400"
     ]
@@ -48,8 +49,8 @@
     "tools": "Custom",
     "responsibility": "",
     "agentType": "worker",
-    "x": -1368.0,
-    "y": 134.0,
+    "x": -1369.0,
+    "y": 131.0,
     "connections": [
       "agent-bot-1773902255400"
     ]

@@ -7,6 +7,10 @@ import asyncio
 import re
 from pdf_generator import ReportPDFGenerator
 
+# -- LLM Models (Abstracting for easy upgrades) --
+FAST_MODEL = os.getenv("FAST_MODEL", "gemini-2.0-flash")
+REASONING_MODEL = os.getenv("REASONING_MODEL", "gemini-3-flash-preview")
+
 def get_training_context():
     """
     Returns the documentation block for training-only tools.
@@ -210,7 +214,7 @@ STRICT RULES:
 7. Return ONLY the content.
 """
     
-    model = "gemini-2.0-flash"
+    model = FAST_MODEL
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {
@@ -387,7 +391,7 @@ FORMATTING RULES:
 - Return ONLY the JSON object.
 """
 
-        model = "gemini-2.0-flash"
+        model = FAST_MODEL
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         headers = {"Content-Type": "application/json"}
         data = {
@@ -730,3 +734,11 @@ async def update_intentions(agent_id, tool_input):
         return f"Objective: {intentions['objective']}\n\n{steps_md}"
     except Exception as e:
         return f"Error updating intentions: {e}"
+
+async def ask_user(agent_id, tool_input):
+    """
+    Halts the autonomous loop and asks the user for steering/direction.
+    """
+    question = tool_input.strip()
+    safe_log(f"[STATUS:{agent_id}] Halting to ask user: {question[:40]}...")
+    return f"HALT_AND_ASK|{question}"

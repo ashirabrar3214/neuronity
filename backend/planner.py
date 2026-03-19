@@ -8,6 +8,10 @@ import asyncio
 BACKEND_URL = "http://127.0.0.1:8000"
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(__file__), "agents_code")
 
+# -- LLM Models (Abstracting for easy upgrades) --
+FAST_MODEL = os.getenv("FAST_MODEL", "gemini-2.0-flash")
+REASONING_MODEL = os.getenv("REASONING_MODEL", "gemini-3-flash-preview")
+
 
 def safe_log(message):
     try:
@@ -22,14 +26,16 @@ async def _call_llm_direct(prompt, api_key, provider, mode="fast"):
     """One-shot LLM call for plan generation or task classification."""
     if provider == "gemini":
         if mode == "think":
-            model = "gemini-3-flash-preview"
+            model = REASONING_MODEL
             # Enable deep reasoning ONLY for plan generation
             generation_config = {
-                "temperature": 0.2,
-                "thinkingConfig": {"includeThoughts": True, "thinkingBudget": -1}
+                "temperature": 0.2
             }
+            # Only apply thinkingConfig if using Gemini 3/Thinking-compatible models
+            if "gemini-3" in REASONING_MODEL or "thinking" in REASONING_MODEL.lower():
+                generation_config["thinkingConfig"] = {"includeThoughts": True, "thinkingBudget": -1}
         else:
-            model = "gemini-2.0-flash"
+            model = FAST_MODEL
             # Fast, standard generation for simple routing
             generation_config = {"temperature": 0.2}
 
@@ -90,25 +96,21 @@ async def generate_plan(task, agent_id, api_key, provider, agents_info=""):
 
     agents_context = f"\n\nAVAILABLE CONNECTED AGENTS:\n{agents_info}" if agents_info else ""
 
-    prompt = f"""You are a master task planner. Break the following task into a detailed numbered list of clear, specific execution steps.{agents_context}
+    prompt = f"""You are a master task planner for an autonomous agent workforce. Break the following task into a numbered list of execution steps.{agents_context}
 
 TASK: {task}
 
-RULES:
-- Each step is ONE specific action (e.g., ask a specific agent once, do one web search). One step = one action.
-- If the task requires asking the same agent multiple times (e.g., 3 rounds of research), create a separate numbered step for EACH individual call. Do NOT merge them.
-- If agents are listed above, name the specific agent and their ID for each step.
-- There is NO maximum number of steps. Use as many as the task logically needs. A 30-step plan is perfectly fine.
-- Keep each step to one concise line.
-- The FINAL step must ALWAYS be exactly: "Use report_generation to create a PDF with all gathered findings"
+CRITICAL STEERABLE AGENCY RULES:
+1. DO NOT plan the entire project from start to finish. 
+2. Plan ONLY the "Next Logical Phase" (maximum 3 to 4 steps of research or data gathering).
+3. The FINAL step of your plan must ALWAYS be: "Use ask_user to summarize findings so far and ask the user where to focus next."
+4. NEVER use the report_generation or generate_report tools unless the user's prompt EXPLICITLY says "write the report", "generate the pdf", or "finalize it". 
+5. If agents are listed above, name the specific agent and their ID for each step.
 
-Return ONLY a numbered list, nothing else. Example of a 6-step multi-agent plan:
-1. Ask Religion Agent (agent-xxx) to research the religious origins of the conflict — Round 1
-2. Ask Economic Agent (agent-yyy) to analyze the economic sanctions — Round 1
-3. Ask Religion Agent (agent-xxx) to deep-dive on sectarian violence — Round 2
-4. Ask Economic Agent (agent-yyy) to analyze oil revenue impacts — Round 2
-5. Ask Political Agent (agent-zzz) to summarize geopolitical alliances
-6. Use report_generation to create a PDF with all gathered findings
+Return ONLY a numbered list. Example of a Phase 1 plan:
+1. Ask Military Historian (agent-xxx) to gather timeline data on the conflict.
+2. Ask Geopolitics Researcher (agent-yyy) to pull current UN sanctions data.
+3. Use ask_user to summarize the gathered intel and ask the user if they want to focus the final report on the military timeline or the economic sanctions.
 
 YOUR PLAN:"""
 
@@ -333,6 +335,18 @@ async def run_execution_loop(agent_id, task, api_key, provider):
             accumulated_context, api_key, provider,
             is_pdf_step=is_pdf, session_id=session_id
         )
+
+        # --- NEW: HUMAN-IN-THE-LOOP INTERCEPTOR ---
+        if "HALT_AND_ASK|" in str(result):
+            question = result.split("HALT_AND_ASK|")[-1].strip()
+            safe_log(f"[STATUS:{agent_id}] Autonomous loop paused by agent. Waiting for user.")
+            
+            # Delete the remaining intentions because the plan is paused
+            if os.path.exists(intentions_path): 
+                try: os.remove(intentions_path)
+                except: pass
+            
+            return f"### 🛑 Pausing for Your Direction\n\n**Agent asks:** {question}\n\n*(Reply to this message to steer the agent and it will generate a new plan based on your feedback.)*"
         step_results.append((step, result))
         if not is_pdf:
             accumulated_context += f"\n### Step {i}: {step}\n{result}\n"

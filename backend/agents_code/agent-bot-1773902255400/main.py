@@ -4,7 +4,7 @@ class agent_bot_1773902255400:
         self.id = "agent-bot-1773902255400"
         self.name = "MainAgent"
         self.working_dir = r"D:\New folder"
-        self.permissions = ['report generation']
+        self.permissions = ['report generation', 'file access']
         self.tools = "Custom"
         
     def get_personality(self):

@@ -1,9 +1,10 @@
 {
-  "objective": "{\"tool_input\": \"Create a detailed report on the Iran War",
+  "objective": "Research potential 2026 Iran war scenarios and generate a report.",
   "steps": [
-    "Delegate historical research to Military Historian",
-    "Delegate geopolitical research to Geopolitics Researcher",
-    "Synthesize findings into a report\"}"
+    "Message Geopolitics Researcher for predictions and triggers",
+    "Message Military Historian for simulations or historical context",
+    "Synthesize findings",
+    "Generate report."
   ],
   "completed": []
 }

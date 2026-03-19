@@ -1,8 +1,10 @@
 {
-  "objective": "",
+  "objective": "Objective",
   "steps": [
-    "Observe Workspace",
-    "Execute requested task"
+    "Step 1: Search for a detailed overview of the Iran-Iraq War",
+    "Step 2: Identify key battles and their significance",
+    "Step 3: Research military strategies employed by both sides",
+    "Step 4: Gather information on casualties and the overall outcome"
   ],
   "completed": []
 }
