@@ -393,11 +393,8 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
     elif tool_name == "deep_search":
         return await toolkit.deep_search(tool_input, agent_id, api_key=api_key)
     
-    elif tool_name == "report_generation":
-        # Pass agent_name from sender_data
-        agent_name = sender_data.get("name", "Agent") if sender_data else "Agent"
-        # report_generation is sync in toolkit.py
-        return toolkit.report_generation(agent_id, tool_input, working_dir, api_key, agent_name=agent_name)
+        # report_generation is now async in toolkit.py
+        return await toolkit.report_generation(agent_id, tool_input, working_dir, api_key, agent_name=agent_name)
     
     elif tool_name == "message_agent":
         if "|" in tool_input:

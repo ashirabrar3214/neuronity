@@ -326,7 +326,7 @@ def _chunk_text(text, max_chars=12000):
     """Chunks text into pieces that fit LLM context limits."""
     return [text[i:i+max_chars] for i in range(0, len(text), max_chars)]
 
-def report_generation(agent_id, tool_input, working_dir, api_key, agent_name="Agent"):
+async def report_generation(agent_id, tool_input, working_dir, api_key, agent_name="Agent"):
     """
     Advanced tool for creating a detailed PDF research report in the working directory.
     Usage: [TOOL: report_generation(Topic | Context/Sources)]
@@ -395,19 +395,20 @@ FORMATTING RULES:
             "generationConfig": {"temperature": 0.2}
         }
         
-        response = requests.post(url, headers=headers, json=data, timeout=30)
-        if response.status_code != 200:
-            return f"Synthesis failed: {response.text}"
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=data, timeout=60)
+            if response.status_code != 200:
+                return f"Synthesis failed: {response.text}"
             
-        res_json = response.json()
-        candidates = res_json.get("candidates", [])
-        if not candidates:
-            return f"Synthesis failed: No candidates in response. {json.dumps(res_json)}"
+            res_json = response.json()
+            candidates = res_json.get("candidates", [])
+            if not candidates:
+                return f"Synthesis failed: No candidates in response. {json.dumps(res_json)}"
             
-        report_data_json = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-        # Remove markdown backticks if Gemini added them
-        report_data_json = re.sub(r'```json\s*|\s*```', '', report_data_json).strip()
-        report_data = json.loads(report_data_json)
+            report_data_json = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+            # Remove markdown backticks if Gemini added them
+            report_data_json = re.sub(r'```json\s*|\s*```', '', report_data_json).strip()
+            report_data = json.loads(report_data_json)
         
         # Get dynamic title from LLM or fallback to topic
         display_title = report_data.get("title", topic)
@@ -469,38 +470,50 @@ async def message_agent(target_id, message, sender_id, sender_name, api_key, tar
 
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=data, timeout=120)
+            # We must stream the response because /chat returns SSE
+            final_target_text = ""
+            async with client.stream("POST", url, json=data, timeout=120) as r:
+                if r.status_code != 200:
+                    return f"Failed to message agent {target_id}. HTTP {r.status_code}"
+                
+                async for line in r.aiter_lines():
+                    line = line.strip()
+                    if line.startswith("data: "):
+                        content_str = line[6:]
+                        if content_str == "[DONE]": continue
+                        try:
+                            chunk = json.loads(content_str)
+                            if chunk.get("type") == "text":
+                                final_target_text += chunk.get("content", "")
+                            elif chunk.get("type") == "error":
+                                return f"Error from {target_id}: {chunk.get('content')}"
+                        except: pass
             
-            if resp.status_code == 200:
-                body = resp.json()
-                if isinstance(body, dict) and "error" in body:
-                    return f"Error from {target_id}: {body['error']}"
-                
-                target_response = body.get("response", "") if isinstance(body, dict) else str(body)
-                
-                # Evaluate whether the agent actually executed the task or just stated intent.
-                intent_markers = ["i will ", "i'll ", "i would ", "i plan to ", "i am going to ", "i'll start", "i need to "]
-                execution_markers = ["result:", "found:", "created:", "generated:", "completed:", "here is", "here are", "report", "error:"]
-                response_lower = target_response.lower().strip()
-                has_intent = any(m in response_lower for m in intent_markers)
-                has_execution = any(m in response_lower for m in execution_markers)
+            target_response = final_target_text.strip()
+            
+            # Evaluate whether the agent actually executed the task or just stated intent.
+            intent_markers = ["i will ", "i'll ", "i would ", "i plan to ", "i am going to ", "i'll start", "i need to "]
+            execution_markers = ["result:", "found:", "created:", "generated:", "completed:", "here is", "here are", "report", "error:"]
+            response_lower = target_response.lower().strip()
+            has_intent = any(m in response_lower for m in intent_markers)
+            has_execution = any(m in response_lower for m in execution_markers)
 
-                if has_intent and not has_execution:
-                    instruction = (
-                        "EVALUATION — TASK NOT COMPLETED: The receiving agent stated intent but did NOT execute the task "
-                        "(no tool results or concrete output present). "
-                        "You MUST inform the user: \"[AgentName] acknowledged the request but has not produced results. "
-                        "They may lack the required permissions or connections to complete the task. "
-                        "Check their capability settings or complete the task yourself.\"\n"
-                        "Do NOT present this as success."
-                    )
-                else:
-                    instruction = "INSTRUCTION: The agent produced results. Relay their findings clearly and completely to the user."
+            if has_intent and not has_execution:
+                instruction = (
+                    "EVALUATION — TASK NOT COMPLETED: The receiving agent stated intent but did NOT execute the task "
+                    "(no tool results or concrete output present). "
+                    "You MUST inform the user: \"[AgentName] acknowledged the request but has not produced results. "
+                    "They may lack the required permissions or connections to complete the task. "
+                    "Check their capability settings or complete the task yourself.\"\n"
+                    "Do NOT present this as success."
+                )
+            else:
+                instruction = "INSTRUCTION: The agent produced results. Relay their findings clearly and completely to the user."
 
-                return (f"--- DATA RECEIVED FROM {target_id} ---\n"
-                        f"{target_response}\n"
-                        f"--- END OF DATA ---\n"
-                        f"{instruction}")
+            return (f"--- DATA RECEIVED FROM {target_id} ---\n"
+                    f"{target_response}\n"
+                    f"--- END OF DATA ---\n"
+                    f"{instruction}")
 
             err = f"HTTP {resp.status_code}: {resp.text}"
             safe_log(f"!!! [CAPABILITY:message_agent] {err}")
