@@ -695,7 +695,7 @@ function initTrainingUI() {
                                     statusEl.className = 'stream-status';
                                     messageDiv.appendChild(statusEl);
                                 }
-                                statusEl.innerHTML = `<i>${data.content || 'Action...'}</i>`;
+                                statusEl.innerHTML = `<i>${data.content || 'Action...'}</i> <div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
                             }
                             else if (data.type === 'error') {
                                 messageDiv.innerHTML += `<div class="error-text">⚠️ ${data.content}</div>`;

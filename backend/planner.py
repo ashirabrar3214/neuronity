@@ -63,23 +63,31 @@ async def _call_llm_direct(prompt, api_key, provider, mode="fast"):
 
 
 
-async def generate_plan(task, agent_id, api_key, provider, agents_info=""):
+async def generate_plan(task, agent_id, api_key, provider, agents_info="", autonomous=False):
     """
     Ask the LLM to break the task into numbered execution steps.
+    autonomous=True: master agents skip the ask_user check-in and proceed to completion.
     """
     safe_log(f"[STATUS:{agent_id}] Generating execution plan...")
 
     agents_context = f"\n\nAVAILABLE CONNECTED AGENTS:\n{agents_info}" if agents_info else ""
+
+    if autonomous:
+        rule3 = '3. Plan all the way to task completion. Do NOT add an ask_user or check-in step at the end. Proceed end-to-end and generate the final deliverable.'
+        rule4_note = '4. You MAY use report_generation or generate_report when the task naturally calls for a final report or summary.'
+    else:
+        rule3 = '3. The FINAL step of your plan must ALWAYS be: "Use ask_user to summarize findings so far and ask the user where to focus next."'
+        rule4_note = '4. NEVER use the report_generation or generate_report tools unless the user\'s prompt EXPLICITLY says "write the report", "generate the pdf", or "finalize it".'
 
     prompt = f"""You are a master task planner for an autonomous agent workforce. Break the following task into a numbered list of execution steps.{agents_context}
 
 TASK: {task}
 
 CRITICAL STEERABLE AGENCY RULES:
-1. DO NOT plan the entire project from start to finish. 
+1. DO NOT plan the entire project from start to finish.
 2. Plan ONLY the "Next Logical Phase" (maximum 3 to 4 steps of research or data gathering).
-3. The FINAL step of your plan must ALWAYS be: "Use ask_user to summarize findings so far and ask the user where to focus next."
-4. NEVER use the report_generation or generate_report tools unless the user's prompt EXPLICITLY says "write the report", "generate the pdf", or "finalize it". 
+{rule3}
+{rule4_note}
 5. If agents are listed above, name the specific agent and their ID for each step.
 
 Return ONLY a numbered list. Example of a Phase 1 plan:
@@ -215,12 +223,13 @@ async def execute_step(step_num, total_steps, step_text, agent_id, accumulated_c
         return f"Step failed: {str(e)}"
 
 
-async def run_autonomous(agent_id, task, api_key, provider, agents_info=""):
+async def run_autonomous(agent_id, task, api_key, provider, agents_info="", autonomous=False):
     """
     Phase 1: Generate the intentions only.
+    autonomous=True: skips the ask_user check-in step (used for master agents).
     """
     safe_log(f"[STATUS:{agent_id}] Autonomous deliberation complete: Plan generated")
-    steps = await generate_plan(task, agent_id, api_key, provider, agents_info)
+    steps = await generate_plan(task, agent_id, api_key, provider, agents_info, autonomous=autonomous)
     if steps:
         save_plan_json(steps, task, agent_id)
     return steps

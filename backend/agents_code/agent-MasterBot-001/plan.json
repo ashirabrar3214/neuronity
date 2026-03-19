@@ -1,8 +1,7 @@
 {
-  "objective": "Objective: Awaiting user instruction",
+  "objective": "Objective: Create a report on a hypothetical Iran War in 2026 covering political, military, and economic factors, including religious reasons.",
   "steps": [
-    "Step 1: Receive user instruction",
-    "Step 2: Execute user instruction"
+    "Step 1: Conduct initial research on current Iran situation and potential conflict triggers (COMPLETED). Step 2: Research potential military capabilities and strategies (COMPLETED). Step 3: Research potential economic impacts (COMPLETED). Step 4: Synthesize findings into a report (IN PROGRESS - added religious reasons). Step 5: Finalize the report."
   ],
   "completed": []
 }

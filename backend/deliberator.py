@@ -18,13 +18,15 @@ def load_agents():
     except:
         return []
 
-async def deliberate(agent_id, message, api_key, provider, beliefs_context, history=None):
+async def deliberate(agent_id, message, api_key, provider, beliefs_context, history=None, capabilities=None):
     """
     Goal Filter Phase (Deliberation).
-    Decides if the agent has enough information to "Solve" (Intend), 
+    Decides if the agent has enough information to "Solve" (Intend),
     if it needs to "RE-PLAN" (Pivot), or should "Clarify" (Ask a question).
+    capabilities: list of permission strings from the agent's config (e.g. ["web search", "report generation"])
     """
-    if not message or len(message.strip()) < 5:
+    # Only short-circuit on length if there is NO history to provide context
+    if not message or (len(message.strip()) < 5 and not history):
         return "CLARIFY", "Please provide more detail about your request."
 
     # 1. Load Persona Data
@@ -62,13 +64,18 @@ async def deliberate(agent_id, message, api_key, provider, beliefs_context, hist
         history_str = "\n".join(h_lines)
 
     global_obj = beliefs_context.get("global_objective", "None")
-    
+    capabilities_str = ", ".join(capabilities) if capabilities else "unknown"
+
     prompt = f"""You are the Deliberation Module of a True BDI (Belief-Desire-Intention) Agent.
-    
+
 --- AGENT IDENTITY ---
 Role: {role}
 Description: {description}
 Key Responsibility: {responsibility}
+
+--- AVAILABLE TOOLS ---
+This agent has access to the following tools: {capabilities_str}
+IMPORTANT: If a task can be accomplished with one of the tools above, that task IS within this agent's scope. Do NOT declare a capability gap for tools that appear in this list.
 
 --- COGNITIVE STATE ---
 Global Objective: {global_obj}
@@ -88,6 +95,7 @@ RULES:
 - If history shows we already have the objective and the user is just following up, choose SOLVE.
 - Use your specific Persona (Description/Responsibility) to decide if this task is YOURS.
 - Look for "Ongoing task:" markers in the message to detect mid-execution states.
+- NEVER choose RE-PLAN due to a "missing capability" if the required tool IS listed in Available Tools above.
 
 Return ONLY a JSON object:
 {{

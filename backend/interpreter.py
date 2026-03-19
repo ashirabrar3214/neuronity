@@ -11,6 +11,7 @@ import requests
 import re
 import random
 import asyncio
+import datetime
 from concurrent.futures import ThreadPoolExecutor
 import threading
 import sys
@@ -102,6 +103,8 @@ app.add_middleware(
 # Data Storage
 DATA_FILE = os.path.join(os.path.dirname(__file__), "agents.json")
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(__file__), "agents_code")
+import brf
+BELIEFS_BASE_FILE = brf.KNOWLEDGE_BASE_FILE
 
 
 def get_beliefs_context():
@@ -418,7 +421,10 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
         agent_name = sender_data.get("name", "Agent") if sender_data else "Agent"
         # report_generation is now async in toolkit.py
         return await toolkit.report_generation(agent_id, tool_input, working_dir, api_key, agent_name=agent_name)
-    
+
+    elif tool_name == "generate_report":
+        return await toolkit.generate_report(agent_id, tool_input, working_dir)
+
     elif tool_name == "message_agent":
         if "|" in tool_input:
             parts = tool_input.split("|", 1)
@@ -745,13 +751,13 @@ if __name__ == "__main__":
     # 3. prompt.md â€” identity and behavioral rules ONLY.
     prompt_path = os.path.join(agent_dir, "prompt.md")
     prompt_content = f"""# Agent Instructions: {agent_data['name']}
-Identity: You are an agent sitting in a desktop PC at UF working for Ashir.
+Identity: You are an agent sitting in a desktop PC working for the User.
 Description: {agent_data['description']}
 Responsibility: {agent_data.get('responsibility', 'General purpose assistance')}
 
 ## OPERATION RULES
 1. **Tool Use**: Use your available tools to complete tasks. Do not explain that you are using a tool; just execute the tool call.
-2. **Intent Gate**: Do NOT execute tool calls for casual greetings. Only act if a specific research topic or objective is provided.
+2. **Intent Gate**: Do NOT execute tool calls for casual greetings. However, if the user just wants to chat, ask about your role, or refine your instructions, respond conversationally without using tools. Only use research tools if a specific objective is provided.
 3. **Intentions (BDI)**: Use `update_plan` ONLY when starting a complex multi-step task, or when crossing off a completed step. Do not use it for simple conversational replies.
 4. **Knowledge Sharing (BRF)**: Use the `post_finding` tool to record important facts to the Shared Belief Base.
 5. **Citations**: Every fact discovered via research MUST include a `[Source: URL]` citation.
@@ -910,8 +916,8 @@ def clear_history(agent_id: str):
         with open(history_path, "w", encoding="utf-8") as f:
             json.dump([], f)
 
-        if os.path.exists(BELIEFS_BASE_FILE):
-            os.remove(BELIEFS_BASE_FILE)
+        if os.path.exists(brf.KNOWLEDGE_BASE_FILE):
+            os.remove(brf.KNOWLEDGE_BASE_FILE)
             
         volatile_path = os.path.join(AGENTS_CODE_DIR, "volatile_findings.json")
         if os.path.exists(volatile_path):
@@ -959,7 +965,7 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest
     if "report generation" in permissions:
         declarations.append({
             "name": "report_generation",
-            "description": "Create a formal PDF report.",
+            "description": "OUTPUTS A PDF FILE. Use this to synthesize research into a polished, multi-section PDF document. This is the ONLY tool that produces a .pdf file. Use this whenever the user wants a report, PDF, or final deliverable.",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
@@ -971,7 +977,7 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest
         })
         declarations.append({
             "name": "generate_report",
-            "description": "Creates a structured markdown report file in the working directory.",
+            "description": "Saves a quick markdown draft (.md text file). Use ONLY when explicitly asked for a markdown file. Do NOT use this when the user wants a PDF — use report_generation instead.",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
@@ -1189,7 +1195,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
     permissions = agent_data.get("permissions", [])
     
     identity_layer = (
-        f"IDENTITY: You are an agent named '{agent_data.get('name')}' working for Ashir.\n"
+        f"IDENTITY: You are an agent named '{agent_data.get('name')}' working for the User.\n"
         f"DESCRIPTION: {agent_data.get('description', 'No description.')}\n"
         f"RESPONSIBILITY: {agent_data.get('responsibility', 'No responsibility set.')}\n"
     )
@@ -1210,6 +1216,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
     
     transient_task_layer = (
         f"## TRANSIENT TASK CONTEXT\n"
+        f"CURRENT DATE: {datetime.datetime.now().strftime('%Y-%m-%d')}\n"
         f"GLOBAL PROJECT OBJECTIVE: {global_obj}\n\n"
         f"{agent_dir_content}\n\n"
         f"IMPORTANT (COLLABORATION RULE): You can ONLY message agents you are DIRECTLY connected to on the canvas.\n"
@@ -1224,17 +1231,19 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
             "\n## MASTER PROTOCOL\n"
             "You are a MASTER agent. Your priority is task completion. If you are given a task, you MUST proceed immediately to the first execution step.\n"
             "- Do NOT stop to ask for clarification on common topics unless it's truly ambiguous.\n"
-            "- For 'Iran War', assume the 1980 conflict OR ask your religion/political agents if they are connected.\n"
             "- Always prioritize calling a tool (web_search, etc.) over providing a conversational text response.\n"
         )
     
     if is_training_mode:
         system_prompt = (
             f"# YOU ARE A CURIOUS AI INTERN: {agent_data.get('name')}\n"
-            f"You are currently in **TRAINING MODE**. Focus on learning your role.\n"
+            f"You are currently in **TRAINING MODE**. Focus on learning your role.\n\n"
+            f"**TRAINING OVERRIDE**: In this mode, IGNORE Rule 2 (Intent Gate) from your prompt.md below. "
+            f"You ARE allowed to chat casually with the user, answer their questions, and help them refine your behavioral prompt. "
+            f"Be helpful, conversational, and non-refusing.\n\n"
             f"## YOUR CURRENT WORK PROMPT (prompt.md):\n```\n{current_agent_prompt}\n```\n"
             f"{training_tools_block}\n"
-            f"{tool_manual_layer}\n"  # FIX: Also remind it of its standard tools
+            f"{tool_manual_layer}\n"
         )
     
     api_key = api_key_input or os.getenv("GEMINI_API_KEY", "")
@@ -1243,7 +1252,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
     
     # â”€â”€â”€ BDI REASONING CYCLE: DELIBERATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if not is_training_mode:
-        decision, reason = await deliberator.deliberate(agent_id, message, api_key, "gemini", beliefs_context, history=history)
+        decision, reason = await deliberator.deliberate(agent_id, message, api_key, "gemini", beliefs_context, history=history, capabilities=permissions)
         yield f"data: {json.dumps({'type': 'thought', 'content': f'BDI Deliberation: {decision} ({reason})'})}\n\n"
         
         if decision == "CLARIFY" and is_task:
@@ -1255,11 +1264,16 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
     # BDI LIMIT: Reduce max_turns to prevent infinite looping and double-thinking.
     # Master agents handle multi-step tasks via the Planner, so execute_agent_turn
     # should ideally perform one cognitive action (turn) then stop.
-    max_turns = 10 if is_task else 1
+    max_turns = 10 if (is_task or is_training_mode) else 1
     if "[AUTO_STEP" in message: max_turns = 5 # Even tighter for autonomous steps
 
+    # Silent tools mutate internal state and must never produce user-visible output.
+    # After one of these runs, we suppress both the tool_result stream event AND
+    # any verbose LLM "confirmation" text the model generates on the next turn.
+    SILENT_TOOLS = {"update_plan", "post_finding"}
+    suppress_text_output = False
+
     while iteration < max_turns:
-        yield f"data: {json.dumps({'type': 'status', 'content': f'Turn {iteration+1}: Observing context...'})}\n\n"
         llm_context = process_generational_history(history)
         # --- FIX: ALL agents (even Masters) use FAST_MODEL for execution turns ---
         # The Master already did its heavy thinking in planner.py and deliberator.py.
@@ -1283,7 +1297,6 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
             "tools": get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0, is_training=is_training_mode)
         }
         
-        yield f"data: {json.dumps({'type': 'status', 'content': f'Generating response (Turn {iteration+1})...'})}\n\n"
 
         current_turn_text = ""
         current_turn_thoughts = ""
@@ -1321,7 +1334,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
                                     elif "text" in part:
                                         text = part.get("text", "")
                                         current_turn_text += text
-                                        yield f"data: {json.dumps({'type': 'text', 'content': text})}\n\n"
+                                        # Do NOT stream text yet — buffer until [TOOL: ...] detection is complete
                                     elif "functionCall" in part:
                                         fn = part["functionCall"]
                                         tool_call_found = {"name": fn["name"], "args": fn.get("args", {})}
@@ -1342,6 +1355,15 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
                     tool_call_found = {"name": t_name, "args": t_args}
                     yield f"data: {json.dumps({'type': 'tool_start', 'content': t_name})}\n\n"
 
+            # Yield buffered text now that [TOOL: ...] patterns have been stripped.
+            # Any conversational prefix (e.g. "Let me look that up...") is preserved;
+            # the raw tool call syntax is not.
+            # suppress_text_output is True when the previous iteration ran a silent tool
+            # (update_plan / post_finding) — we don't want its verbose LLM confirmation shown.
+            if current_turn_text.strip() and not suppress_text_output:
+                yield f"data: {json.dumps({'type': 'text', 'content': current_turn_text})}\n\n"
+            suppress_text_output = False  # Reset after each turn regardless
+
             if tool_call_found:
                 t_name = tool_call_found["name"]
                 t_args = tool_call_found["args"]
@@ -1351,28 +1373,27 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
                 
                 # Execute tool call
                 result = await perform_tool_call(agent_id, t_name, arg_str, agent_dir, api_key=api_key, session_id=session_id)
-                yield f"data: {json.dumps({'type': 'tool_result', 'content': str(result)})}\n\n"
-                
-                # FIX: Remove `update_plan` and `post_finding` from early exit.
-                # Allow the loop to continue so the agent sees the result and responds to the user.
+
+                # Silent tools (update_plan, post_finding) are atomic internal state changes.
+                # Don't stream their result to the UI, and suppress the next turn's LLM confirmation text.
+                if t_name not in SILENT_TOOLS:
+                    yield f"data: {json.dumps({'type': 'tool_result', 'content': str(result)})}\n\n"
+
                 if t_name in ["report_generation"]:
                     safe_log(f"[BDI:EXIT] Agent called {t_name} — terminating Turn {iteration+1} and yielding.")
-                    
-                    # Yield as text so the UI accumulates it in responseContent
-                    # and processPlanResponse can detect the intention header.
-                    display_result = str(result)
-                    
+
                     # Yield ONLY the clean display result to the UI, not the raw tool call
-                    yield f"data: {json.dumps({'type': 'text', 'content': f'\n\n{display_result}'})}\n\n"
-                    
+                    yield f"data: {json.dumps({'type': 'text', 'content': f'\n\n{str(result)}'})}\n\n"
+
                     history.append({"role": "assistant", "content": f"[TOOL: {t_name}({arg_str})]"})
                     history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {result}"})
                     final_response_collected = f"Committed action: {t_name}. Result: {result}"
                     break
-                
-                # If it was an update_plan or post_finding, append to history and let the loop iterate again!
+
                 history.append({"role": "assistant", "content": f"[TOOL: {t_name}({arg_str})]"})
                 history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {result}"})
+                if t_name in SILENT_TOOLS:
+                    suppress_text_output = True
                 iteration += 1
             else:
                 final_response_collected = current_turn_text
@@ -1445,7 +1466,8 @@ async def run_autonomous_agent(request: ChatRequest):
         request.message,
         api_key,
         provider,
-        agents_info
+        agents_info,
+        autonomous=True
     )
 
     if not steps:
