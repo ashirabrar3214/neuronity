@@ -2,7 +2,8 @@ import time
 import os
 import random
 import json
-import requests
+import httpx
+import asyncio
 import re
 from pdf_generator import ReportPDFGenerator
 
@@ -25,20 +26,24 @@ def safe_log(message):
     except Exception:
         pass
 
-def _ddgs_search_raw(query, agent_id):
+async def _ddgs_search_raw(query, agent_id):
     """
     Internal helper to fetch raw DuckDuckGo results.
     """
     safe_log(f"[STATUS:{agent_id}] DuckDuckGo: Searching '{query[:40]}...'")
     try:
         from ddgs import DDGS
-        results = []
-        for result in DDGS().text(query, max_results=15):
-            results.append({
-                "title": result.get("title", ""),
-                "href": result.get("href", ""),
-                "body": result.get("body", "")
-            })
+        def do_search():
+            results = []
+            for result in DDGS().text(query, max_results=15):
+                results.append({
+                    "title": result.get("title", ""),
+                    "href": result.get("href", ""),
+                    "body": result.get("body", "")
+                })
+            return results
+        
+        results = await asyncio.to_thread(do_search)
         safe_log(f"+++ [INTERNAL:search] Got {len(results)} results")
         return results
     except Exception as e:
@@ -81,7 +86,7 @@ Select between 3 and 8 sources. Prioritize: relevance, authority (Wikipedia, maj
 
 
 
-def synthesize_fact_with_gemini(query, search_results, api_key):
+async def synthesize_fact_with_gemini(query, search_results, api_key):
     """
     Specialized synthesis for quick facts, targeted data, or small snippets.
     Returns a structured JSON object containing the fact, source URLs, and confidence.
@@ -157,7 +162,7 @@ def deep_search(query, agent_id, api_key):
     return "\n\n---\n\n".join(formatted_results)
 
 
-def synthesize_with_gemini(query, search_results, api_key):
+async def synthesize_with_gemini(query, search_results, api_key):
     """
     Function 2: Feed raw search results JSON to Gemini, get a clean synthesis.
     Always appends a ### Sources section built directly from the raw results.
@@ -197,28 +202,29 @@ STRICT RULES:
     model = "gemini-2.0-flash"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
-    data = {
+    payload = {
         "contents": [{"role": "user", "parts": [{"text": synthesis_prompt}]}],
     }
     
     try:
-        response = requests.post(url, headers=headers, json=data, timeout=20)
-        if response.status_code == 200:
-            res_json = response.json()
-            candidates = res_json.get("candidates", [])
-            if candidates and isinstance(candidates, list) and len(candidates) > 0:
-                cand = candidates[0]
-                content = cand.get("content", {})
-                parts = content.get("parts", [])
-                if parts and isinstance(parts, list) and len(parts) > 0:
-                    gemini_text = parts[0].get("text", "")
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload, timeout=60)
+            if response.status_code == 200:
+                res_json = response.json()
+                candidates = res_json.get("candidates", [])
+                if candidates and isinstance(candidates, list) and len(candidates) > 0:
+                    cand = candidates[0]
+                    content = cand.get("content", {})
+                    parts = content.get("parts", [])
+                    if parts and isinstance(parts, list) and len(parts) > 0:
+                        gemini_text = parts[0].get("text", "")
+                    else:
+                        gemini_text = "Synthesis failed: No parts found."
                 else:
-                    gemini_text = "Synthesis failed: No parts found."
+                    gemini_text = "Synthesis failed: No candidates found."
             else:
-                gemini_text = "Synthesis failed: No candidates found."
-        else:
-            print(f"!!! [CAPABILITY:synthesize] Gemini error {response.status_code}: {response.text}", flush=True)
-            gemini_text = f"Search found results but synthesis failed.\n\n{raw_context}"
+                print(f"!!! [CAPABILITY:synthesize] Gemini error {response.status_code}: {response.text}", flush=True)
+                gemini_text = f"Search found results but synthesis failed.\n\n{raw_context}"
     except Exception as e:
         safe_log(f"!!! [CAPABILITY:synthesize] Exception: {e}")
         gemini_text = f"Search found results but could not synthesize: {str(e)}"
@@ -239,7 +245,7 @@ STRICT RULES:
 # THINKING CAPABILITY
 # ─────────────────────────────────────────────────
 
-def thinking(agent_id, topic):
+async def thinking(agent_id, topic):
     """
     Simulates a deep thinking process for a specific topic.
     """
@@ -250,7 +256,7 @@ def thinking(agent_id, topic):
     topic = topic.strip("'").strip('"').strip("`")
 
     safe_log(f"[STATUS:{agent_id}] Thinking: Analyzing '{topic[:40]}...'")
-    time.sleep(3)
+    await asyncio.sleep(3)
     # FIX: Explicitly instruct the agent to stop looping and output the response
     return f"SYSTEM INSTRUCTION: The thinking pause for '{topic}' is complete. Do NOT call the thinking tool again. Use your internal knowledge to generate a deep, detailed analysis and respond directly to the user."
 
@@ -259,13 +265,13 @@ def thinking(agent_id, topic):
 # REPORT GENERATION CAPABILITY
 # ─────────────────────────────────────────────────
 
-def generate_report(agent_id, tool_input, working_dir):
+async def generate_report(agent_id, tool_input, working_dir):
     """
     Generates a structured markdown report file in the agent's working directory.
     Usage: [TOOL: generate_report(Title|Content)]
     """
     safe_log(f"[STATUS:{agent_id}] Report: Draft for '{tool_input[:40]}...'")
-    time.sleep(1)
+    await asyncio.sleep(1)
     try:
         if not working_dir:
             return "Error: No working directory assigned. Cannot save report."
@@ -432,14 +438,9 @@ FORMATTING RULES:
 # AGENT-TO-AGENT COMMUNICATION CAPABILITY
 # ─────────────────────────────────────────────────
 
-def message_agent(target_id, message, sender_id, sender_name, api_key, target_provider, context_snippet="", intent_priority="NORMAL"):
+async def message_agent(target_id, message, sender_id, sender_name, api_key, target_provider, context_snippet="", intent_priority="NORMAL"):
     """
     Sends a structured, context-rich message to a connected agent.
-    The payload includes:
-      - Sender identity (name + ID)
-      - The explicit task/request
-      - A snippet of the sender's recent conversation history for context
-    Runs the HTTP call in a new daemon thread to avoid event-loop deadlocks.
     """
     safe_log(f"[STATUS:{sender_id}] Messenger: Sending to '{target_id}' (Priority: {intent_priority})")
 
@@ -472,63 +473,48 @@ def message_agent(target_id, message, sender_id, sender_name, api_key, target_pr
         "provider": target_provider
     }
 
-    import threading
-    result_container = {}
-    error_container = {}
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, json=data, timeout=120)
+            
+            if resp.status_code == 200:
+                body = resp.json()
+                if isinstance(body, dict) and "error" in body:
+                    return f"Error from {target_id}: {body['error']}"
+                
+                target_response = body.get("response", "") if isinstance(body, dict) else str(body)
+                
+                # Evaluate whether the agent actually executed the task or just stated intent.
+                intent_markers = ["i will ", "i'll ", "i would ", "i plan to ", "i am going to ", "i'll start", "i need to "]
+                execution_markers = ["result:", "found:", "created:", "generated:", "completed:", "here is", "here are", "report", "error:"]
+                response_lower = target_response.lower().strip()
+                has_intent = any(m in response_lower for m in intent_markers)
+                has_execution = any(m in response_lower for m in execution_markers)
 
-    def do_request():
-        try:
-            resp = requests.post(url, json=data, timeout=120)
-            result_container["status"] = resp.status_code
-            result_container["body"] = resp.json() if resp.status_code == 200 else resp.text
-        except Exception as ex:
-            error_container["err"] = str(ex)
+                if has_intent and not has_execution:
+                    instruction = (
+                        "EVALUATION — TASK NOT COMPLETED: The receiving agent stated intent but did NOT execute the task "
+                        "(no tool results or concrete output present). "
+                        "You MUST inform the user: \"[AgentName] acknowledged the request but has not produced results. "
+                        "They may lack the required permissions or connections to complete the task. "
+                        "Check their capability settings or complete the task yourself.\"\n"
+                        "Do NOT present this as success."
+                    )
+                else:
+                    instruction = "INSTRUCTION: The agent produced results. Relay their findings clearly and completely to the user."
 
-    t = threading.Thread(target=do_request, daemon=True)
-    t.start()
-    t.join(timeout=120)  # wait up to 2 minutes
+                return (f"--- DATA RECEIVED FROM {target_id} ---\n"
+                        f"{target_response}\n"
+                        f"--- END OF DATA ---\n"
+                        f"{instruction}")
 
-    if error_container:
-        safe_log(f"!!! [CAPABILITY:message_agent] {error_container['err']}")
-        return f"Failed to message agent {target_id}. Error: {error_container['err']}"
+            err = f"HTTP {resp.status_code}: {resp.text}"
+            safe_log(f"!!! [CAPABILITY:message_agent] {err}")
+            return f"Failed to message agent {target_id}. Error: {err}"
 
-    if not result_container:
-        return f"Timed out waiting for response from agent {target_id}."
-
-    if result_container["status"] == 200:
-        body = result_container["body"]
-        if isinstance(body, dict) and "error" in body:
-            return f"Error from {target_id}: {body['error']}"
-        target_response = body.get("response", "") if isinstance(body, dict) else ""
-
-        # Evaluate whether the agent actually executed the task or just stated intent.
-        # Intent-only responses contain future-tense promises but no evidence of tool results.
-        intent_markers = ["i will ", "i'll ", "i would ", "i plan to ", "i am going to ", "i'll start", "i need to "]
-        execution_markers = ["result:", "found:", "created:", "generated:", "completed:", "here is", "here are", "report", "error:"]
-        response_lower = target_response.lower().strip()
-        has_intent = any(m in response_lower for m in intent_markers)
-        has_execution = any(m in response_lower for m in execution_markers)
-
-        if has_intent and not has_execution:
-            instruction = (
-                "EVALUATION — TASK NOT COMPLETED: The receiving agent stated intent but did NOT execute the task "
-                "(no tool results or concrete output present). "
-                "You MUST inform the user: \"[AgentName] acknowledged the request but has not produced results. "
-                "They may lack the required permissions or connections to complete the task. "
-                "Check their capability settings or complete the task yourself.\"\n"
-                "Do NOT present this as success."
-            )
-        else:
-            instruction = "INSTRUCTION: The agent produced results. Relay their findings clearly and completely to the user."
-
-        return (f"--- DATA RECEIVED FROM {target_id} ---\n"
-                f"{target_response}\n"
-                f"--- END OF DATA ---\n"
-                f"{instruction}")
-
-    err = f"HTTP {result_container['status']}: {result_container['body']}"
-    safe_log(f"!!! [CAPABILITY:message_agent] {err}")
-    return f"Failed to message agent {target_id}. Error: {err}"
+    except Exception as e:
+        safe_log(f"!!! [CAPABILITY:message_agent] {e}")
+        return f"Failed to message agent {target_id}. Error: {str(e)}"
 
 
 
@@ -673,7 +659,7 @@ def write_file(agent_id, input_str, working_dir):
 # GLOBAL KNOWLEDGE & BDI PLANNING
 # ─────────────────────────────────────────────────
 
-def post_finding(agent_id, tool_input):
+async def post_finding(agent_id, tool_input, session_id=None):
     """
     Writes a key insight to the Belief Base (Shared Ledger). 
     """
@@ -683,12 +669,12 @@ def post_finding(agent_id, tool_input):
         insight = parts[0].strip()
         source = parts[1].strip() if len(parts) > 1 else ""
         
-        update_belief_base(agent_id, insight, source)
+        update_belief_base(agent_id, insight, source, session_id=session_id)
         return f"Success: Insight recorded in the Belief Base."
     except Exception as e:
         return f"Error posting finding: {e}"
 
-def update_intentions(agent_id, tool_input):
+async def update_intentions(agent_id, tool_input):
     """
     Atomic updates to the agent's committed intentions (BDI).
     Format: "Task completed" OR "Objective | Intention 1, Intention 2"
@@ -715,14 +701,8 @@ def update_intentions(agent_id, tool_input):
                 intentions["completed"].append(item)
 
             if item.lower() == "task completed":
-                # Final BDI Cleanup
-                agents_code_dir = os.path.join(os.path.dirname(__file__), "agents_code")
-                beliefs_path = os.path.join(agents_code_dir, "beliefs_base.json")
-                if os.path.exists(beliefs_path):
-                    try:
-                        os.remove(beliefs_path)
-                        safe_log("--- [BDI CLEANUP] Belief Base cleared.")
-                    except: pass
+                # Final BDI Cleanup - (User-requested removal removed to keep persistence)
+                pass
 
         with open(intentions_path, "w", encoding="utf-8") as f:
             json.dump(intentions, f, indent=2)

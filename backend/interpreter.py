@@ -344,11 +344,11 @@ STRICT RULE: The output must be a clean, bulleted markdown summary. Do not inclu
     return response_text.strip() if response_text else current_summary
     
 # Tool Implementations
-def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
+async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key="", session_id=None):
     # --- Resolve workingDir for file-saving tools ---
     agents = load_data()
     sender_data = next((a for a in agents if a["id"] == agent_id), None)
-    working_dir = sender_data.get("workingDir", "") if sender_data else ""
+    working_dir = sender_data.get("working_dir", "") if sender_data else ""
 
     if sender_data:
         permissions = sender_data.get("permissions", [])
@@ -383,7 +383,7 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
             url = url_match.group(1).strip().rstrip(']')
             raw_snippet = re.sub(r'(?:Source:|\[Source:)[^\]\n]*', '', raw_snippet).strip()
 
-        brf.update_belief_base(agent_id, raw_snippet, url)
+        brf.update_belief_base(agent_id, raw_snippet, url, session_id=session_id)
         safe_log(f"[BRF:{agent_id}] New Belief Added: {raw_snippet[:60]}...")
         return f"Success: Fact recorded in Belief Base."
     
@@ -1036,249 +1036,244 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest
 @app.post("/chat")
 async def chat_with_agent(request: ChatRequest):
     """
-    Primary chat endpoint. Now returns a StreamingResponse to support live thinking/text.
+    FastAPI endpoint for chat. Wraps the core execute_agent_turn logic.
+    """
+    return StreamingResponse(
+        execute_agent_turn(
+            request.agent_id,
+            request.message,
+            request.api_key,
+            request.provider,
+            request.mode
+        ),
+        media_type="text/event-stream"
+    )
+
+async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini", mode="work"):
+    """
+    Core BDI Reasoning Cycle (The Executive).
+    Yields SSE-formatted data strings.
     """
     agents = load_data()
-    agent_data = next((a for a in agents if a["id"] == request.agent_id), None)
+    agent_data = next((a for a in agents if a["id"] == agent_id), None)
     if not agent_data:
-        raise HTTPException(status_code=404, detail=f"Agent '{request.agent_id}' not found")
+        yield f"data: {json.dumps({'type': 'error', 'content': 'Agent not found'})}\n\n"
+        yield "data: [DONE]\n\n"
+        return
 
-    agent_dir = os.path.join(AGENTS_CODE_DIR, request.agent_id)
-    if not os.path.exists(agent_dir):
-        os.makedirs(agent_dir, exist_ok=True)
-        
-    prompt_path = os.path.join(agent_dir, "prompt.md")
+    is_training_mode = (mode == "training")
+    agent_dir = os.path.join(AGENTS_CODE_DIR, agent_id)
     history_path = os.path.join(agent_dir, "history.json")
     internal_history_path = os.path.join(agent_dir, "internal_history.json")
-    summary_path = os.path.join(agent_dir, "summary.json")
-
-    # Move context and history initialization above the generator for proper closure binding
-    current_agent_prompt = ""
-    if os.path.exists(prompt_path):
+    
+    # 1. Identity & Context Initialization
+    history = []
+    if os.path.exists(internal_history_path):
         try:
-            with open(prompt_path, "r", encoding="utf-8") as f:
+            with open(internal_history_path, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        except: pass
+    
+    if not history and os.path.exists(history_path):
+        try:
+            with open(history_path, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        except: pass
+
+    # Extract session_id from tagged message if present
+    session_id = None
+    session_match = re.search(r'\[SESSION_ID:\s*(\w+)\]', message)
+    if session_match:
+        session_id = session_match.group(1)
+        # Clean the message for the agent's actual turn
+        message = message.replace(session_match.group(0), "").strip()
+
+    history.append({"role": "user", "content": message})
+    
+    # Observe: Update global context with new user message
+    update_beliefs_context(message)
+    beliefs_context = get_beliefs_context()
+    global_obj = beliefs_context.get("global_objective", "Initial exploration.")
+
+    iteration = 0
+    final_response_collected = ""
+    
+    # Build Context Layers (Consolidated for streaming)
+    current_agent_prompt = ""
+    prompt_file = os.path.join(agent_dir, "prompt.md")
+    if os.path.exists(prompt_file):
+        try:
+            with open(prompt_file, "r", encoding="utf-8") as f:
                 current_agent_prompt = f.read()
         except: pass
 
-    try:
-        if os.path.exists(internal_history_path):
-            with open(internal_history_path, "r", encoding="utf-8") as f: history = json.load(f)
-        else: history = []
-    except: history = []
-    
-    history.append({"role": "user", "content": request.message})
-
-    # Prepare Training Mode logic if needed
-    is_training_mode = False
     training_tools_block = ""
-    if getattr(request, 'mode', 'work') == 'training':
-        training_tools_block = "## TRAINING TOOLS\n- [TOOL: read_prompt()]\n- [TOOL: update_prompt(new_content)]\n"
-        if agent_data.get("agentType") == "master": training_tools_block += "- [TOOL: read_workspace()]\n"
-        is_training_mode = True
+    if is_training_mode:
+        from toolkit import get_training_context
+        training_tools_block = get_training_context()
 
-    async def event_generator():
-        nonlocal history
-        iteration = 0
-        final_response_collected = ""
-        
-        # Build Context Layers (Consolidated for streaming)
-        beliefs_context = get_beliefs_context()
-        global_obj = beliefs_context.get("global_objective", "Initial exploration.")
-        
-        reachable_agents = []
-        connections_list = agent_data.get("connections", [])
-        for a in agents:
-            if a["id"] in connections_list or request.agent_id in a.get("connections", []):
-                reachable_agents.append(a)
-        
-        permissions = agent_data.get("permissions", [])
-        
-        identity_layer = (
-            f"IDENTITY: You are an agent named '{agent_data.get('name')}' working for Ashir.\n"
-            f"DESCRIPTION: {agent_data.get('description', 'No description.')}\n"
-            f"RESPONSIBILITY: {agent_data.get('responsibility', 'No responsibility set.')}\n"
+    reachable_agents = []
+    connections_list = agent_data.get("connections", [])
+    for a in agents:
+        if a["id"] in connections_list or agent_id in a.get("connections", []):
+            reachable_agents.append(a)
+    
+    permissions = agent_data.get("permissions", [])
+    
+    identity_layer = (
+        f"IDENTITY: You are an agent named '{agent_data.get('name')}' working for Ashir.\n"
+        f"DESCRIPTION: {agent_data.get('description', 'No description.')}\n"
+        f"RESPONSIBILITY: {agent_data.get('responsibility', 'No responsibility set.')}\n"
+    )
+    
+    tool_manual_layer = f"## CAPABILITY MANIFEST\n{get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0, manifest_only=True)}\n"
+    
+    connected_str = "\n".join([f"- {a['name']} (ID: {a['id']}): {a.get('responsibility', '')}" for a in reachable_agents]) or "None"
+    belief_base_context = search_beliefs_base(f"{global_obj} {message}")
+    
+    transient_task_layer = (
+        f"## TRANSIENT TASK CONTEXT\n"
+        f"GLOBAL PROJECT OBJECTIVE: {global_obj}\n"
+        f"IMPORTANT: You can ONLY message these specific connected agents:\n{connected_str}\n\n"
+        f"### BELIEF BASE FINDINGS (Shared Ledger)\n{belief_base_context}\n"
+    )
+
+    system_prompt = f"{identity_layer}\n{tool_manual_layer}\n{transient_task_layer}\n"
+    
+    if is_training_mode:
+        system_prompt = (
+            f"# YOU ARE A CURIOUS AI INTERN: {agent_data.get('name')}\n"
+            f"You are currently in **TRAINING MODE**. Focus on learning your role.\n"
+            f"## YOUR CURRENT WORK PROMPT (prompt.md):\n```\n{current_agent_prompt}\n```\n"
+            f"{training_tools_block}\n"
         )
+    
+    api_key = api_key_input or os.getenv("GEMINI_API_KEY", "")
+    is_master = agent_data.get("agentType", "worker") == "master"
+    is_task = planner.is_task_request(message, api_key, "gemini")
+    
+    # ─── BDI REASONING CYCLE: DELIBERATION ──────────────────
+    if not is_training_mode:
+        decision, reason = deliberator.deliberate(agent_id, message, api_key, "gemini", beliefs_context)
+        yield f"data: {json.dumps({'type': 'thought', 'content': f'BDI Deliberation: {decision} ({reason})'})}\n\n"
         
-        tool_manual_layer = f"## CAPABILITY MANIFEST\n{get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0, manifest_only=True)}\n"
-        
-        connected_str = "\n".join([f"- {a['name']} (ID: {a['id']}): {a.get('responsibility', '')}" for a in reachable_agents]) or "None"
-        belief_base_context = search_beliefs_base(f"{global_obj} {request.message}")
-        
-        transient_task_layer = (
-            f"## TRANSIENT TASK CONTEXT\n"
-            f"GLOBAL PROJECT OBJECTIVE: {global_obj}\n"
-            f"IMPORTANT: You can ONLY message these specific connected agents:\n{connected_str}\n\n"
-            f"### BELIEF BASE FINDINGS (Shared Ledger)\n{belief_base_context}\n"
-        )
+        if decision == "CLARIFY" and is_task:
+            yield f"data: {json.dumps({'type': 'text', 'content': f'I need more information to proceed. {reason}'})}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+    
+    max_turns = 50 if is_task else 1
+    if "[AUTO_STEP" in message: max_turns = 10
 
-        system_prompt = f"{identity_layer}\n{tool_manual_layer}\n{transient_task_layer}\n"
+    while iteration < max_turns:
+        llm_context = process_generational_history(history)
+        model = "gemini-2.0-flash"
+        gen_config = {"temperature": 0.3, "maxOutputTokens": 8192}
         
-        # Apply Training Mode override if prepared
-        if is_training_mode:
-            system_prompt = (
-                f"# YOU ARE A CURIOUS AI INTERN: {agent_data.get('name')}\n"
-                f"You are currently in **TRAINING MODE**. Focus on learning your role.\n"
-                f"## YOUR CURRENT WORK PROMPT (prompt.md):\n```\n{current_agent_prompt}\n```\n"
-                f"{training_tools_block}\n"
-            )
-        
-        # Priority: (1) frontend key via request, (2) backend .env key
-        api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
-        is_master = agent_data.get("agentType", "worker") == "master"
-        is_task = planner.is_task_request(request.message, api_key, "gemini")
-        
-        # ─── BDI REASONING CYCLE: DELIBERATION ──────────────────
-        if not is_training_mode:
-            decision, reason = deliberator.deliberate(request.agent_id, request.message, api_key, "gemini", beliefs_context)
-            yield f"data: {json.dumps({'type': 'thought', 'content': f'BDI Deliberation: {decision} ({reason})'})}\n\n"
+        if is_master and not is_training_mode:
+            model = "gemini-3-flash-preview"
+            gen_config["thinkingConfig"] = {"includeThoughts": True, "thinkingBudget": -1}
             
-            if decision == "CLARIFY" and is_task:
-                # If the deliberator says clarify, we force it to ask a question
-                yield f"data: {json.dumps({'type': 'text', 'content': f'I need more information to proceed. {reason}'})}\n\n"
-                return
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={api_key}&alt=sse"
         
-        max_turns = 50 if is_task else 1
-        if "[AUTO_STEP" in request.message: max_turns = 10
+        gemini_history = []
+        for h in llm_context:
+            gemini_history.append({
+                "role": "user" if h["role"] == "user" else "model",
+                "parts": [{"text": h["content"] or "[Empty]"}]
+            })
+        
+        payload = {
+            "contents": gemini_history,
+            "systemInstruction": {"parts": [{"text": system_prompt}]},
+            "generationConfig": gen_config,
+            "tools": get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0)
+        }
 
-        while iteration < max_turns:
-            llm_context = process_generational_history(history)
-            
-            # UPGRADE: Master agents in production 'work' mode use Gemini 3 Thinking for complex reasoning.
-            # All other cases (workers, training mode) use Gemini 2.0 Flash for speed/efficiency.
-            model = "gemini-2.0-flash"
-            gen_config = {"temperature": 0.3, "maxOutputTokens": 8192}
-            
-            if is_master and not is_training_mode:
-                model = "gemini-3-flash-preview"
-                # Enable specialized thinking budget for high-quality plans/responses
-                gen_config["thinkingConfig"] = {"includeThoughts": True, "thinkingBudget": -1}
+        current_turn_text = ""
+        current_turn_thoughts = ""
+        tool_call_found = None
+
+        try:
+            print(f"[STATUS:{agent_id}] Turn {iteration+1}: Streaming from {model} (SSE Mode)...", flush=True)
+            async with httpx.AsyncClient() as client:
+                async with client.stream("POST", url, json=payload, timeout=120) as r:
+                    if r.status_code != 200:
+                        err = await r.aread()
+                        yield f"data: {json.dumps({'type': 'error', 'content': f'Gemini Error: {err.decode()}'})}\n\n"
+                        break
+
+                    async for line in r.aiter_lines():
+                        line = line.strip()
+                        if not line: continue
+                        if line.startswith("data: "):
+                            json_str = line[6:]
+                            if json_str == "[DONE]": continue
+                            try:
+                                chunk = json.loads(json_str)
+                                parts = chunk.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                                for part in parts:
+                                    if "thought" in part:
+                                        thought = part.get("text", "")
+                                        current_turn_thoughts += thought
+                                        yield f"data: {json.dumps({'type': 'thought', 'content': thought})}\n\n"
+                                    elif "text" in part:
+                                        text = part.get("text", "")
+                                        current_turn_text += text
+                                        yield f"data: {json.dumps({'type': 'text', 'content': text})}\n\n"
+                                    elif "functionCall" in part:
+                                        fn = part["functionCall"]
+                                        tool_call_found = {"name": fn["name"], "args": fn.get("args", {})}
+                                        yield f"data: {json.dumps({'type': 'tool_start', 'content': tool_call_found['name']})}\n\n"
+                            except: pass
+
+            if not tool_call_found and current_turn_text:
+                tool_match = re.search(r'\[TOOL:\s*(\w+)\((.*?)\)\]', current_turn_text)
+                if tool_match:
+                    t_name = tool_match.group(1)
+                    t_args_str = tool_match.group(2)
+                    current_turn_text = current_turn_text.replace(tool_match.group(0), "").strip()
+                    try:
+                        t_args = json.loads(t_args_str) if t_args_str.startswith("{") else t_args_str
+                    except: t_args = t_args_str
+                    tool_call_found = {"name": t_name, "args": t_args}
+                    yield f"data: {json.dumps({'type': 'tool_start', 'content': t_name})}\n\n"
+
+            if tool_call_found:
+                t_name = tool_call_found["name"]
+                t_args = tool_call_found["args"]
+                arg_str = json.dumps(t_args)
+                status_msg = "Action: " + t_name.replace("_", " ").title()
+                yield f"data: {json.dumps({'type': 'status', 'content': status_msg})}\n\n"
                 
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?key={api_key}&alt=sse"
-            
-            gemini_history = []
-            for h in llm_context:
-                gemini_history.append({
-                    "role": "user" if h["role"] == "user" else "model",
-                    "parts": [{"text": h["content"] or "[Empty]"}]
-                })
-            
-            payload = {
-                "contents": gemini_history,
-                "systemInstruction": {"parts": [{"text": system_prompt}]},
-                "generationConfig": gen_config,
-                "tools": get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0)
-            }
-
-            current_turn_text = ""
-            current_turn_thoughts = ""
-            tool_call_found = None
-
-            try:
-                print(f"[STATUS:{request.agent_id}] Turn {iteration+1}: Streaming from {model} (SSE Mode)...", flush=True)
-                async with httpx.AsyncClient() as client:
-                    async with client.stream("POST", url, json=payload, timeout=120) as r:
-                        if r.status_code != 200:
-                            err = await r.aread()
-                            yield f"data: {json.dumps({'type': 'error', 'content': f'Gemini Error: {err.decode()}'})}\n\n"
-                            break
-
-                        async for line in r.aiter_lines():
-                            line = line.strip()
-                            if not line: continue
-                            
-                            # In SSE mode, every valid JSON chunk starts with "data: "
-                            if line.startswith("data: "):
-                                json_str = line[6:] # Strip off "data: "
-                                
-                                # Gemini sometimes sends [DONE] at the very end
-                                if json_str == "[DONE]":
-                                    continue
-                                
-                                try:
-                                    chunk = json.loads(json_str)
-                                    parts = chunk.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                                    
-                                    for part in parts:
-                                        if "thought" in part:
-                                            thought = part.get("text", "")
-                                            current_turn_thoughts += thought
-                                            yield f"data: {json.dumps({'type': 'thought', 'content': thought})}\n\n"
-                                        elif "text" in part:
-                                            text = part.get("text", "")
-                                            current_turn_text += text
-                                            yield f"data: {json.dumps({'type': 'text', 'content': text})}\n\n"
-                                        elif "functionCall" in part:
-                                            fn = part["functionCall"]
-                                            tool_call_found = {"name": fn["name"], "args": fn.get("args", {})}
-                                            yield f"data: {json.dumps({'type': 'tool_start', 'content': tool_call_found['name']})}\n\n"
-                                            
-                                except Exception as e:
-                                    print(f"[STREAM PARSE ERROR] {e} on chunk: {json_str[:50]}", flush=True)
-                                    pass
-
-                # --- Fallback: Detect tool calls written in text ---
-                if not tool_call_found and current_turn_text:
-                    # Look for [TOOL: name(args)]
-                    tool_match = re.search(r'\[TOOL:\s*(\w+)\((.*?)\)\]', current_turn_text)
-                    if tool_match:
-                        t_name = tool_match.group(1)
-                        t_args_str = tool_match.group(2)
-                        
-                        # Strip the tool call from the text sent to user if possible
-                        current_turn_text = current_turn_text.replace(tool_match.group(0), "").strip()
-                        
-                        # Try to handle common arg hallucinations
-                        try:
-                            # If it looks like JSON, parse it
-                            if t_args_str.startswith("{"):
-                                t_args = json.loads(t_args_str)
-                            else:
-                                t_args = t_args_str # just a string
-                        except:
-                            t_args = t_args_str
-
-                        tool_call_found = {"name": t_name, "args": t_args}
-                        yield f"data: {json.dumps({'type': 'tool_start', 'content': t_name})}\n\n"
-
-                if tool_call_found:
-                    t_name = tool_call_found["name"]
-                    t_args = tool_call_found["args"]
-                    arg_str = json.dumps(t_args)
-                    
-                    status_msg = "Action: " + t_name.replace("_", " ").title()
-                    yield f"data: {json.dumps({'type': 'status', 'content': status_msg})}\n\n"
-                    
-                    # Execute tool call
-                    result = perform_tool_call(request.agent_id, t_name, arg_str, agent_dir, api_key=api_key)
-                    
-                    yield f"data: {json.dumps({'type': 'tool_result', 'content': str(result)})}\n\n"
-                    
-                    history.append({"role": "assistant", "content": f"[TOOL: {t_name}({arg_str})]"})
-                    history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {result}"})
-                    iteration += 1
-                else:
-                    final_response_collected = current_turn_text
-                    break
-                    
-            except Exception as e:
-                yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+                # Execute tool call
+                result = await perform_tool_call(agent_id, t_name, arg_str, agent_dir, api_key=api_key, session_id=session_id)
+                yield f"data: {json.dumps({'type': 'tool_result', 'content': str(result)})}\n\n"
+                
+                history.append({"role": "assistant", "content": f"[TOOL: {t_name}({arg_str})]"})
+                history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {result}"})
+                iteration += 1
+            else:
+                final_response_collected = current_turn_text
                 break
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            break
+    
+    # Finalization
+    history.append({"role": "assistant", "content": final_response_collected})
+    with open(internal_history_path, "w", encoding="utf-8") as f:
+        json.dump(history, f, indent=2)
         
-        # Finalization
-        history.append({"role": "assistant", "content": final_response_collected})
-        with open(internal_history_path, "w", encoding="utf-8") as f:
-            json.dump(history, f, indent=2)
-            
-        ui_history = []
-        for h in history:
-            if h["role"] == "user" and "SYSTEM TOOL" in str(h["content"]): continue
-            ui_history.append({"role": h["role"], "content": sanitize_ruthlessly(h["content"])})
-        with open(history_path, "w", encoding="utf-8") as f:
-            json.dump(ui_history, f, indent=2)
+    ui_history = []
+    for h in history:
+        if h["role"] == "user" and "SYSTEM TOOL" in str(h["content"]): continue
+        ui_history.append({"role": h["role"], "content": sanitize_ruthlessly(h["content"])})
+    with open(history_path, "w", encoding="utf-8") as f:
+        json.dump(ui_history, f, indent=2)
 
-        yield "data: [DONE]\n\n"
+    yield "data: [DONE]\n\n"
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
 @app.post("/run_autonomous")
 async def run_autonomous_agent(request: ChatRequest):
     """
@@ -1354,7 +1349,7 @@ def execute_autonomous(request: ChatRequest):
     """
     provider = request.provider or "gemini"
     api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
-    result = planner.run_execution_loop(
+    result = await planner.run_execution_loop(
         request.agent_id,
         request.message,
         api_key,

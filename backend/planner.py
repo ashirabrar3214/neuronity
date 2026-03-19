@@ -149,7 +149,7 @@ def _clear_internal_history(agent_id):
         pass
 
 
-def execute_step(step_num, total_steps, step_text, agent_id, accumulated_context, api_key, provider, is_pdf_step=False):
+async def execute_step(step_num, total_steps, step_text, agent_id, accumulated_context, api_key, provider, is_pdf_step=False, session_id=None):
     """
     Execute a single plan step by calling /chat.
     The [AUTO_STEP] prefix tells server.py to filter this from the user-facing UI history.
@@ -197,39 +197,33 @@ def execute_step(step_num, total_steps, step_text, agent_id, accumulated_context
         )
 
     try:
-        resp = requests.post(f"{BACKEND_URL}/chat", json={
-            "agent_id": agent_id,
-            "message": message,
-            "api_key": api_key,
-            "provider": provider
-        }, timeout=300, stream=True)
+        from interpreter import execute_agent_turn
+        
+        full_text = ""
+        # The agent_turn generator yields SSE-formatted strings. We parse them live.
+        # We append session_id to the message for brf to pick up if needed, 
+        # or pass it as a separate context if we update execute_agent_turn signature.
+        # For now, let's keep it simple: pass session_id in the message metadata tag.
+        tagged_message = f"{message}\n[SESSION_ID: {session_id}]"
+        
+        async for line in execute_agent_turn(agent_id, tagged_message, api_key, provider):
+            line = line.strip()
+            if not line: continue
+            if line.startswith("data: "):
+                content = line[6:]
+                if content == "[DONE]": break
+                try:
+                    data = json.loads(content)
+                    if data.get("type") == "text":
+                        full_text += data.get("content", "")
+                    elif data.get("type") == "error":
+                        safe_log(f"!!! [PLAN_RUNNER] Internal Error: {data.get('content')}")
+                        return f"Step failed: {data.get('content')}"
+                except: pass
+        
+        safe_log(f"[STATUS:{agent_id}] Step {step_num} complete")
+        return full_text
 
-        if resp.status_code == 200:
-            full_text = ""
-            for line in resp.iter_lines():
-                if not line: continue
-                decoded = line.decode('utf-8').strip()
-                if decoded.startswith("data: "):
-                    content = decoded[6:]
-                    if content == "[DONE]": break
-                    try:
-                        data = json.loads(content)
-                        if data.get("type") == "text":
-                            full_text += data.get("content", "")
-                        elif data.get("type") == "error":
-                            safe_log(f"!!! [PLAN_RUNNER] Stream Error: {data.get('content')}")
-                            return f"Step failed: {data.get('content')}"
-                    except: pass
-            
-            safe_log(f"[STATUS:{agent_id}] Step {step_num} complete")
-            return full_text
-        else:
-            safe_log(f"!!! [PLAN_RUNNER] Step {step_num} HTTP {resp.status_code}")
-            return f"Step failed: HTTP {resp.status_code}"
-
-    except requests.exceptions.Timeout:
-        safe_log(f"!!! [PLAN_RUNNER] Step {step_num} timed out")
-        return "Step timed out."
     except Exception as e:
         safe_log(f"!!! [PLAN_RUNNER] Step {step_num} error: {e}")
         return f"Step failed: {str(e)}"
@@ -245,7 +239,7 @@ def run_autonomous(agent_id, task, api_key, provider, agents_info=""):
         save_intentions_md(steps, task, agent_id)
     return steps
 
-def run_execution_loop(agent_id, task, api_key, provider):
+async def run_execution_loop(agent_id, task, api_key, provider):
     """
     Phase 2: Actual step-by-step execution loop.
     Clears the Blackboard at start, injects EXTRACTION MODE into each step,
@@ -261,13 +255,11 @@ def run_execution_loop(agent_id, task, api_key, provider):
             safe_log(f"--- [CLEANUP] Volatile ledger cleared for new task.")
         except: pass
 
-    # CLEAR BELIEF BASE: Fresh research for this intention run
-    beliefs_path = os.path.join(AGENTS_CODE_DIR, "beliefs_base.json")
-    if os.path.exists(beliefs_path):
-        try:
-            os.remove(beliefs_path)
-            safe_log(f"--- [BDI CLEANUP] Belief Base cleared for new task.")
-        except: pass
+    # TIERED BELIEF PERSISTENCE: beliefs_base.json is NOT cleared.
+    # Instead, brf.py handles session-based relevance and promotions.
+    # We create a unique session ID for this execution run.
+    session_id = f"sess_{int(time.time())}"
+    safe_log(f"--- [BDI] Session initialized: {session_id}")
 
     # Load from intentions.md
     agent_dir = os.path.join(AGENTS_CODE_DIR, agent_id)
@@ -297,13 +289,31 @@ def run_execution_loop(agent_id, task, api_key, provider):
     last_is_pdf = any(w in last_step_lower for w in PDF_KEYWORDS)
 
     for i, step in enumerate(steps, 1):
+        # ─── CLOSED-LOOP COMMITMENT (CHECK-IN) ──────────────────────
+        # Every 3 steps, ask the deliberator if we should pivot
+        if i > 1 and i % 3 == 0:
+            import deliberator
+            from interpreter import get_beliefs_context
+            beliefs_ctx = get_beliefs_context()
+            decision, reason = await deliberator.deliberate(agent_id, f"Ongoing task: {task}. Next step: {step}", api_key, provider, beliefs_ctx)
+            
+            if decision == "RE-PLAN":
+                safe_log(f"!!! [PIVOT] Deliberator signals RE-PLAN: {reason}")
+                # Archive current intentions and trigger a new cycle
+                # (Recursive call to generate new plan based on current beliefs)
+                new_steps = run_autonomous(agent_id, task, api_key, provider)
+                if new_steps:
+                    return await run_execution_loop(agent_id, task, api_key, provider)
+                else:
+                    return f"Pivot failed: Could not generate new intentions. Reason: {reason}"
+
         is_last = (i == len(steps))
         is_pdf = is_last and last_is_pdf
 
-        result = execute_step(
+        result = await execute_step(
             i, len(steps), step, agent_id,
             accumulated_context, api_key, provider,
-            is_pdf_step=is_pdf
+            is_pdf_step=is_pdf, session_id=session_id
         )
         step_results.append((step, result))
         if not is_pdf:
@@ -314,12 +324,12 @@ def run_execution_loop(agent_id, task, api_key, provider):
         final_response = step_results[-1][1]
     else:
         safe_log(f"[STATUS:{agent_id}] No PDF step in plan — adding PDF generation...")
-        result = execute_step(
+        result = await execute_step(
             len(steps) + 1, len(steps) + 1,
             f"Create a PDF report for: {task}",
             agent_id,
             accumulated_context, api_key, provider,
-            is_pdf_step=True
+            is_pdf_step=True, session_id=session_id
         )
         final_response = result
 
@@ -332,11 +342,7 @@ def run_execution_loop(agent_id, task, api_key, provider):
             safe_log(f"--- [CLEANUP] Volatile ledger deleted after task completion.")
         except: pass
 
-    if os.path.exists(beliefs_path):
-        try:
-            os.remove(beliefs_path)
-            safe_log(f"--- [BDI CLEANUP] Belief Base cleared after task completion.")
-        except: pass
+    # Belief Base is NOT deleted here anymore.
 
     if os.path.exists(intentions_path):
         try:
