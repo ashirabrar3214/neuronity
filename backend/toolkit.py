@@ -675,93 +675,58 @@ def write_file(agent_id, input_str, working_dir):
 
 def post_finding(agent_id, tool_input):
     """
-    Writes a key insight to the Volatile Workspace Ledger. 
-    Notes: This file is temporary and cleared after autonomous tasks.
-    Format: "Insight/Fact | Source URL"
+    Writes a key insight to the Belief Base (Shared Ledger). 
     """
     try:
-        ledger_path = os.path.join(os.path.dirname(__file__), "agents_code", "volatile_findings.json")
-        os.makedirs(os.path.dirname(ledger_path), exist_ok=True)
-        
-        data = []
-        if os.path.exists(ledger_path):
-            try:
-                with open(ledger_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except: pass
-
+        from brf import update_belief_base
         parts = tool_input.split("|", 1)
         insight = parts[0].strip()
-        source = parts[1].strip() if len(parts) > 1 else "N/A"
-            
-        entry = {
-            "agent_id": agent_id,
-            "insight": insight,
-            "source": source,
-            "timestamp": time.time()
-        }
-        data.append(entry)
+        source = parts[1].strip() if len(parts) > 1 else ""
         
-        # Keep it lean (last 100 findings)
-        if len(data) > 100:
-            data = data[-100:]
-            
-        with open(ledger_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-            
-        return f"Success: Insight recorded in the Volatile Ledger."
+        update_belief_base(agent_id, insight, source)
+        return f"Success: Insight recorded in the Belief Base."
     except Exception as e:
         return f"Error posting finding: {e}"
 
-def update_plan(agent_id, tool_input):
+def update_intentions(agent_id, tool_input):
     """
-    Atomic updates to the agent's internal plan (BDI Model).
-    Format: "Completed task" OR "Objective | Step 1, Step 2, Step 3"
+    Atomic updates to the agent's committed intentions (BDI).
+    Format: "Task completed" OR "Objective | Intention 1, Intention 2"
     """
     try:
-        plan_path = os.path.join(os.path.dirname(__file__), "agents_code", agent_id, "plan.json")
-        os.makedirs(os.path.dirname(plan_path), exist_ok=True)
+        intentions_path = os.path.join(os.path.dirname(__file__), "agents_code", agent_id, "intentions.json")
+        os.makedirs(os.path.dirname(intentions_path), exist_ok=True)
         
-        plan = {"objective": "Not Set", "steps": [], "completed": []}
-        if os.path.exists(plan_path):
+        intentions = {"objective": "Not Set", "steps": [], "completed": []}
+        if os.path.exists(intentions_path):
             try:
-                with open(plan_path, "r", encoding="utf-8") as f:
-                    plan = json.load(f)
+                with open(intentions_path, "r", encoding="utf-8") as f:
+                    intentions = json.load(f)
             except: pass
 
         if "|" in tool_input:
             obj, steps_str = tool_input.split("|", 1)
-            plan["objective"] = obj.strip()
-            plan["steps"] = [s.strip() for s in steps_str.split(",") if s.strip()]
-            # Don't clear completed if re-initializing objective unless it's a major change?
-            # Let's keep it simple: objective reset = fresh plan
-            plan["completed"] = []
+            intentions["objective"] = obj.strip()
+            intentions["steps"] = [s.strip() for s in steps_str.split(",") if s.strip()]
+            intentions["completed"] = []
         else:
             item = tool_input.strip()
-            if item not in plan["completed"]:
-                plan["completed"].append(item)
+            if item not in intentions["completed"]:
+                intentions["completed"].append(item)
 
             if item.lower() == "task completed":
-                # CLEAR BLACKBOARD & VOLATILE LEDGER ON COMPLETION
+                # Final BDI Cleanup
                 agents_code_dir = os.path.join(os.path.dirname(__file__), "agents_code")
-                blackboard_path = os.path.join(agents_code_dir, "blackboard.json")
-                volatile_path = os.path.join(agents_code_dir, "volatile_findings.json")
-                
-                if os.path.exists(blackboard_path):
+                beliefs_path = os.path.join(agents_code_dir, "beliefs_base.json")
+                if os.path.exists(beliefs_path):
                     try:
-                        os.remove(blackboard_path)
-                        safe_log("--- [CLEANUP] Blackboard cleared (Task Completed).")
-                    except: pass
-                    
-                if os.path.exists(volatile_path):
-                    try:
-                        os.remove(volatile_path)
-                        safe_log("--- [CLEANUP] Volatile ledger cleared (Task Completed).")
+                        os.remove(beliefs_path)
+                        safe_log("--- [BDI CLEANUP] Belief Base cleared.")
                     except: pass
 
-        with open(plan_path, "w", encoding="utf-8") as f:
-            json.dump(plan, f, indent=2)
+        with open(intentions_path, "w", encoding="utf-8") as f:
+            json.dump(intentions, f, indent=2)
             
-        return f"Success: Internal plan updated. Objective: {plan['objective']}"
+        return f"Success: Intentions updated. Objective: {intentions['objective']}"
     except Exception as e:
-        return f"Error updating plan: {e}"
+        return f"Error updating intentions: {e}"

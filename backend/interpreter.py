@@ -16,9 +16,14 @@ import threading
 import sys
 import io
 import httpx
-from dotenv import load_dotenv
-
 load_dotenv()
+
+import shutil
+import toolkit
+import response_formatter
+import planner
+import brf
+import deliberator
 
 # Ensure UTF-8 for standard output on Windows
 if sys.stdout.encoding != 'utf-8':
@@ -92,129 +97,91 @@ app.add_middleware(
 DATA_FILE = os.path.join(os.path.dirname(__file__), "agents.json")
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(__file__), "agents_code")
 
-# Ensure agents code directory exists
-if not os.path.exists(AGENTS_CODE_DIR):
-    os.makedirs(AGENTS_CODE_DIR)
+# ─── BDI BELIEF BASE ────────────────────────────────────────────────────────
+BELIEFS_CONTEXT_FILE = os.path.join(AGENTS_CODE_DIR, "beliefs_context.json")
+BELIEFS_BASE_FILE = os.path.join(AGENTS_CODE_DIR, "beliefs_base.json")
 
-WORKSPACE_CONTEXT_FILE = os.path.join(AGENTS_CODE_DIR, "workspace_context.json")
-BLACKBOARD_FILE = os.path.join(AGENTS_CODE_DIR, "blackboard.json")
+def get_beliefs_context():
+    """Reads the global identity beliefs (overarching goal)."""
+    if not os.path.exists(BELIEFS_CONTEXT_FILE):
+        return {"global_objective": "No specific objective set yet.", "last_update": 0}
+    try:
+        with open(BELIEFS_CONTEXT_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {"global_objective": "Error reading context.", "last_update": 0}
 
-# ─── BLACKBOARD KNOWLEDGE GRAPH ─────────────────────────────────────────────
+def update_beliefs_context(new_goal):
+    """Updates the identity beliefs with a new objective."""
+    import brf
+    return brf.update_belief_context(new_goal)
 
-_blackboard_lock = threading.Lock()
+# ─── BELIEF BASE SEARCH ───────────────────────────────────────────────────
 
-def write_to_blackboard(agent_id, agent_name, query, raw_snippet, url, entities=None):
+def search_beliefs_base(query, top_k=15):
     """
-    Append a rich Data Object to the global blackboard.
-    Each entry stores a RAW, un-summarized fact with full provenance.
-    """
-    import uuid
-    entry = {
-        "id": str(uuid.uuid4())[:8],
-        "agent_id": agent_id,
-        "agent_name": agent_name,
-        "timestamp": time.time(),
-        "query": query,
-        "raw_snippet": raw_snippet,
-        "url": url,
-        "entities": entities or []
-    }
-    with _blackboard_lock:
-        entries = []
-        if os.path.exists(BLACKBOARD_FILE):
-            try:
-                with open(BLACKBOARD_FILE, "r", encoding="utf-8") as f:
-                    entries = json.load(f)
-            except: pass
-        entries.append(entry)
-        with open(BLACKBOARD_FILE, "w", encoding="utf-8") as f:
-            json.dump(entries, f, indent=2, ensure_ascii=False)
-    return entry["id"]
-
-def search_blackboard(query, top_k=15):
-    """
-    Semantically search the blackboard for the most relevant entries.
+    Semantically search the belief base (Shared Ledger) for the most relevant entries.
     Returns a formatted string of matched entries for injection into context.
     """
-    if not os.path.exists(BLACKBOARD_FILE):
-        return "Blackboard is empty. No findings have been recorded yet."
+    if not os.path.exists(BELIEFS_BASE_FILE):
+        return "Belief Base is empty. No findings have been recorded yet."
     try:
-        with open(BLACKBOARD_FILE, "r", encoding="utf-8") as f:
+        with open(BELIEFS_BASE_FILE, "r", encoding="utf-8") as f:
             entries = json.load(f)
     except:
-        return "Error reading blackboard."
+        return "Error reading belief base."
 
     if not entries:
-        return "Blackboard is empty."
+        return "Belief Base is empty."
 
     # Score each entry against the query using semantic similarity
     scored = []
     for e in entries:
-        text = f"{e.get('query','')} {e.get('raw_snippet','')}"
-        score = calculate_semantic_similarity(query, text)
+        text = f"{e.get('fact', '')}"
+        score = calculate_belief_relevance(query, text)
         scored.append((score, e))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     top = scored[:top_k]
 
-    lines = [f"### Blackboard Search: '{query}'\n"]
+    lines = [f"### Belief Base Search: '{query}'\n"]
     for score, e in top:
         lines.append(
-            f"**[{e['agent_name']}]** | Query: {e.get('query','?')} | Score: {score:.2f}\n"
-            f"Snippet: {e.get('raw_snippet','')}\n"
+            f"**[{e.get('agent_id', 'Unknown')}]** | Relevance: {score:.2f}\n"
+            f"Fact: {e.get('fact','')}\n"
             f"Source: {e.get('url','No URL')}\n"
         )
     return "\n---\n".join(lines)
 
-def get_full_blackboard():
-    """Returns all entries from the blackboard as a formatted research dump."""
-    if not os.path.exists(BLACKBOARD_FILE):
-        return "Blackboard is empty."
+def get_beliefs_base_all():
+    """Returns all entries from the belief base as a formatted research dump."""
+    if not os.path.exists(BELIEFS_BASE_FILE):
+        return "Belief Base is empty."
     try:
-        with open(BLACKBOARD_FILE, "r", encoding="utf-8") as f:
+        with open(BELIEFS_BASE_FILE, "r", encoding="utf-8") as f:
             entries = json.load(f)
     except:
-        return "Error reading blackboard."
+        return "Error reading belief base."
     if not entries:
-        return "Blackboard is empty."
-    lines = [f"### Full Blackboard — {len(entries)} entries\n"]
+        return "Belief Base is empty."
+    lines = [f"### Full Belief Base — {len(entries)} entries\n"]
     for e in entries:
         lines.append(
-            f"[{e['agent_name']}] {e.get('raw_snippet','')}\nSource: {e.get('url','No URL')}"
+            f"[{e.get('agent_id', 'Agent')}] {e.get('fact','')}\nSource: {e.get('url','No URL')}"
         )
     return "\n---\n".join(lines)
 
-
-def get_workspace_context():
-    """Reads the global workspace context (overarching goal)."""
-    if not os.path.exists(WORKSPACE_CONTEXT_FILE):
-        return {"global_objective": "No specific objective set yet.", "last_update": 0}
-    try:
-        with open(WORKSPACE_CONTEXT_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {"global_objective": "Error reading context.", "last_update": 0}
-
-def update_workspace_context(new_goal):
-    """Updates the global workspace context with a new objective."""
-    try:
-        # Don't update for internal system messages or tool results
-        if "SYSTEM TOOL RESULT:" in new_goal or "[MESSAGE FROM" in new_goal:
-            return
-        
-        # Simple heuristic: if it's more than 20 chars, it's likely a new or refined goal
-        if len(new_goal.strip()) < 20:
-            return
-
-        context = {
-            "global_objective": new_goal.strip(),
-            "last_update": time.time()
-        }
-        with open(WORKSPACE_CONTEXT_FILE, "w", encoding="utf-8") as f:
-            json.dump(context, f, indent=2)
-        safe_log(f"--- [BACKEND] Updated Workspace Context: {new_goal[:50]}...")
-    except Exception as e:
-        safe_log(f"!!! [BACKEND ERROR] Could not update workspace context: {e}")
+def calculate_belief_relevance(text1, text2):
+    """
+    Calculates word-overlap similarity (Keyword Energy) between two belief strings.
+    """
+    if not text1 or not text2: return 0.0
+    stop_words = {"a", "an", "the", "and", "or", "but", "if", "then", "else", "to", "for", "with", "is", "was", "be", "of", "in", "on", "at"}
+    words1 = set(w for w in re.findall(r'\w+', text1.lower()) if w not in stop_words)
+    words2 = set(w for w in re.findall(r'\w+', text2.lower()) if w not in stop_words)
+    intersection = words1.intersection(words2)
+    union = words1.union(words2)
+    return len(intersection) / len(union) if union else 0.0
 
 def sanitize_ruthlessly(text):
     """
@@ -289,8 +256,8 @@ def process_generational_history(history, max_turns=60):
         # PERMANENT MESSAGES: SYSTEM TOOL RESULT and post_finding confirmations
         # are NEVER decayed — they are raw knowledge data, not conversation.
         is_tool_result = content.startswith("SYSTEM TOOL RESULT:")
-        is_blackboard_confirm = "recorded in the Blackboard" in content
-        if is_tool_result or is_blackboard_confirm:
+        is_beliefs_confirm = "recorded in the Belief Base" in content
+        if is_tool_result or is_beliefs_confirm:
             processed.insert(0, {"role": role, "content": content})
             continue
 
@@ -406,50 +373,22 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
             return f"Error: My '{required_perm}' capability is currently disabled. I cannot use the tool '{tool_name}'. Please enable it in my settings if you want me to proceed with this action."
 
     if tool_name == "post_finding":
-        # ── BLACKBOARD UPGRADE ──────────────────────────────────
-        # Parse the tool input to extract structured fields.
-        # Expected format (flexible): "Snippet | Source: URL | Entities: ..."
-        # Fallback: treat the whole input as the raw snippet.
+        # ── BELIEF REVISION (BRF) ──────────────────────────────
+        import brf
         raw_snippet = tool_input.strip()
         url = ""
-        entities = []
-        query_hint = ""
-
-        # Try to extract URL from [Source: ...] or Source: ...
+        
         url_match = re.search(r'(?:Source:|\[Source:)\s*(https?://[^\]\n,]+)', tool_input, re.IGNORECASE)
         if url_match:
             url = url_match.group(1).strip().rstrip(']')
-            # Strip the source annotation from the snippet for cleanliness
             raw_snippet = re.sub(r'(?:Source:|\[Source:)[^\]\n]*', '', raw_snippet).strip()
 
-        # Try to extract entities from the snippet (names, years, proper nouns in title case)
-        entity_candidates = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b', raw_snippet)
-        entities = list(set(entity_candidates))[:10]  # cap at 10
-
-        # Use the first portion of the snippet as a query hint
-        query_hint = raw_snippet[:80] if raw_snippet else tool_input[:80]
-
-        # Resolve agent name for provenance
-        try:
-            all_agents = load_data()
-            this_agent = next((a for a in all_agents if a["id"] == agent_id), {})
-            agent_name_for_blackboard = this_agent.get("name", agent_id)
-        except:
-            agent_name_for_blackboard = agent_id
-
-        entry_id = write_to_blackboard(
-            agent_id=agent_id,
-            agent_name=agent_name_for_blackboard,
-            query=query_hint,
-            raw_snippet=raw_snippet,
-            url=url,
-            entities=entities
-        )
-        safe_log(f"[BLACKBOARD:{agent_id}] Entry #{entry_id} added. snippet={raw_snippet[:60]}... url={url[:40]}")
-        return f"Success: Finding recorded in the Blackboard (ID: {entry_id})."
+        brf.update_belief_base(agent_id, raw_snippet, url)
+        safe_log(f"[BRF:{agent_id}] New Belief Added: {raw_snippet[:60]}...")
+        return f"Success: Fact recorded in Belief Base."
     
     elif tool_name == "update_plan":
-        return toolkit.update_plan(agent_id, tool_input)
+        return toolkit.update_intentions(agent_id, tool_input)
 
     elif tool_name == "web_search":
         return toolkit.web_search(tool_input, agent_id, api_key=api_key)
@@ -608,12 +547,12 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
         except Exception as e:
             return f"Error executing {tool_name}: {e}"
 
-    elif tool_name == "read_blackboard":
-        # Semantically search the blackboard for relevant entries
+    elif tool_name == "read_blackboard" or tool_name == "read_beliefs":
+        # Semantically search the belief base for relevant entries
         query = tool_input.strip() or "all findings"
         if query.lower() in ["all", "full", ""]:
-            return get_full_blackboard()
-        return search_blackboard(query)
+            return get_beliefs_base_all()
+        return search_beliefs_base(query)
 
     elif tool_name == "read_prompt":
         prompt_file = os.path.join(AGENTS_CODE_DIR, agent_id, "prompt.md")
@@ -651,19 +590,21 @@ def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=""):
         except Exception as e:
             return f"Error reading memory: {e}"
 
-    elif tool_name == "read_workspace":
+    elif tool_name == "read_workspace" or tool_name == "read_beliefs_context":
         try:
-            content = get_workspace_context()
-            return f"### Global Workspace Context:\n\n{content or 'No workspace context set.'}"
+            content = get_beliefs_context()
+            return f"### Global Beliefs Context:\n\n{content or 'No context set.'}"
         except Exception as e:
-            return f"Error reading workspace context: {e}"
+            return f"Error reading beliefs context: {e}"
 
     return "i dont have that ability yet"
 
 import shutil
 import toolkit
 import response_formatter
-import plan_runner
+import planner
+import brf
+import deliberator
 
 class AgentModel(BaseModel):
     id: str
@@ -767,23 +708,23 @@ Responsibility: {agent_data.get('responsibility', 'General purpose assistance')}
 ## OPERATION RULES
 1. **Tool Use**: Use your available tools to complete tasks. Do not explain that you are using a tool; just execute the tool call.
 2. **Intent Gate**: Do NOT execute tool calls for casual greetings. Only act if a specific research topic or objective is provided.
-3. **Planning (BDI)**: Use the `update_plan` tool immediately upon accepting a new task to set your objective and steps. Use it again to mark tasks as completed.
-4. **Knowledge Sharing (Stigmergy)**: Use the `post_finding` tool to record important facts or insights to the Shared Workspace Ledger so other agents can see them.
+3. **Intentions (BDI)**: Use the `update_plan` tool immediately upon accepting a new task to set your objective and steps. Use it again to mark steps as completed.
+4. **Knowledge Sharing (BRF)**: Use the `post_finding` tool to record important facts to the Shared Belief Base so other agents can see them.
 5. **Citations**: Every fact discovered via research MUST include a `[Source: URL]` citation.
 """
     with open(prompt_path, "w", encoding="utf-8") as f:
         f.write(prompt_content)
 
-    # 4. Phase 2: Plan (BDI) - Initialize if not exists
-    plan_path = os.path.join(agent_dir, "plan.json")
-    if not os.path.exists(plan_path):
-        initial_plan = {
+    # 4. Phase 2: Intentions (BDI) - Initialize if not exists
+    intentions_path = os.path.join(agent_dir, "intentions.json")
+    if not os.path.exists(intentions_path):
+        initial_intentions = {
             "objective": agent_data.get('responsibility', 'General assistance'),
             "steps": ["Observe Workspace", "Execute requested task"],
             "completed": []
         }
-        with open(plan_path, "w", encoding="utf-8") as f:
-            json.dump(initial_plan, f, indent=2)
+        with open(intentions_path, "w", encoding="utf-8") as f:
+            json.dump(initial_intentions, f, indent=2)
 
     # 5. Short term memory (History) - Initialize if not exists
     history_path = os.path.join(agent_dir, "history.json")
@@ -925,15 +866,15 @@ def clear_history(agent_id: str):
         with open(history_path, "w", encoding="utf-8") as f:
             json.dump([], f)
 
-        if os.path.exists(BLACKBOARD_FILE):
-            os.remove(BLACKBOARD_FILE)
+        if os.path.exists(BELIEFS_BASE_FILE):
+            os.remove(BELIEFS_BASE_FILE)
             
         volatile_path = os.path.join(AGENTS_CODE_DIR, "volatile_findings.json")
         if os.path.exists(volatile_path):
             os.remove(volatile_path)
 
-        print(f"--- [BACKEND] Cleared history, blackboard and volatile ledger for agent: {agent_id}")
-        return {"status": "success", "message": "History, logs, and blackboard cleared"}
+        print(f"--- [BACKEND] Cleared history, belief base and volatile ledger for agent: {agent_id}")
+        return {"status": "success", "message": "History, logs, and beliefs cleared"}
     except Exception as e:
         print(f"!!! [BACKEND ERROR] Could not clear history for {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1078,11 +1019,11 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest
     })
     declarations.append({
         "name": "update_plan",
-        "description": "Updates your internal BDI plan. Mandated before messaging the user.",
+        "description": "Updates your internal BDI intentions. Mandated before messaging the user.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "tool_input": {"type": "STRING", "description": "Format: 'Objective | Step1, Step2' OR 'Task Completed'"}
+                "tool_input": {"type": "STRING", "description": "Format: 'Objective | Step 1, Step 2' OR 'Task Completed'"}
             },
             "required": ["tool_input"]
         }
@@ -1141,8 +1082,8 @@ async def chat_with_agent(request: ChatRequest):
         final_response_collected = ""
         
         # Build Context Layers (Consolidated for streaming)
-        ws_context = get_workspace_context()
-        global_obj = ws_context.get("global_objective", "Initial exploration.")
+        beliefs_context = get_beliefs_context()
+        global_obj = beliefs_context.get("global_objective", "Initial exploration.")
         
         reachable_agents = []
         connections_list = agent_data.get("connections", [])
@@ -1161,13 +1102,13 @@ async def chat_with_agent(request: ChatRequest):
         tool_manual_layer = f"## CAPABILITY MANIFEST\n{get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0, manifest_only=True)}\n"
         
         connected_str = "\n".join([f"- {a['name']} (ID: {a['id']}): {a.get('responsibility', '')}" for a in reachable_agents]) or "None"
-        blackboard_context = search_blackboard(f"{global_obj} {request.message}")
+        belief_base_context = search_beliefs_base(f"{global_obj} {request.message}")
         
         transient_task_layer = (
             f"## TRANSIENT TASK CONTEXT\n"
             f"GLOBAL PROJECT OBJECTIVE: {global_obj}\n"
             f"IMPORTANT: You can ONLY message these specific connected agents:\n{connected_str}\n\n"
-            f"### BLACKBOARD FINDINGS\n{blackboard_context}\n"
+            f"### BELIEF BASE FINDINGS (Shared Ledger)\n{belief_base_context}\n"
         )
 
         system_prompt = f"{identity_layer}\n{tool_manual_layer}\n{transient_task_layer}\n"
@@ -1184,7 +1125,17 @@ async def chat_with_agent(request: ChatRequest):
         # Priority: (1) frontend key via request, (2) backend .env key
         api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
         is_master = agent_data.get("agentType", "worker") == "master"
-        is_task = plan_runner.is_task_request(request.message, api_key, "gemini")
+        is_task = planner.is_task_request(request.message, api_key, "gemini")
+        
+        # ─── BDI REASONING CYCLE: DELIBERATION ──────────────────
+        if not is_training_mode:
+            decision, reason = deliberator.deliberate(request.agent_id, request.message, api_key, "gemini", beliefs_context)
+            yield f"data: {json.dumps({'type': 'thought', 'content': f'BDI Deliberation: {decision} ({reason})'})}\n\n"
+            
+            if decision == "CLARIFY" and is_task:
+                # If the deliberator says clarify, we force it to ask a question
+                yield f"data: {json.dumps({'type': 'text', 'content': f'I need more information to proceed. {reason}'})}\n\n"
+                return
         
         max_turns = 50 if is_task else 1
         if "[AUTO_STEP" in request.message: max_turns = 10
@@ -1362,12 +1313,12 @@ async def run_autonomous_agent(request: ChatRequest):
     api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
 
     # If it's just a greeting or casual talk, bypass the planner and route to normal chat.
-    if not plan_runner.is_task_request(request.message, api_key, provider):
+    if not planner.is_task_request(request.message, api_key, provider):
         safe_log(f"[STATUS:{request.agent_id}] Casual conversation detected - routing to standard chat")
         return await chat_with_agent(request)
 
-    # Phase 1: Generate the plan
-    steps = plan_runner.run_autonomous(
+    # Phase 1: Generate the intentions
+    steps = planner.run_autonomous(
         request.agent_id,
         request.message,
         api_key,
@@ -1385,12 +1336,12 @@ async def run_autonomous_agent(request: ChatRequest):
     # Return plan markdown (without HTML button — the frontend handles button display)
     steps_md = "\n".join([f"{i+1}. {s}" for i, s in enumerate(steps)])
     final_response = (
-        f"### 📝 Execution Plan Generated\n\n"
-        f"I've analyzed your request and created an autonomous execution plan:\n\n"
+        f"### 🎯 Intentions Generated (BDI)\n\n"
+        f"I've committed to the following intentions to satisfy your request:\n\n"
         f"{steps_md}\n\n"
         f"---\n"
-        f"**Plan file saved to:** `{plan_path}`\n\n"
-        f"The execution panel will appear in the training sidebar. Click 'Start Execution' to begin."
+        f"**Intentions file:** `{plan_path}`\n\n"
+        f"Click 'Start Execution' to begin following these intentions."
     )
 
     return {"response": final_response}
@@ -1403,7 +1354,7 @@ def execute_autonomous(request: ChatRequest):
     """
     provider = request.provider or "gemini"
     api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
-    result = plan_runner.run_execution_loop(
+    result = planner.run_execution_loop(
         request.agent_id,
         request.message,
         api_key,

@@ -116,22 +116,22 @@ YOUR PLAN:"""
     return steps
 
 
-def save_plan_md(steps, task, agent_id):
-    """Save the execution plan as a readable markdown file inside the agent's directory."""
+def save_intentions_md(steps, task, agent_id):
+    """Save the committed intentions as a readable markdown file inside the agent's directory."""
     agent_dir = os.path.join(AGENTS_CODE_DIR, agent_id)
     os.makedirs(agent_dir, exist_ok=True)
-    plan_path = os.path.join(agent_dir, "plan.md")
+    intentions_path = os.path.join(agent_dir, "intentions.md")
 
-    with open(plan_path, "w", encoding="utf-8") as f:
-        f.write("# Autonomous Execution Plan\n")
-        f.write(f"**Task:** {task}\n")
-        f.write(f"**Generated:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+    with open(intentions_path, "w", encoding="utf-8") as f:
+        f.write("# Agent Intentions (BDI)\n")
+        f.write(f"**Objective:** {task}\n")
+        f.write(f"**Committed:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         f.write("## Steps\n")
         for i, step in enumerate(steps, 1):
             f.write(f"{i}. {step}\n")
-        f.write("\n---\n*This plan is being executed autonomously.*\n")
+        f.write("\n---\n*The agent is committed to these intentions until finished.*\n")
 
-    return plan_path
+    return intentions_path
 
 
 def _clear_internal_history(agent_id):
@@ -175,11 +175,11 @@ def execute_step(step_num, total_steps, step_text, agent_id, accumulated_context
         # The PDF step MUST read from the Blackboard first to get full structured data.
         message = (
             f"[AUTO_STEP {step_num}/{total_steps}] AUTONOMOUS EXECUTION MODE — PDF GENERATION.\n\n"
-            f"All research is complete and stored in the Blackboard. Your ONLY job now is:\n"
-            f"1. First: call [TOOL: read_blackboard({step_text})] to retrieve ALL gathered research.\n"
-            f"2. Then: call [TOOL: report_generation(topic|context)] using that blackboard data as the context.\n"
-            f"Do NOT use thinking, web_search, or generate_report. Use ONLY read_blackboard then report_generation.\n"
-            f"Do NOT skip step 1. The blackboard contains raw verified data you MUST use.\n\n"
+            f"All research is complete and stored in the Belief Base. Your ONLY job now is:\n"
+            f"1. First: call [TOOL: read_beliefs({step_text})] to retrieve ALL gathered research.\n"
+            f"2. Then: call [TOOL: report_generation(topic|context)] using that belief data as the context.\n"
+            f"Do NOT use thinking, web_search, or generate_report. Use ONLY read_beliefs then report_generation.\n"
+            f"Do NOT skip step 1. The belief base contains raw verified data you MUST use.\n\n"
             f"ORIGINAL TASK: {step_text}\n"
         )
     else:
@@ -237,12 +237,12 @@ def execute_step(step_num, total_steps, step_text, agent_id, accumulated_context
 
 def run_autonomous(agent_id, task, api_key, provider, agents_info=""):
     """
-    Phase 1: Generate the plan only.
+    Phase 1: Generate the intentions only.
     """
-    safe_log(f"[STATUS:{agent_id}] Autonomous planning activated")
+    safe_log(f"[STATUS:{agent_id}] Autonomous deliberation complete: Intentions generated")
     steps = generate_plan(task, agent_id, api_key, provider, agents_info)
     if steps:
-        save_plan_md(steps, task, agent_id)
+        save_intentions_md(steps, task, agent_id)
     return steps
 
 def run_execution_loop(agent_id, task, api_key, provider):
@@ -261,29 +261,29 @@ def run_execution_loop(agent_id, task, api_key, provider):
             safe_log(f"--- [CLEANUP] Volatile ledger cleared for new task.")
         except: pass
 
-    # CLEAR BLACKBOARD: Fresh research for this plan run
-    blackboard_path = os.path.join(AGENTS_CODE_DIR, "blackboard.json")
-    if os.path.exists(blackboard_path):
+    # CLEAR BELIEF BASE: Fresh research for this intention run
+    beliefs_path = os.path.join(AGENTS_CODE_DIR, "beliefs_base.json")
+    if os.path.exists(beliefs_path):
         try:
-            os.remove(blackboard_path)
-            safe_log(f"--- [CLEANUP] Blackboard cleared for new task.")
+            os.remove(beliefs_path)
+            safe_log(f"--- [BDI CLEANUP] Belief Base cleared for new task.")
         except: pass
 
-    # Load steps from plan.md to ensure consistency with what the user saw
+    # Load from intentions.md
     agent_dir = os.path.join(AGENTS_CODE_DIR, agent_id)
-    plan_path = os.path.join(agent_dir, "plan.md")
+    intentions_path = os.path.join(agent_dir, "intentions.md")
     
     steps = []
-    if os.path.exists(plan_path):
+    if os.path.exists(intentions_path):
         try:
-            with open(plan_path, "r", encoding="utf-8") as f:
+            with open(intentions_path, "r", encoding="utf-8") as f:
                 for line in f:
                     # Match numbered list items: "1. Step description"
                     match = re.match(r'^\d+\.\s+(.*)$', line.strip())
                     if match:
                         steps.append(match.group(1).strip())
         except Exception as e:
-            safe_log(f"!!! [PLAN_RUNNER] Error reading plan.md: {e}")
+            safe_log(f"!!! [PLAN_RUNNER] Error reading intentions.md: {e}")
 
     if not steps:
         return "Failed to locate an execution plan. Please try generating the plan again."
@@ -332,16 +332,16 @@ def run_execution_loop(agent_id, task, api_key, provider):
             safe_log(f"--- [CLEANUP] Volatile ledger deleted after task completion.")
         except: pass
 
-    if os.path.exists(blackboard_path):
+    if os.path.exists(beliefs_path):
         try:
-            os.remove(blackboard_path)
-            safe_log(f"--- [CLEANUP] Blackboard cleared after task completion.")
+            os.remove(beliefs_path)
+            safe_log(f"--- [BDI CLEANUP] Belief Base cleared after task completion.")
         except: pass
 
-    if os.path.exists(plan_path):
+    if os.path.exists(intentions_path):
         try:
-            os.remove(plan_path)
-            safe_log(f"--- [CLEANUP] plan.md deleted after task completion.")
+            os.remove(intentions_path)
+            safe_log(f"--- [BDI CLEANUP] intentions.md deleted after task completion.")
         except: pass
 
     return final_response

@@ -20,7 +20,7 @@ ipcMain.handle('open-external', async (_event, url) => {
 let mainWindow;
 
 function startPythonBackend() {
-  const scriptPath = path.join(__dirname, 'backend', 'server.py');
+  const scriptPath = path.join(__dirname, 'backend', 'interpreter.py');
   pythonProcess = spawn('python', [scriptPath]);
 
   function sendToRenderer(data) {
