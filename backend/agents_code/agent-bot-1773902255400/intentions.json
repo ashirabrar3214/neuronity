@@ -1,0 +1,8 @@
+{
+  "objective": "{\"tool_input\": \"Synthesize research findings into a structured report",
+  "steps": [
+    "Generate the markdown report using the generate_report tool",
+    "Present the final response to the user\"}"
+  ],
+  "completed": []
+}

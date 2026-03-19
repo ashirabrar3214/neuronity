@@ -1,8 +1,9 @@
-import requests
+import httpx
 import json
 import os
 import re
 import time
+import asyncio
 
 BACKEND_URL = "http://127.0.0.1:8000"
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(__file__), "agents_code")
@@ -17,7 +18,7 @@ def safe_log(message):
         pass
 
 
-def _call_llm_direct(prompt, api_key, provider, mode="fast"):
+async def _call_llm_direct(prompt, api_key, provider, mode="fast"):
     """One-shot LLM call for plan generation or task classification."""
     if provider == "gemini":
         if mode == "think":
@@ -33,27 +34,28 @@ def _call_llm_direct(prompt, api_key, provider, mode="fast"):
             generation_config = {"temperature": 0.2}
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        data = {
+        headers = {"Content-Type": "application/json"}
+        payload = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
             "generationConfig": generation_config
         }
         try:
-            # Increased timeout slightly for deep thinking
-            resp = requests.post(url, json=data, timeout=90) 
-            if resp.status_code == 200:
-                parts = resp.json()["candidates"][0]["content"]["parts"]
-                # Gemini 3 returns multiple parts (thoughts, then text). 
-                # The final text plan is always the last part in the array.
-                return parts[-1]["text"].strip()
-            else:
-                safe_log(f"!!! [PLAN_RUNNER] API Error: {resp.text}")
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url, headers=headers, json=payload, timeout=120)
+                if resp.status_code == 200:
+                    parts = resp.json()["candidates"][0]["content"]["parts"]
+                    # Gemini 3 returns multiple parts (thoughts, then text). 
+                    # The final text plan is always the last part in the array.
+                    return parts[-1]["text"].strip()
+                else:
+                    safe_log(f"!!! [PLAN_RUNNER] API Error: {resp.text}")
         except Exception as e:
             safe_log(f"!!! [PLAN_RUNNER] LLM error: {e}")
 
     return ""
 
 
-def is_task_request(text, api_key, provider):
+async def is_task_request(text, api_key, provider):
     """
     Asks the LLM if the message is a complex task/command or just casual conversation.
     Returns True if it's a task, False if it's chat.
@@ -61,21 +63,28 @@ def is_task_request(text, api_key, provider):
     if not text or len(text.strip()) < 3:
         return False
 
-    prompt = f"""Determine if the following message is a "TASK" (a request for research, analysis, or multi-step action) or "CHAT" (a greeting, thanks, or casual remark).
+    prompt = f"""You are an Intent Classifier. Analyze the message below and decide if it is a 'TASK' (requires research, file access, report generation, or multi-step action) or 'CHAT' (simple greeting, thanks, or conversation with no specific objective).
+
+EXAMPLES:
+"hello there" -> CHAT
+"make a report on the iran war" -> TASK
+"research the history of rome" -> TASK
+"generate a pdf report on solar energy" -> TASK
+"thank you so much" -> CHAT
+"what can you do?" -> CHAT
+"help me write a plan for a new startup" -> TASK
 
 MESSAGE: "{text}"
 
-Return ONLY 'TASK' or 'CHAT'."""
+Return ONLY the word 'TASK' or 'CHAT'."""
 
-    res = _call_llm_direct(prompt, api_key, provider, mode="fast")
+    res = await _call_llm_direct(prompt, api_key, provider, mode="fast")
     return "TASK" in res.upper()
 
 
-def generate_plan(task, agent_id, api_key, provider, agents_info=""):
+async def generate_plan(task, agent_id, api_key, provider, agents_info=""):
     """
     Ask the LLM to break the task into numbered execution steps.
-    Returns a list of step strings. No arbitrary step limit — the plan
-    should be as long as the task requires, including loops over agents.
     """
     safe_log(f"[STATUS:{agent_id}] Generating execution plan...")
 
@@ -103,7 +112,7 @@ Return ONLY a numbered list, nothing else. Example of a 6-step multi-agent plan:
 
 YOUR PLAN:"""
 
-    text = _call_llm_direct(prompt, api_key, provider, mode="think")
+    text = await _call_llm_direct(prompt, api_key, provider, mode="think")
 
     steps = []
     for line in text.strip().split('\n'):
@@ -229,12 +238,12 @@ async def execute_step(step_num, total_steps, step_text, agent_id, accumulated_c
         return f"Step failed: {str(e)}"
 
 
-def run_autonomous(agent_id, task, api_key, provider, agents_info=""):
+async def run_autonomous(agent_id, task, api_key, provider, agents_info=""):
     """
     Phase 1: Generate the intentions only.
     """
     safe_log(f"[STATUS:{agent_id}] Autonomous deliberation complete: Intentions generated")
-    steps = generate_plan(task, agent_id, api_key, provider, agents_info)
+    steps = await generate_plan(task, agent_id, api_key, provider, agents_info)
     if steps:
         save_intentions_md(steps, task, agent_id)
     return steps
@@ -295,13 +304,23 @@ async def run_execution_loop(agent_id, task, api_key, provider):
             import deliberator
             from interpreter import get_beliefs_context
             beliefs_ctx = get_beliefs_context()
-            decision, reason = await deliberator.deliberate(agent_id, f"Ongoing task: {task}. Next step: {step}", api_key, provider, beliefs_ctx)
+            
+            # Load history for deliberator context
+            history = []
+            history_path = os.path.join(agent_dir, "history.json")
+            if os.path.exists(history_path):
+                try:
+                    with open(history_path, "r", encoding="utf-8") as f:
+                        history = json.load(f)
+                except: pass
+                
+            decision, reason = await deliberator.deliberate(agent_id, f"Ongoing task: {task}. Next step: {step}", api_key, provider, beliefs_ctx, history=history)
             
             if decision == "RE-PLAN":
                 safe_log(f"!!! [PIVOT] Deliberator signals RE-PLAN: {reason}")
                 # Archive current intentions and trigger a new cycle
                 # (Recursive call to generate new plan based on current beliefs)
-                new_steps = run_autonomous(agent_id, task, api_key, provider)
+                new_steps = await run_autonomous(agent_id, task, api_key, provider)
                 if new_steps:
                     return await run_execution_loop(agent_id, task, api_key, provider)
                 else:
@@ -335,19 +354,17 @@ async def run_execution_loop(agent_id, task, api_key, provider):
 
     safe_log(f"[STATUS:{agent_id}] Autonomous task complete")
     
-    # FINAL CLEANUP: Delete volatile findings, blackboard, and plan.md as requested by user
-    if os.path.exists(volatile_path):
-        try:
-            os.remove(volatile_path)
-            safe_log(f"--- [CLEANUP] Volatile ledger deleted after task completion.")
-        except: pass
+    # FINAL CLEANUP: (Deletion of volatile findings and plans commented out to fix 'Clean Slate' bug)
+    # if os.path.exists(volatile_path):
+    #     try:
+    #         os.remove(volatile_path)
+    #         safe_log(f"--- [CLEANUP] Volatile ledger deleted after task completion.")
+    #     except: pass
 
-    # Belief Base is NOT deleted here anymore.
-
-    if os.path.exists(intentions_path):
-        try:
-            os.remove(intentions_path)
-            safe_log(f"--- [BDI CLEANUP] intentions.md deleted after task completion.")
-        except: pass
+    # if os.path.exists(intentions_path):
+    #     try:
+    #         os.remove(intentions_path)
+    #         safe_log(f"--- [BDI CLEANUP] intentions.md deleted after task completion.")
+    #     except: pass
 
     return final_response

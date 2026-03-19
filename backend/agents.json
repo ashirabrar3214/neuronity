@@ -1,94 +1,20 @@
 [
   {
-    "id": "agent-bot-1773697414554",
-    "name": "Masterbot",
+    "id": "agent-bot-1773902255400",
+    "name": "MainAgent",
     "description": "Agent description...",
-    "brain": "Gemini",
+    "brain": "",
     "channel": "Gmail",
-    "workingDir": "D:\\New folder",
+    "workingDir": "",
     "permissions": [
+      "web search",
       "report generation"
     ],
     "tools": "Custom",
     "responsibility": "",
     "agentType": "master",
-    "x": -706.0,
-    "y": -44.0,
-    "connections": []
-  },
-  {
-    "id": "agent-bot-1773719459989",
-    "name": "Religion",
-    "description": "Agent description...",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [
-      "web search"
-    ],
-    "tools": "Custom",
-    "responsibility": "",
-    "agentType": "worker",
-    "x": -1150.0,
-    "y": 23.0,
-    "connections": [
-      "agent-bot-1773697414554",
-      "agent-bot-1773875787725"
-    ]
-  },
-  {
-    "id": "agent-bot-1773719477712",
-    "name": "Economics",
-    "description": "Agent description...",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [
-      "web search"
-    ],
-    "tools": "Custom",
-    "responsibility": "",
-    "agentType": "worker",
-    "x": -1149.0,
-    "y": 221.0,
-    "connections": [
-      "agent-bot-1773697414554",
-      "agent-bot-1773875787725"
-    ]
-  },
-  {
-    "id": "agent-bot-1773719489513",
-    "name": "Political",
-    "description": "Agent description...",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [
-      "web search"
-    ],
-    "tools": "Custom",
-    "responsibility": "",
-    "agentType": "worker",
-    "x": -1147.0,
-    "y": 409.0,
-    "connections": [
-      "agent-bot-1773697414554",
-      "agent-bot-1773875787725"
-    ]
-  },
-  {
-    "id": "agent-bot-1773875787725",
-    "name": "Sam Altman",
-    "description": "Agent description...",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [],
-    "tools": "Custom",
-    "responsibility": "",
-    "agentType": "master",
-    "x": -703.0,
-    "y": 343.0,
+    "x": -1173.0,
+    "y": 67.0,
     "connections": []
   }
 ]

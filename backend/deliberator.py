@@ -14,7 +14,7 @@ def load_agents():
     except:
         return []
 
-async def deliberate(agent_id, message, api_key, provider, beliefs_context):
+async def deliberate(agent_id, message, api_key, provider, beliefs_context, history=None):
     """
     Goal Filter Phase (Deliberation).
     Decides if the agent has enough information to "Solve" (Intend), 
@@ -24,13 +24,38 @@ async def deliberate(agent_id, message, api_key, provider, beliefs_context):
         return "CLARIFY", "Please provide more detail about your request."
 
     # 1. Load Persona Data
-    agents = load_agents()
-    persona = next((a for a in agents if a["id"] == agent_id), {})
-    role = persona.get("name", "Unknown Agent")
-    description = persona.get("description", "A helpful AI assistant.")
-    responsibility = persona.get("responsibility", "General task execution.")
-    permissions = persona.get("permissions", [])
-    capabilities = ", ".join(permissions) if permissions else "none"
+    agent_dir = os.path.join(os.path.dirname(__file__), "agents_code", agent_id)
+    personality_path = os.path.join(agent_dir, "personality.json")
+    
+    personality = {}
+    if os.path.exists(personality_path):
+        try:
+            with open(personality_path, "r", encoding="utf-8") as f:
+                personality = json.load(f)
+        except: pass
+
+    # Fallback to agents.json if personality.json is missing or incomplete
+    if not personality:
+        agents = load_agents()
+        personality = next((a for a in agents if a["id"] == agent_id), {})
+
+    role = personality.get("name", "Unknown Agent")
+    description = personality.get("description", "A helpful AI assistant.")
+    responsibility = personality.get("responsibility", "General task execution.")
+    
+    # 2. Format History for Context
+    history_str = "No recent history provided."
+    if history:
+        # Only take the last 10 messages for brevity in deliberation
+        recent = history[-10:]
+        h_lines = []
+        for h in recent:
+            role_label = "Agent" if h.get("role") == "assistant" else "User"
+            content = h.get("content", "")
+            if content:
+                preview = content[:300] + "..." if len(content) > 300 else content
+                h_lines.append(f"[{role_label}]: {preview}")
+        history_str = "\n".join(h_lines)
 
     global_obj = beliefs_context.get("global_objective", "None")
     
@@ -40,23 +65,25 @@ async def deliberate(agent_id, message, api_key, provider, beliefs_context):
 Role: {role}
 Description: {description}
 Key Responsibility: {responsibility}
-Available Capabilities: {capabilities}
 
 --- COGNITIVE STATE ---
-Current Beliefs (Goal): {global_obj}
-Incoming Desire (Request/Step): "{message}"
+Global Objective: {global_obj}
+Recent Conversation/Action History:
+{history_str}
+
+Incoming Desire (New Request/Current Step): "{message}"
 
 --- TASK ---
 Decide if we should:
-1. SOLVE: We have a clear task and all information needed to start or continue.
-2. CLARIFY: The request is vague, conversational, or outside our responsibility.
-3. RE-PLAN: We are already executing a task, but this new information suggests our current intentions are obsolete or we need a major pivot.
+1. SOLVE: We have a clear task, and it is within our responsibility. Or, if we are in the middle of a task, this new observation confirms we are on the right track.
+2. CLARIFY: The request is vague, or we lack critical context (like a report topic) that isn't in our history.
+3. RE-PLAN: The new data contradicts our current plan or suggests we need to completely change our approach.
 
 RULES:
-- If the message is a casual greeting or vague, choose CLARIFY.
-- If the message is a specific actionable task within our responsibility, choose SOLVE.
-- If the message contains "Ongoing task:" and you detect a contradiction with current info, choose RE-PLAN.
-- Be decisive. SOLVE is the default for clear tasks.
+- If the message is a casual greeting or vague AND no clear objective exists in history, choose CLARIFY.
+- If history shows we already have the objective and the user is just following up, choose SOLVE.
+- Use your specific Persona (Description/Responsibility) to decide if this task is YOURS.
+- Look for "Ongoing task:" markers in the message to detect mid-execution states.
 
 Return ONLY a JSON object:
 {{

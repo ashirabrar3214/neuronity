@@ -1,4 +1,4 @@
-import uvicorn
+﻿import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,12 +16,14 @@ import threading
 import sys
 import io
 import httpx
+from dotenv import load_dotenv
 load_dotenv()
 
 import shutil
 import toolkit
 import response_formatter
-import planner
+import inspect
+
 import brf
 import deliberator
 
@@ -97,7 +99,7 @@ app.add_middleware(
 DATA_FILE = os.path.join(os.path.dirname(__file__), "agents.json")
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(__file__), "agents_code")
 
-# ─── BDI BELIEF BASE ────────────────────────────────────────────────────────
+# â”€â”€â”€ BDI BELIEF BASE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 BELIEFS_CONTEXT_FILE = os.path.join(AGENTS_CODE_DIR, "beliefs_context.json")
 BELIEFS_BASE_FILE = os.path.join(AGENTS_CODE_DIR, "beliefs_base.json")
 
@@ -116,7 +118,7 @@ def update_beliefs_context(new_goal):
     import brf
     return brf.update_belief_context(new_goal)
 
-# ─── BELIEF BASE SEARCH ───────────────────────────────────────────────────
+# â”€â”€â”€ BELIEF BASE SEARCH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def search_beliefs_base(query, top_k=15):
     """
@@ -164,7 +166,7 @@ def get_beliefs_base_all():
         return "Error reading belief base."
     if not entries:
         return "Belief Base is empty."
-    lines = [f"### Full Belief Base — {len(entries)} entries\n"]
+    lines = [f"### Full Belief Base â€” {len(entries)} entries\n"]
     for e in entries:
         lines.append(
             f"[{e.get('agent_id', 'Agent')}] {e.get('fact','')}\nSource: {e.get('url','No URL')}"
@@ -214,7 +216,7 @@ def sanitize_ruthlessly(text):
         delim_count = 0
         for l in lines[:10]:
             clean_l = l.strip()
-            if clean_l.startswith(('-', '*', '•')):
+            if clean_l.startswith(('-', '*', 'â€¢')):
                 continue
             if ',' in l or '\t' in l or '|' in l:
                 delim_count += 1
@@ -237,11 +239,10 @@ def calculate_semantic_similarity(text1, text2):
     union = words1.union(words2)
     return len(intersection) / len(union) if union else 0.0
 
-def process_generational_history(history, max_turns=60):
+def process_generational_history(history, max_turns=80):
     """
     CONTEXT RETENTION: Protects tool result messages from decay.
-    - SYSTEM TOOL RESULT messages (blackboard writes, search results) are NEVER truncated —
-      they contain foundational research data that is still needed later.
+    - SYSTEM TOOL RESULT messages (blackboard writes, search results) are NEVER truncated.
     - Normal user/assistant turns follow the generational decay pattern.
     """
     if not history: return []
@@ -253,54 +254,49 @@ def process_generational_history(history, max_turns=60):
         role = msg.get("role", "user")
         content = str(msg.get("content", "") or "")
 
-        # PERMANENT MESSAGES: SYSTEM TOOL RESULT and post_finding confirmations
-        # are NEVER decayed — they are raw knowledge data, not conversation.
+        # PERMANENT MESSAGES: Research data and belief updates are NEVER decayed.
         is_tool_result = content.startswith("SYSTEM TOOL RESULT:")
         is_beliefs_confirm = "recorded in the Belief Base" in content
-        if is_tool_result or is_beliefs_confirm:
+        is_search_result = "### Belief Base Search:" in content
+        if is_tool_result or is_beliefs_confirm or is_search_result:
             processed.insert(0, {"role": role, "content": content})
             continue
 
-        # Generation 0 (Last 15 messages): Full detail
-        if i < 15:
+        # Generation 0 (Last 40 messages): Full detail (Fixes 'Dory' effect)
+        if i < 40:
             processed.insert(0, {"role": role, "content": content})
 
-        # Generation 1 (Messages 16-30): Condensed — keep meaning, cut length
-        elif i < 30:
+        # Generation 1 (Messages 41-60): Condensed
+        elif i < 60:
             if content.startswith("[TOOL:"):
                 tool_body = content[len("[TOOL:"):].rstrip("]")
                 name_part = tool_body.split("(", 1)[0].strip()
                 processed.insert(0, {"role": role, "content": f"[Previously used tool: {name_part}]"})
             else:
-                preview = content[:300] + "..." if len(content) > 300 else content
+                preview = content[:400] + "..." if len(content) > 400 else content
                 processed.insert(0, {"role": role, "content": preview})
 
-        # Generation 2 (Messages 31-60): Topic-only metadata
+        # Generation 2 (Messages 61-80): Topic-only metadata
         else:
             if content.startswith("[TOOL:"):
                 tool_body = content[len("[TOOL:"):].rstrip("]")
                 name_part = tool_body.split("(", 1)[0].strip()
                 processed.insert(0, {"role": role, "content": f"[Past action: {name_part}]"})
             else:
-                processed.insert(0, {"role": role, "content": f"[Past message: {content[:80]}...]"})
+                processed.insert(0, {"role": role, "content": f"[Past message: {content[:100]}...]"})
 
     return processed
 
-def refresh_conversation_summary(agent_id, history, api_key, provider, current_summary=""):
+async def refresh_conversation_summary(agent_id, history, api_key, provider, current_summary=""):
     """
     Uses the LLM to condense the conversation history and existing summary into a new, 
     leaner cumulative summary. This preserves long-term memory while saving tokens.
     """
     print(f"[STATUS:{agent_id}] Updating Long-term Memory Summary...", flush=True)
     
-    # We only summarize messages that are falling out of the sliding window
-    # or the entire history if it's the first summary.
-    # To keep it simple: we summarize the provided context as 'History so far'.
-    
     formatted_history = ""
     for h in history:
         role = "Agent" if h["role"] == "assistant" else "User"
-        # Truncate content for the summarizer itself to be safe
         content = h.get("content", "")
         if content is None: content = "[No Content]"
         content_preview = content[:500] + "..." if len(content) > 500 else content
@@ -324,19 +320,21 @@ STRICT RULE: The output must be a clean, bulleted markdown summary. Do not inclu
     try:
         model = "gemini-2.0-flash" 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        data = {
+        headers = {"Content-Type": "application/json"}
+        payload = {
             "contents": [{"role": "user", "parts": [{"text": summary_prompt}]}]
         }
-        resp = requests.post(url, json=data, timeout=30)
-        if resp.status_code == 200:
-            res_json = resp.json()
-            candidates = res_json.get("candidates", [])
-            if candidates and isinstance(candidates, list) and len(candidates) > 0:
-                cand = candidates[0]
-                content = cand.get("content", {})
-                parts = content.get("parts", [])
-                if parts and isinstance(parts, list) and len(parts) > 0:
-                    response_text = parts[0].get("text", "")
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, headers=headers, json=payload, timeout=60)
+            if resp.status_code == 200:
+                res_json = resp.json()
+                candidates = res_json.get("candidates", [])
+                if candidates and isinstance(candidates, list) and len(candidates) > 0:
+                    cand = candidates[0]
+                    content = cand.get("content", {})
+                    parts = content.get("parts", [])
+                    if parts and isinstance(parts, list) and len(parts) > 0:
+                        response_text = parts[0].get("text", "")
     except Exception as e:
         print(f"!!! [SUMMARY ERROR] Failed to update summary: {e}")
         return current_summary
@@ -357,7 +355,6 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
         tool_to_perm = {
             "web_search": "web search",
             "deep_search": "web search",
-            "thinking": "thinking",
             "generate_report": "report generation",
             "report_generation": "report generation",
             "list_workspace": "file access",
@@ -373,7 +370,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
             return f"Error: My '{required_perm}' capability is currently disabled. I cannot use the tool '{tool_name}'. Please enable it in my settings if you want me to proceed with this action."
 
     if tool_name == "post_finding":
-        # ── BELIEF REVISION (BRF) ──────────────────────────────
+        # â”€â”€ BELIEF REVISION (BRF) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         import brf
         raw_snippet = tool_input.strip()
         url = ""
@@ -388,23 +385,18 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
         return f"Success: Fact recorded in Belief Base."
     
     elif tool_name == "update_plan":
-        return toolkit.update_intentions(agent_id, tool_input)
+        return await toolkit.update_intentions(agent_id, tool_input)
 
     elif tool_name == "web_search":
-        return toolkit.web_search(tool_input, agent_id, api_key=api_key)
+        return await toolkit.web_search(tool_input, agent_id, api_key=api_key)
     
     elif tool_name == "deep_search":
-        return toolkit.deep_search(tool_input, agent_id, api_key=api_key)
+        return await toolkit.deep_search(tool_input, agent_id, api_key=api_key)
     
-    elif tool_name == "thinking":
-        return toolkit.thinking(agent_id, tool_input)
-
-    elif tool_name == "generate_report":
-        return toolkit.generate_report(agent_id, tool_input, working_dir)
-
     elif tool_name == "report_generation":
         # Pass agent_name from sender_data
         agent_name = sender_data.get("name", "Agent") if sender_data else "Agent"
+        # report_generation is sync in toolkit.py
         return toolkit.report_generation(agent_id, tool_input, working_dir, api_key, agent_name=agent_name)
     
     elif tool_name == "message_agent":
@@ -424,18 +416,18 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
             
             agents = load_data()
 
-            # ── 1. Find sender data
+            # â”€â”€ 1. Find sender data
             sender_data = next((a for a in agents if a["id"] == agent_id), None)
             if not sender_data:
                 return f"Error: Sender agent {agent_id} not found."
             sender_name = sender_data.get("name", "Unknown Agent")
 
-            # ── 3. Find target
+            # â”€â”€ 3. Find target
             target_data = next((a for a in agents if a["id"] == target_id), None)
             if not target_data:
                 return f"Error: Target agent {target_id} not found."
 
-            # ── 2. ENFORCE CONNECTION GRAPH (BIDIRECTIONAL)
+            # â”€â”€ 2. ENFORCE CONNECTION GRAPH (BIDIRECTIONAL)
             #       A wire on the canvas between two agents means both can message each other,
             #       regardless of which end the user drew the arrow from.
             sender_connections = sender_data.get("connections", [])
@@ -448,7 +440,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
             
             target_provider = target_data.get("brain", "").lower()
 
-            # ── 4. PRE-DELEGATION CAPABILITY CHECK
+            # â”€â”€ 4. PRE-DELEGATION CAPABILITY CHECK
             #       Before sending, verify the target can actually do the work.
             #       An agent with zero permissions and zero connections is a dead end.
             target_perms = target_data.get("permissions", [])
@@ -462,7 +454,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
                     f"(2) tell the user that '{target_name}' needs permissions enabled before it can work."
                 )
 
-            # ── 5. BUILD COMPACT TASK CONTEXT (not full history — just enough for the agent to orient)
+            # â”€â”€ 5. BUILD COMPACT TASK CONTEXT (not full history â€” just enough for the agent to orient)
             sender_plan_path = os.path.join(AGENTS_CODE_DIR, agent_id, "plan.json")
             task_context_lines = []
             try:
@@ -479,7 +471,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
             task_context_lines.append(f"Your available capabilities: {cap_summary}")
             sender_context_snippet = "\n".join(task_context_lines)
             
-            # ── 5. Get API key for target provider
+            # â”€â”€ 5. Get API key for target provider
             target_api_key = api_key
             config_path = os.path.join(os.getenv('APPDATA', ''), 'easy-company', 'config.json')
             if os.path.exists(config_path):
@@ -502,7 +494,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
             # Signal the UI: who is being messaged so its canvas terminal can update
             print(f"[AGENT_MSG:{agent_id}->{target_id}] Contacting {target_data.get('name', target_id)} (Priority: {intent_priority})", flush=True)
             
-            return toolkit.message_agent(
+            return await toolkit.message_agent(
                 target_id, message.strip(), agent_id, sender_name,
                 target_api_key, target_provider,
                 context_snippet=sender_context_snippet,
@@ -573,7 +565,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
             with open(prompt_file, "w", encoding="utf-8") as f:
                 f.write(new_content)
             safe_log(f"[TRAINING] Agent {agent_id} updated its own prompt.")
-            return f"✅ prompt.md has been successfully updated. The new prompt is now active."
+            return f"âœ… prompt.md has been successfully updated. The new prompt is now active."
         except Exception as e:
             return f"Error updating prompt: {e}"
 
@@ -602,7 +594,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
 import shutil
 import toolkit
 import response_formatter
-import planner
+
 import brf
 import deliberator
 
@@ -698,7 +690,7 @@ if __name__ == "__main__":
     with open(personality_path, "w", encoding="utf-8") as f:
         json.dump(personality_data, f, indent=2)
 
-    # 3. prompt.md — identity and behavioral rules ONLY.
+    # 3. prompt.md â€” identity and behavioral rules ONLY.
     prompt_path = os.path.join(agent_dir, "prompt.md")
     prompt_content = f"""# Agent Instructions: {agent_data['name']}
 Identity: You are an agent sitting in a desktop PC at UF working for Ashir.
@@ -732,7 +724,7 @@ Responsibility: {agent_data.get('responsibility', 'General purpose assistance')}
         with open(history_path, "w", encoding="utf-8") as f:
             json.dump([], f)
 
-    # 6. Agent Manifest (Phase 4) — always regenerate so settings changes apply
+    # 6. Agent Manifest (Phase 4) â€” always regenerate so settings changes apply
     agent_type = agent_data.get("agentType", "worker")
     manifest = {
         "agent_id": agent_data.get("id", ""),
@@ -911,18 +903,6 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest
             }
         })
 
-    if "thinking" in permissions:
-        declarations.append({
-            "name": "thinking",
-            "description": "A self-correction and deep analysis pass.",
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "topic": {"type": "STRING", "description": "What needs analysis."}
-                },
-                "required": ["topic"]
-            }
-        })
 
     if "report generation" in permissions:
         declarations.append({
@@ -1062,6 +1042,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
         return
 
     is_training_mode = (mode == "training")
+    is_master = agent_data.get("agentType", "worker") == "master"
     agent_dir = os.path.join(AGENTS_CODE_DIR, agent_id)
     history_path = os.path.join(agent_dir, "history.json")
     internal_history_path = os.path.join(agent_dir, "internal_history.json")
@@ -1140,6 +1121,15 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
 
     system_prompt = f"{identity_layer}\n{tool_manual_layer}\n{transient_task_layer}\n"
     
+    if is_master and not is_training_mode:
+        system_prompt += (
+            "\n## MASTER PROTOCOL\n"
+            "You are a MASTER agent. Your priority is task completion. If you are given a task, you MUST proceed immediately to the first execution step.\n"
+            "- Do NOT stop to ask for clarification on common topics unless it's truly ambiguous.\n"
+            "- For 'Iran War', assume the 1980 conflict OR ask your religion/political agents if they are connected.\n"
+            "- Always prioritize calling a tool (web_search, etc.) over providing a conversational text response.\n"
+        )
+    
     if is_training_mode:
         system_prompt = (
             f"# YOU ARE A CURIOUS AI INTERN: {agent_data.get('name')}\n"
@@ -1149,23 +1139,28 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
         )
     
     api_key = api_key_input or os.getenv("GEMINI_API_KEY", "")
-    is_master = agent_data.get("agentType", "worker") == "master"
-    is_task = planner.is_task_request(message, api_key, "gemini")
+    import planner
+    is_task = await planner.is_task_request(message, api_key, "gemini")
     
-    # ─── BDI REASONING CYCLE: DELIBERATION ──────────────────
+    # â”€â”€â”€ BDI REASONING CYCLE: DELIBERATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if not is_training_mode:
-        decision, reason = deliberator.deliberate(agent_id, message, api_key, "gemini", beliefs_context)
+        decision, reason = await deliberator.deliberate(agent_id, message, api_key, "gemini", beliefs_context, history=history)
         yield f"data: {json.dumps({'type': 'thought', 'content': f'BDI Deliberation: {decision} ({reason})'})}\n\n"
         
         if decision == "CLARIFY" and is_task:
             yield f"data: {json.dumps({'type': 'text', 'content': f'I need more information to proceed. {reason}'})}\n\n"
             yield "data: [DONE]\n\n"
             return
+        yield f"data: {json.dumps({'type': 'status', 'content': 'Proceeding to executive reasoning...'})}\n\n"
     
-    max_turns = 50 if is_task else 1
-    if "[AUTO_STEP" in message: max_turns = 10
+    # BDI LIMIT: Reduce max_turns to prevent infinite looping and double-thinking.
+    # Master agents handle multi-step tasks via the Planner, so execute_agent_turn
+    # should ideally perform one cognitive action (turn) then stop.
+    max_turns = 10 if is_task else 1
+    if "[AUTO_STEP" in message: max_turns = 5 # Even tighter for autonomous steps
 
     while iteration < max_turns:
+        yield f"data: {json.dumps({'type': 'status', 'content': f'Turn {iteration+1}: Observing context...'})}\n\n"
         llm_context = process_generational_history(history)
         model = "gemini-2.0-flash"
         gen_config = {"temperature": 0.3, "maxOutputTokens": 8192}
@@ -1189,6 +1184,8 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
             "generationConfig": gen_config,
             "tools": get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0)
         }
+        
+        yield f"data: {json.dumps({'type': 'status', 'content': f'Generating response (Turn {iteration+1})...'})}\n\n"
 
         current_turn_text = ""
         current_turn_thoughts = ""
@@ -1211,7 +1208,13 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
                             if json_str == "[DONE]": continue
                             try:
                                 chunk = json.loads(json_str)
-                                parts = chunk.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                                candidate = chunk.get("candidates", [{}])[0]
+                                finish_reason = candidate.get("finishReason", "")
+                                if finish_reason and finish_reason != "STOP":
+                                    yield f"data: {json.dumps({'type': 'error', 'content': f'Model halted early: {finish_reason}'})}\n\n"
+                                    break
+                                    
+                                parts = candidate.get("content", {}).get("parts", [])
                                 for part in parts:
                                     if "thought" in part:
                                         thought = part.get("text", "")
@@ -1225,7 +1228,9 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
                                         fn = part["functionCall"]
                                         tool_call_found = {"name": fn["name"], "args": fn.get("args", {})}
                                         yield f"data: {json.dumps({'type': 'tool_start', 'content': tool_call_found['name']})}\n\n"
-                            except: pass
+                            except Exception as e:
+                                safe_log(f"!!! Error parsing SSE chunk: {e} | Content: {json_str[:100]}...")
+                                continue
 
             if not tool_call_found and current_turn_text:
                 tool_match = re.search(r'\[TOOL:\s*(\w+)\((.*?)\)\]', current_turn_text)
@@ -1249,6 +1254,25 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
                 # Execute tool call
                 result = await perform_tool_call(agent_id, t_name, arg_str, agent_dir, api_key=api_key, session_id=session_id)
                 yield f"data: {json.dumps({'type': 'tool_result', 'content': str(result)})}\n\n"
+                
+                # BDI EARLY EXIT: If the agent committed to a plan or posted a finding,
+                # we yield the result and break the turn loop. This prevents the
+                # "Thinking about thoughts" stall and deep thinking recursion.
+                if t_name in ["update_plan", "post_finding", "report_generation"]:
+                    safe_log(f"[BDI:EXIT] Agent called {t_name} — terminating Turn {iteration+1} and yielding.")
+                    
+                    # Yield as text so the UI accumulates it in responseContent
+                    # and processPlanResponse can detect the intention header.
+                    display_result = str(result)
+                    if t_name == "update_plan":
+                        display_result = f"### 🎯 Intentions Updated\n\n{result}"
+                    
+                    yield f"data: {json.dumps({'type': 'text', 'content': f'\n\n{display_result}'})}\n\n"
+                    
+                    history.append({"role": "assistant", "content": f"[TOOL: {t_name}({arg_str})]"})
+                    history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {result}"})
+                    final_response_collected = f"Committed action: {t_name}. Result: {result}"
+                    break
                 
                 history.append({"role": "assistant", "content": f"[TOOL: {t_name}({arg_str})]"})
                 history.append({"role": "user", "content": f"SYSTEM TOOL RESULT: {result}"})
@@ -1303,17 +1327,19 @@ async def run_autonomous_agent(request: ChatRequest):
             )
     agents_info = "\n".join(agents_info_lines)
 
-    # ── ROUTING: Task vs. Conversation ──────────────────────────
+    # â”€â”€ ROUTING: Task vs. Conversation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     provider = request.provider or "gemini"
     api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
 
     # If it's just a greeting or casual talk, bypass the planner and route to normal chat.
-    if not planner.is_task_request(request.message, api_key, provider):
+    import planner
+    if not await planner.is_task_request(request.message, api_key, provider):
         safe_log(f"[STATUS:{request.agent_id}] Casual conversation detected - routing to standard chat")
         return await chat_with_agent(request)
 
     # Phase 1: Generate the intentions
-    steps = planner.run_autonomous(
+    import planner
+    steps = await planner.run_autonomous(
         request.agent_id,
         request.message,
         api_key,
@@ -1328,10 +1354,10 @@ async def run_autonomous_agent(request: ChatRequest):
     # Save plan location for the UI
     plan_path = os.path.join(AGENTS_CODE_DIR, request.agent_id, "plan.md")
     
-    # Return plan markdown (without HTML button — the frontend handles button display)
+    # Return plan markdown (without HTML button â€” the frontend handles button display)
     steps_md = "\n".join([f"{i+1}. {s}" for i, s in enumerate(steps)])
     final_response = (
-        f"### 🎯 Intentions Generated (BDI)\n\n"
+        f"### ðŸŽ¯ Intentions Generated (BDI)\n\n"
         f"I've committed to the following intentions to satisfy your request:\n\n"
         f"{steps_md}\n\n"
         f"---\n"
@@ -1342,13 +1368,14 @@ async def run_autonomous_agent(request: ChatRequest):
     return {"response": final_response}
 
 @app.post("/execute_autonomous")
-def execute_autonomous(request: ChatRequest):
+async def execute_autonomous(request: ChatRequest):
     """
     Triggered by the 'Start' button in the UI. 
     Executes the pre-generated plan for an agent.
     """
     provider = request.provider or "gemini"
     api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
+    import planner
     result = await planner.run_execution_loop(
         request.agent_id,
         request.message,
@@ -1358,5 +1385,5 @@ def execute_autonomous(request: ChatRequest):
     return {"response": result}
 
 if __name__ == "__main__":
-    # Run on localhost:8000 — loop=asyncio lets multiple agents communicate concurrently
+    # Run on localhost:8000 â€” loop=asyncio lets multiple agents communicate concurrently
     uvicorn.run(app, host="127.0.0.1", port=8000, loop="asyncio")

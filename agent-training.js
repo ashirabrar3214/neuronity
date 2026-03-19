@@ -613,28 +613,38 @@ function initTrainingUI() {
                 return;
             }
 
+            await parseResponse(response, text);
+        } catch (error) {
             removeTypingIndicator();
+            addMessage(`Error: ${error.message}`, false);
+        }
+    }
 
-            // --- STREAM HANDLING (for /chat) ---
-            if (endpoint.includes('/chat')) {
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
+    async function parseResponse(response, originalText) {
+        removeTypingIndicator();
+        const contentType = response.headers.get('Content-Type') || '';
+        const isStream = contentType.includes('text/event-stream');
 
-                let messageDiv = document.createElement('div');
-                messageDiv.className = 'message agent-message';
-                chatArea.appendChild(messageDiv);
+        if (isStream) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
 
-                let thoughtDetails = null;
-                let thoughtContent = null;
-                let responseContent = "";
-                let fullThoughtText = "";
+            let messageDiv = document.createElement('div');
+            messageDiv.className = 'message agent-message';
+            chatArea.appendChild(messageDiv);
 
-                let initialStatus = document.createElement('div');
-                initialStatus.className = 'stream-status';
-                initialStatus.innerHTML = `<div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
-                messageDiv.appendChild(initialStatus);
+            let thoughtDetails = null;
+            let thoughtContent = null;
+            let responseContent = "";
+            let fullThoughtText = "";
 
-                let unprocessedText = "";
+            let initialStatus = document.createElement('div');
+            initialStatus.className = 'stream-status';
+            initialStatus.innerHTML = `<div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+            messageDiv.appendChild(initialStatus);
+
+            let unprocessedText = "";
+            try {
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
@@ -645,13 +655,12 @@ function initTrainingUI() {
 
                     for (let line of lines) {
                         if (!line.trim() || !line.startsWith('data: ')) continue;
-                        let dataText = line.slice(6).trim();
-                        if (dataText === '[DONE]') break;
-
-                        // Safeguard: some SSE engines accidentally duplicate the prefix
-                        if (dataText.startsWith('data: ')) {
+                        let dataText = line.trim();
+                        // Robust stripping of all SSE data prefixes
+                        while (dataText.startsWith('data: ')) {
                             dataText = dataText.slice(6).trim();
                         }
+                        if (!dataText || dataText === '[DONE]') break;
 
                         try {
                             const data = JSON.parse(dataText);
@@ -661,6 +670,7 @@ function initTrainingUI() {
                                 if (!thoughtDetails) {
                                     thoughtDetails = document.createElement('details');
                                     thoughtDetails.className = 'thought-block';
+                                    thoughtDetails.setAttribute('open', '');
                                     thoughtDetails.innerHTML = `<summary>🧠 <div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></summary><div class="thought-content"></div>`;
                                     messageDiv.appendChild(thoughtDetails);
                                     thoughtContent = thoughtDetails.querySelector('.thought-content');
@@ -696,25 +706,21 @@ function initTrainingUI() {
                     }
                     chatArea.scrollTop = chatArea.scrollHeight;
                 }
-
+            } finally {
+                if (initialStatus) initialStatus.remove();
                 const sEl = messageDiv.querySelector('.stream-status');
                 if (sEl) sEl.remove();
-
-                processPlanResponse(responseContent, text, true); // true = already displayed
-            }
-            // --- REGULAR JSON HANDLING (for /run_autonomous) ---
-            else {
-                const data = await response.json();
-                if (data.response) {
-                    processPlanResponse(data.response, text, false); // false = not displayed yet
-                } else if (data.error) {
-                    addMessage(`Error: ${data.error}`, false);
-                }
             }
 
-        } catch (error) {
-            removeTypingIndicator();
-            addMessage(`Error: ${error.message}`, false);
+            processPlanResponse(responseContent, originalText, true);
+        }
+        else {
+            const data = await response.json();
+            if (data.response) {
+                processPlanResponse(data.response, originalText, false);
+            } else if (data.error) {
+                addMessage(`Error: ${data.error}`, false);
+            }
         }
     }
 
@@ -751,14 +757,7 @@ function initTrainingUI() {
                     })
                 });
 
-                removeTypingIndicator();
-                const data = await response.json();
-
-                if (data.response) {
-                    processPlanResponse(data.response, text);
-                } else {
-                    addMessage(data.error || "Failed to generate plan.", false);
-                }
+                await parseResponse(response, text);
             } catch (error) {
                 removeTypingIndicator();
                 addMessage("Error connecting to planning service.", false);
@@ -767,8 +766,10 @@ function initTrainingUI() {
     }
 
     function processPlanResponse(responseText, originalTask, isAlreadyDisplayed = false) {
-        // Check if this is an execution plan response
-        if (responseText.includes("Execution Plan Generated") || responseText.includes("### 📝")) {
+        // Check if this is an execution plan response using varied headers
+        if (responseText.includes("Execution Plan Generated") ||
+            responseText.includes("### 📝") ||
+            responseText.includes("### 🎯")) {
             // Extract plan steps and show in dedicated area
             const planAreaDiv = document.getElementById('autonomous-plan-area');
             const planContentDiv = document.getElementById('plan-content');
@@ -792,8 +793,11 @@ function initTrainingUI() {
             } else if (!isAlreadyDisplayed) {
                 addMessage(responseText, false);
             }
-        } else if (!isAlreadyDisplayed) {
-            addMessage(responseText, false);
+        } else {
+            // Only add to chat if it wasn't a stream (which already added it)
+            if (!isAlreadyDisplayed) {
+                addMessage(responseText, false);
+            }
         }
     }
 

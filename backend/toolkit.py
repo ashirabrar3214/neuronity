@@ -7,6 +7,17 @@ import asyncio
 import re
 from pdf_generator import ReportPDFGenerator
 
+def get_training_context():
+    """
+    Returns the documentation block for training-only tools.
+    """
+    return """## TRAINING CAPABILITIES (Only active in Training Mode)
+1. update_prompt(new_content): Use this to directly rewrite your own system instructions (prompt.md). Use this to fix behavioral bugs or refine your identity.
+2. read_prompt(): Use this to see your current identity and behavioral rules.
+3. read_memory(): Use this to read your long-term memory summary (summary.json).
+4. read_beliefs_context(): Use this to read the project's global overarching objective (blackboard identity).
+"""
+
 # ─────────────────────────────────────────────────
 # WEB SEARCH CAPABILITY
 # ─────────────────────────────────────────────────
@@ -117,7 +128,7 @@ If the information is not found, set "fact" to "Information not found" and "sour
 
     return json.dumps({"fact": "Could not extract fact. Synthesis tool currently limited.", "sources": [], "confidence_score": 0})
 
-def web_search(query, agent_id, api_key):
+async def web_search(query, agent_id, api_key):
     """
     The new QUICK SEARCH tool. Just the facts.
     """
@@ -127,7 +138,7 @@ def web_search(query, agent_id, api_key):
         query = query.split("=", 1)[-1].strip()
     query = query.strip("'").strip('"').strip("`")
 
-    results = _ddgs_search_raw(query, agent_id)
+    results = await _ddgs_search_raw(query, agent_id)
     if not results:
         return "No results found for the query."
     
@@ -138,7 +149,7 @@ def web_search(query, agent_id, api_key):
     
     return "\n\n---\n\n".join(formatted_results)
 
-def deep_search(query, agent_id, api_key):
+async def deep_search(query, agent_id, api_key):
     """
     The existing COMPREHENSIVE search tool. Full reports.
     """
@@ -148,7 +159,7 @@ def deep_search(query, agent_id, api_key):
         query = query.split("=", 1)[-1].strip()
     query = query.strip("'").strip('"').strip("`")
 
-    results = _ddgs_search_raw(query, agent_id)
+    results = await _ddgs_search_raw(query, agent_id)
     if not results:
         return "No results found for the query."
     
@@ -241,24 +252,7 @@ STRICT RULES:
     return f"{gemini_text.strip()}\n\n{sources_section}"
 
 
-# ─────────────────────────────────────────────────
-# THINKING CAPABILITY
-# ─────────────────────────────────────────────────
-
-async def thinking(agent_id, topic):
-    """
-    Simulates a deep thinking process for a specific topic.
-    """
-    # Robust parsing: handle hallucinations like topic="..."
-    topic = topic.strip()
-    if "=" in topic and topic.lower().startswith("topic="):
-        topic = topic.split("=", 1)[-1].strip()
-    topic = topic.strip("'").strip('"').strip("`")
-
-    safe_log(f"[STATUS:{agent_id}] Thinking: Analyzing '{topic[:40]}...'")
-    await asyncio.sleep(3)
-    # FIX: Explicitly instruct the agent to stop looping and output the response
-    return f"SYSTEM INSTRUCTION: The thinking pause for '{topic}' is complete. Do NOT call the thinking tool again. Use your internal knowledge to generate a deep, detailed analysis and respond directly to the user."
+# Thinking tool removed - Gemini 3 native thinkingConfig is used instead.
 
 
 # ─────────────────────────────────────────────────
@@ -707,6 +701,7 @@ async def update_intentions(agent_id, tool_input):
         with open(intentions_path, "w", encoding="utf-8") as f:
             json.dump(intentions, f, indent=2)
             
-        return f"Success: Intentions updated. Objective: {intentions['objective']}"
+        steps_md = "\n".join([f"{i+1}. {s}" for i, s in enumerate(intentions['steps'])])
+        return f"Objective: {intentions['objective']}\n\n{steps_md}"
     except Exception as e:
         return f"Error updating intentions: {e}"
