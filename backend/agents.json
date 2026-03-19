@@ -5,16 +5,53 @@
     "description": "Agent description...",
     "brain": "",
     "channel": "Gmail",
-    "workingDir": "",
+    "workingDir": "D:\\New folder",
     "permissions": [
-      "web search",
       "report generation"
     ],
     "tools": "Custom",
     "responsibility": "",
     "agentType": "master",
-    "x": -1173.0,
-    "y": 67.0,
+    "x": -1010.0,
+    "y": 47.0,
     "connections": []
+  },
+  {
+    "id": "agent-bot-1773903633083",
+    "name": "Geopolitics Researcher",
+    "description": "Agent description...",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [
+      "web search"
+    ],
+    "tools": "Custom",
+    "responsibility": "",
+    "agentType": "worker",
+    "x": -1368.0,
+    "y": -216.0,
+    "connections": [
+      "agent-bot-1773902255400"
+    ]
+  },
+  {
+    "id": "agent-bot-1773903640364",
+    "name": "Military Historian",
+    "description": "Agent description...",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [
+      "web search"
+    ],
+    "tools": "Custom",
+    "responsibility": "",
+    "agentType": "worker",
+    "x": -1368.0,
+    "y": 134.0,
+    "connections": [
+      "agent-bot-1773902255400"
+    ]
   }
 ]

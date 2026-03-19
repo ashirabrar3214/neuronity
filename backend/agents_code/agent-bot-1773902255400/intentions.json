@@ -1,8 +1,9 @@
 {
-  "objective": "{\"tool_input\": \"Synthesize research findings into a structured report",
+  "objective": "{\"tool_input\": \"Create a detailed report on the Iran War",
   "steps": [
-    "Generate the markdown report using the generate_report tool",
-    "Present the final response to the user\"}"
+    "Delegate historical research to Military Historian",
+    "Delegate geopolitical research to Geopolitics Researcher",
+    "Synthesize findings into a report\"}"
   ],
   "completed": []
 }

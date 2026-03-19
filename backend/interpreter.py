@@ -1349,7 +1349,7 @@ async def run_autonomous_agent(request: ChatRequest):
         return await chat_with_agent(request)
 
     # Save plan location for the UI
-    plan_path = os.path.join(AGENTS_CODE_DIR, request.agent_id, "plan.md")
+    plan_path = os.path.join(AGENTS_CODE_DIR, request.agent_id, "intentions.json")
     
     # Return plan markdown (without HTML button â€” the frontend handles button display)
     steps_md = "\n".join([f"{i+1}. {s}" for i, s in enumerate(steps)])

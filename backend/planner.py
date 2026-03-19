@@ -126,19 +126,20 @@ YOUR PLAN:"""
 
 
 def save_intentions_md(steps, task, agent_id):
-    """Save the committed intentions as a readable markdown file inside the agent's directory."""
+    """Save the committed intentions as JSON to unify with the update_plan tool."""
     agent_dir = os.path.join(AGENTS_CODE_DIR, agent_id)
     os.makedirs(agent_dir, exist_ok=True)
-    intentions_path = os.path.join(agent_dir, "intentions.md")
+    intentions_path = os.path.join(agent_dir, "intentions.json")
 
+    # Format it exactly like the toolkit.py update_plan does
+    intentions = {
+        "objective": task,
+        "steps": steps,
+        "completed": []
+    }
     with open(intentions_path, "w", encoding="utf-8") as f:
-        f.write("# Agent Intentions (BDI)\n")
-        f.write(f"**Objective:** {task}\n")
-        f.write(f"**Committed:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-        f.write("## Steps\n")
-        for i, step in enumerate(steps, 1):
-            f.write(f"{i}. {step}\n")
-        f.write("\n---\n*The agent is committed to these intentions until finished.*\n")
+        import json
+        json.dump(intentions, f, indent=2)
 
     return intentions_path
 
@@ -270,21 +271,19 @@ async def run_execution_loop(agent_id, task, api_key, provider):
     session_id = f"sess_{int(time.time())}"
     safe_log(f"--- [BDI] Session initialized: {session_id}")
 
-    # Load from intentions.md
+    # Load from intentions.json (Unified Source)
     agent_dir = os.path.join(AGENTS_CODE_DIR, agent_id)
-    intentions_path = os.path.join(agent_dir, "intentions.md")
+    intentions_path = os.path.join(agent_dir, "intentions.json")
     
     steps = []
     if os.path.exists(intentions_path):
         try:
             with open(intentions_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    # Match numbered list items: "1. Step description"
-                    match = re.match(r'^\d+\.\s+(.*)$', line.strip())
-                    if match:
-                        steps.append(match.group(1).strip())
+                data = json.load(f)
+                steps = data.get("steps", [])
+                task = data.get("objective", task) # Adopt the objective from the file
         except Exception as e:
-            safe_log(f"!!! [PLAN_RUNNER] Error reading intentions.md: {e}")
+            safe_log(f"!!! [PLAN_RUNNER] Error reading intentions.json: {e}")
 
     if not steps:
         return "Failed to locate an execution plan. Please try generating the plan again."
