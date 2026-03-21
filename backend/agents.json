@@ -1,99 +1,19 @@
 [
   {
-    "id": "agent-MasterBot-001",
-    "name": "MasterBot",
-    "description": "Main orchestrator agent.",
-    "brain": "Gemini",
+    "id": "agent-bot-1774125681779",
+    "name": "MasterAgnet",
+    "description": "Agent description...",
+    "brain": "",
     "channel": "Gmail",
     "workingDir": "D:\\New folder",
     "permissions": [
-      "report generation",
       "file access"
     ],
-    "tools": "Gmail",
-    "responsibility": "Coordinate all agents",
-    "agentType": "master",
-    "x": 100.0,
-    "y": 150.0,
+    "tools": "Custom",
+    "responsibility": "",
+    "agentType": "worker",
+    "x": -190.0,
+    "y": 413.0,
     "connections": []
-  },
-  {
-    "id": "agent-bot-1773947472648",
-    "name": "Geopolitics",
-    "description": "Agent description...",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "D:\\New folder",
-    "permissions": [
-      "web search",
-      "file access"
-    ],
-    "tools": "Custom",
-    "responsibility": "",
-    "agentType": "worker",
-    "x": -230.0,
-    "y": 17.0,
-    "connections": [
-      "agent-MasterBot-001"
-    ]
-  },
-  {
-    "id": "agent-bot-1773965327852",
-    "name": "Religion",
-    "description": "Agent description...",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [
-      "web search",
-      "file access"
-    ],
-    "tools": "Custom",
-    "responsibility": "",
-    "agentType": "worker",
-    "x": -246.0,
-    "y": 191.0,
-    "connections": [
-      "agent-MasterBot-001"
-    ]
-  },
-  {
-    "id": "agent-bot-1773965338441",
-    "name": "Natanyahu",
-    "description": "Agent description...",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [
-      "web search",
-      "file access"
-    ],
-    "tools": "Custom",
-    "responsibility": "",
-    "agentType": "worker",
-    "x": -258.0,
-    "y": 359.0,
-    "connections": [
-      "agent-MasterBot-001"
-    ]
-  },
-  {
-    "id": "agent-bot-1773965348959",
-    "name": "DJT",
-    "description": "Agent description...",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [
-      "web search"
-    ],
-    "tools": "Custom",
-    "responsibility": "",
-    "agentType": "worker",
-    "x": -253.0,
-    "y": 542.0,
-    "connections": [
-      "agent-MasterBot-001"
-    ]
   }
 ]

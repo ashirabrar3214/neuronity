@@ -4,3 +4,7 @@ pydantic
 requests
 ddgs
 python-dotenv
+httpx
+chromadb
+beautifulsoup4
+sentence-transformers

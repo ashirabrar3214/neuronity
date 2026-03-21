@@ -1,4 +1,5 @@
 ﻿import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -89,7 +90,72 @@ threading.Thread(target=background_dir_scanner, daemon=True).start()
 
 _thread_pool = ThreadPoolExecutor(max_workers=8)  # allows concurrent agent calls
 
-app = FastAPI()
+# Captured at startup so the tick thread can dispatch async coroutines safely.
+# The tick thread uses asyncio.run_coroutine_threadsafe(_main_event_loop) —
+# it must NOT call asyncio.get_event_loop() from a non-async thread in Python 3.10+.
+_main_event_loop = None
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    global _main_event_loop
+    _main_event_loop = asyncio.get_running_loop()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+def execution_engine_tick():
+    """
+    Background tick: every 5 seconds, scan all agents for RUNNING workmaps
+    and fire-and-forget execute_next_node() into the main event loop.
+
+    Fire-and-forget means we do NOT call future.result() — the coroutine owns
+    all workmap state updates itself. The only guard here is skipping agents
+    that already have an IN_PROGRESS node, which prevents double-dispatch
+    (execute_next_node writes IN_PROGRESS before its first await).
+    """
+    # Wait for FastAPI startup to capture the event loop
+    while _main_event_loop is None:
+        time.sleep(0.1)
+
+    import planner as _planner
+
+    while True:
+        try:
+            agents = load_data()
+            for agent in agents:
+                agent_id = agent.get("id")
+                if not agent_id:
+                    continue
+                wm_path = os.path.join(AGENTS_CODE_DIR, agent_id, "workmap.json")
+                if not os.path.exists(wm_path):
+                    continue
+                try:
+                    with open(wm_path, "r", encoding="utf-8") as f:
+                        wm = json.load(f)
+                    if wm.get("status") != "RUNNING":
+                        continue
+                    # Guard: skip if a node is already in flight
+                    if any(n.get("status") == "IN_PROGRESS" for n in wm.get("nodes", [])):
+                        continue
+                    api_key = wm.get("api_key") or os.getenv("GEMINI_API_KEY", "")
+                    provider = wm.get("provider", "gemini")
+                    # FIRE AND FORGET — do not block the tick thread
+                    asyncio.run_coroutine_threadsafe(
+                        _planner.execute_next_node(agent_id, api_key, provider),
+                        _main_event_loop
+                    )
+                    safe_log(f"[TICK] Dispatched node for {agent_id}")
+                except Exception as e:
+                    safe_log(f"!!! [TICK] Error reading workmap for {agent_id}: {e}")
+        except Exception as e:
+            safe_log(f"!!! [TICK] Outer error: {e}")
+        time.sleep(5)
+
+
+threading.Thread(target=execution_engine_tick, daemon=True).start()
 
 # Enable CORS for Electron
 app.add_middleware(
@@ -118,7 +184,7 @@ def update_beliefs_context(new_goal):
     import brf
     return brf.update_belief_context(new_goal)
 
-# â”€â”€â”€ BELIEF BASE SEARCH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€â"€ BELIEF BASE SEARCH â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 def search_beliefs_base(query, top_k=15):
     """
@@ -157,7 +223,7 @@ def get_beliefs_base_all():
     
     if not entries:
         return "Belief Base is empty."
-    lines = [f"### Full Belief Base â€” {len(entries)} entries\n"]
+    lines = [f"### Full Belief Base -- {len(entries)} entries\n"]
     for e in entries:
         lines.append(
             f"[{e.get('agent_id', 'Agent')}] {e.get('fact','')}\nSource: {e.get('url','No URL')}"
@@ -375,6 +441,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
         tool_to_perm = {
             "web_search": "web search",
             "deep_search": "web search",
+            "extract_to_db": "web search",
             "generate_report": "report generation",
             "report_generation": "report generation",
             "list_workspace": "file access",
@@ -390,7 +457,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
             return f"Error: My '{required_perm}' capability is currently disabled. I cannot use the tool '{tool_name}'. Please enable it in my settings if you want me to proceed with this action."
 
     if tool_name == "post_finding":
-        # â”€â”€ BELIEF REVISION (BRF) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # â"€â"€ BELIEF REVISION (BRF) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
         import brf
         raw_snippet = tool_input.strip()
         url = ""
@@ -411,8 +478,21 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
         return await toolkit.ask_user(agent_id, tool_input)
 
     elif tool_name == "web_search":
+        # LOOK BEFORE YOU LEAP: check the vector belief store before hitting DDGS
+        cache_hits = brf.vector_search_beliefs(tool_input, top_k=5, threshold=0.72)
+        if cache_hits:
+            safe_log(f"[LBYL:{agent_id}] Cache hit ({len(cache_hits)} results) — skipping web search")
+            lines = [
+                f"**[Cached]** {h[1].get('fact', '')}  \nSource: {h[1].get('url', 'No URL')}  \nRelevance: {h[0]:.2f}"
+                for h in cache_hits
+            ]
+            return "BELIEF BASE HIT — Retrieved from local knowledge (no web search used):\n\n" + "\n\n---\n\n".join(lines)
         return await toolkit.web_search(tool_input, agent_id, api_key=api_key)
-    
+
+    elif tool_name == "extract_to_db":
+        import raw_data_ingestor
+        return await raw_data_ingestor.ingest_url(tool_input, agent_id)
+
     elif tool_name == "deep_search":
         return await toolkit.deep_search(tool_input, agent_id, api_key=api_key)
     
@@ -442,18 +522,18 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
             
             agents = load_data()
 
-            # â”€â”€ 1. Find sender data
+            # â"€â"€ 1. Find sender data
             sender_data = next((a for a in agents if a["id"] == agent_id), None)
             if not sender_data:
                 return f"Error: Sender agent {agent_id} not found."
             sender_name = sender_data.get("name", "Unknown Agent")
 
-            # â”€â”€ 3. Find target
+            # â"€â"€ 3. Find target
             target_data = next((a for a in agents if a["id"] == target_id), None)
             if not target_data:
                 return f"Error: Target agent {target_id} not found."
 
-            # â”€â”€ 2. ENFORCE CONNECTION GRAPH (BIDIRECTIONAL)
+            # â"€â"€ 2. ENFORCE CONNECTION GRAPH (BIDIRECTIONAL)
             #       A wire on the canvas between two agents means both can message each other,
             #       regardless of which end the user drew the arrow from.
             sender_connections = sender_data.get("connections", [])
@@ -466,7 +546,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
             
             target_provider = target_data.get("brain", "").lower()
 
-            # â”€â”€ 4. PRE-DELEGATION CAPABILITY CHECK
+            # â"€â"€ 4. PRE-DELEGATION CAPABILITY CHECK
             #       Before sending, verify the target can actually do the work.
             #       An agent with zero permissions and zero connections is a dead end.
             target_perms = target_data.get("permissions", [])
@@ -480,7 +560,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
                     f"(2) tell the user that '{target_name}' needs permissions enabled before it can work."
                 )
 
-            # â”€â”€ 5. BUILD COMPACT TASK CONTEXT (not full history â€” just enough for the agent to orient)
+            # â"€â"€ 5. BUILD COMPACT TASK CONTEXT (not full history -- just enough for the agent to orient)
             sender_plan_path = os.path.join(AGENTS_CODE_DIR, agent_id, "plan.json")
             task_context_lines = []
             try:
@@ -497,7 +577,7 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
             task_context_lines.append(f"Your available capabilities: {cap_summary}")
             sender_context_snippet = "\n".join(task_context_lines)
             
-            # â”€â”€ 5. Get API key for target provider
+            # â"€â"€ 5. Get API key for target provider
             target_api_key = api_key
             config_path = os.path.join(os.getenv('APPDATA', ''), 'easy-company', 'config.json')
             if os.path.exists(config_path):
@@ -748,7 +828,7 @@ if __name__ == "__main__":
     with open(personality_path, "w", encoding="utf-8") as f:
         json.dump(personality_data, f, indent=2)
 
-    # 3. prompt.md â€” identity and behavioral rules ONLY.
+    # 3. prompt.md -- identity and behavioral rules ONLY.
     prompt_path = os.path.join(agent_dir, "prompt.md")
     prompt_content = f"""# Agent Instructions: {agent_data['name']}
 Identity: You are an agent sitting in a desktop PC working for the User.
@@ -782,7 +862,7 @@ Responsibility: {agent_data.get('responsibility', 'General purpose assistance')}
         with open(history_path, "w", encoding="utf-8") as f:
             json.dump([], f)
 
-    # 6. Agent Manifest (Phase 4) â€” always regenerate so settings changes apply
+    # 6. Agent Manifest (Phase 4) -- always regenerate so settings changes apply
     agent_type = agent_data.get("agentType", "worker")
     manifest = {
         "agent_id": agent_data.get("id", ""),
@@ -960,7 +1040,22 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest
                 "required": ["query"]
             }
         })
-
+        declarations.append({
+            "name": "extract_to_db",
+            "description": (
+                "Fetches a URL, strips the HTML, and embeds the full page text into the local "
+                "vector knowledge base using a sentence-aware chunker. Use this to ingest an "
+                "entire article or page for deep retrieval — it is much cheaper than repeated "
+                "web searches because future queries will be answered from the local cache."
+            ),
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "url": {"type": "STRING", "description": "The full URL of the page to ingest."}
+                },
+                "required": ["url"]
+            }
+        })
 
     if "report generation" in permissions:
         declarations.append({
@@ -1251,7 +1346,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
     # ROUTING: Classify by explicit mode rather than LLM guessing
     is_task = (mode == "work")
     
-    # â”€â”€â”€ BDI REASONING CYCLE: DELIBERATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â"€â"€â"€ BDI REASONING CYCLE: DELIBERATION â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
     if not is_training_mode:
         decision, reason = await deliberator.deliberate(agent_id, message, api_key, "gemini", beliefs_context, history=history, capabilities=permissions)
         yield f"data: {json.dumps({'type': 'thought', 'content': f'BDI Deliberation: {decision} ({reason})'})}\n\n"
@@ -1452,7 +1547,7 @@ async def run_autonomous_agent(request: ChatRequest):
             )
     agents_info = "\n".join(agents_info_lines)
 
-    # â”€â”€ ROUTING: Task vs. Conversation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # â"€â"€ ROUTING: Task vs. Conversation â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
     provider = request.provider or "gemini"
     api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
 
@@ -1478,7 +1573,7 @@ async def run_autonomous_agent(request: ChatRequest):
     # Save plan location for the UI
     plan_path = os.path.join(AGENTS_CODE_DIR, request.agent_id, "intentions.json")
     
-    # Return plan markdown (without HTML button â€” the frontend handles button display)
+    # Return plan markdown (without HTML button -- the frontend handles button display)
     steps_md = "\n".join([f"{i+1}. {s}" for i, s in enumerate(steps)])
     final_response = (
         f"### ðŸŽ¯ Intentions Generated (BDI)\n\n"
@@ -1508,6 +1603,46 @@ async def execute_autonomous(request: ChatRequest):
     )
     return {"response": result}
 
+# --- WORKMAP ENDPOINTS -------------------------------------------------------
+
+@app.get("/workmap/{agent_id}")
+async def get_workmap(agent_id: str):
+    """Return the current DAG workmap for an agent."""
+    wm_path = os.path.join(AGENTS_CODE_DIR, agent_id, "workmap.json")
+    if not os.path.exists(wm_path):
+        raise HTTPException(status_code=404, detail="No workmap found for this agent")
+    with open(wm_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@app.post("/workmap/{agent_id}/play")
+async def play_workmap(agent_id: str):
+    """Set workmap status to RUNNING — tick engine will begin dispatching nodes."""
+    wm_path = os.path.join(AGENTS_CODE_DIR, agent_id, "workmap.json")
+    if not os.path.exists(wm_path):
+        raise HTTPException(status_code=404, detail="No workmap found for this agent")
+    with open(wm_path, "r", encoding="utf-8") as f:
+        wm = json.load(f)
+    wm["status"] = "RUNNING"
+    with open(wm_path, "w", encoding="utf-8") as f:
+        json.dump(wm, f, indent=2)
+    return {"status": "RUNNING", "agent_id": agent_id}
+
+
+@app.post("/workmap/{agent_id}/pause")
+async def pause_workmap(agent_id: str):
+    """Set workmap status to PAUSED — tick engine will skip this agent."""
+    wm_path = os.path.join(AGENTS_CODE_DIR, agent_id, "workmap.json")
+    if not os.path.exists(wm_path):
+        raise HTTPException(status_code=404, detail="No workmap found for this agent")
+    with open(wm_path, "r", encoding="utf-8") as f:
+        wm = json.load(f)
+    wm["status"] = "PAUSED"
+    with open(wm_path, "w", encoding="utf-8") as f:
+        json.dump(wm, f, indent=2)
+    return {"status": "PAUSED", "agent_id": agent_id}
+
+
 if __name__ == "__main__":
-    # Run on localhost:8000 â€” loop=asyncio lets multiple agents communicate concurrently
+    # Run on localhost:8000 — loop=asyncio lets multiple agents communicate concurrently
     uvicorn.run(app, host="127.0.0.1", port=8000, loop="asyncio")

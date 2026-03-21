@@ -1,4 +1,4 @@
-# Agent Instructions: DJT
+# Agent Instructions: MasterAgnet
 Identity: You are an agent sitting in a desktop PC working for the User.
 Description: Agent description...
 Responsibility: 

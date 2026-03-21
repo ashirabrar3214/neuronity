@@ -922,3 +922,113 @@ input:checked+.slider:before {
         opacity: 0.5
     }
 }
+
+/* ── WORKMAP DAG VISUALIZATION ──────────────────────────────────────── */
+
+.workmap-dag {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 8px 10px 6px;
+    margin-top: 2px;
+}
+
+.dag-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.dag-title {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.3);
+    text-transform: uppercase;
+}
+
+.dag-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.dag-play-btn,
+.dag-pause-btn {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 10px;
+    padding: 2px 5px;
+    line-height: 1;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.dag-play-btn:hover {
+    color: #86efac;
+    border-color: #86efac;
+}
+
+.dag-pause-btn:hover {
+    color: #fbbf24;
+    border-color: #fbbf24;
+}
+
+.dag-nodes {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.dag-node {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    gap: 8px;
+}
+
+.dag-node-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dag-node-badge {
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.75;
+    flex-shrink: 0;
+}
+
+/* Status colour-coding */
+.dag-node-status-pending {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.dag-node-status-in-progress {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+    animation: dag-pulse 1.6s ease-in-out infinite;
+}
+
+.dag-node-status-completed {
+    background: rgba(34, 197, 94, 0.15);
+    color: #86efac;
+}
+
+.dag-node-status-error {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+}
+
+@keyframes dag-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.35); }
+    50%       { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0); }
+}

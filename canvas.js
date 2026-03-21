@@ -86,6 +86,16 @@ class AgentCanvas {
                 <button class="delete-btn">Delete Agent</button>
             </div>
             <div class="node-body">${content}</div>
+            <div class="workmap-dag" id="dag-${id}" style="display:none;">
+                <div class="dag-header">
+                    <span class="dag-title">WORKMAP</span>
+                    <div class="dag-controls">
+                        <button class="dag-play-btn" data-agent="${id}" title="Resume execution">&#9654;</button>
+                        <button class="dag-pause-btn" data-agent="${id}" title="Pause execution">&#9646;&#9646;</button>
+                    </div>
+                </div>
+                <div class="dag-nodes" id="dag-nodes-${id}"></div>
+            </div>
             <div class="node-terminal">
                 <div class="terminal-header">LIVE BACKEND</div>
                 <div class="terminal-content" id="term-${id}">> Agent initialized...</div>
@@ -150,6 +160,30 @@ class AgentCanvas {
             }
         });
         settingsPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+
+        // Workmap Play/Pause buttons
+        const dagPlayBtn = nodeEl.querySelector('.dag-play-btn');
+        const dagPauseBtn = nodeEl.querySelector('.dag-pause-btn');
+        if (dagPlayBtn) {
+            dagPlayBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+            dagPlayBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                try {
+                    await fetch(`http://localhost:8000/workmap/${id}/play`, { method: 'POST' });
+                    this.logToTerminal(id, 'Workmap RESUMED');
+                } catch (err) { console.error('Workmap play error:', err); }
+            });
+        }
+        if (dagPauseBtn) {
+            dagPauseBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+            dagPauseBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                try {
+                    await fetch(`http://localhost:8000/workmap/${id}/pause`, { method: 'POST' });
+                    this.logToTerminal(id, 'Workmap PAUSED');
+                } catch (err) { console.error('Workmap pause error:', err); }
+            });
+        }
 
         // Train Button
         const trainBtn = nodeEl.querySelector('.train-btn');
@@ -528,6 +562,12 @@ class AgentCanvas {
             if (agents.length > 0) {
                 setTimeout(() => this.centerView(), 50);
             }
+
+            // Start workmap polling once agents are loaded
+            if (!this._workmapPollingStarted) {
+                this._workmapPollingStarted = true;
+                this.startWorkmapPolling();
+            }
         } catch (error) {
             if (retries > 0) {
                 console.log(`Backend not ready, retrying in 1s... (${retries} retries left)`);
@@ -538,6 +578,52 @@ class AgentCanvas {
                 this.createNode('agent-MasterBot-001', 'MasterBot', 'Main orchestrator agent.', 100, 150);
             }
         }
+    }
+
+    updateWorkmapNodes(agentId, workmap) {
+        const dagEl = document.getElementById(`dag-${agentId}`);
+        const dagNodesEl = document.getElementById(`dag-nodes-${agentId}`);
+        if (!dagEl || !dagNodesEl) return;
+
+        const nodes = workmap && workmap.nodes;
+        if (!nodes || nodes.length === 0) {
+            dagEl.style.display = 'none';
+            return;
+        }
+
+        dagEl.style.display = 'block';
+        dagNodesEl.innerHTML = nodes.map(node => {
+            const statusClass = 'dag-node-status-' + node.status.toLowerCase().replace('_', '-');
+            const label = node.task.length > 42 ? node.task.substring(0, 42) + '...' : node.task;
+            return `<div class="dag-node ${statusClass}" title="${node.task}">
+                <span class="dag-node-label">${label}</span>
+                <span class="dag-node-badge">${node.status}</span>
+            </div>`;
+        }).join('');
+    }
+
+    startWorkmapPolling() {
+        // Poll every 5000ms — matches the backend tick interval.
+        // Only polls agents whose DAG section is already visible (master agents
+        // that have a workmap). Worker agents 404 and are silently skipped.
+        setInterval(async () => {
+            for (const nodeObj of this.nodes) {
+                const dagEl = document.getElementById(`dag-${nodeObj.id}`);
+                // Skip polling agents whose workmap is not yet visible
+                if (dagEl && dagEl.style.display === 'none') {
+                    // Still try a probe fetch so new workmaps become visible
+                    try {
+                        const r = await fetch(`http://localhost:8000/workmap/${nodeObj.id}`);
+                        if (r.ok) this.updateWorkmapNodes(nodeObj.id, await r.json());
+                    } catch (_) { /* worker agent — no workmap */ }
+                } else if (dagEl) {
+                    try {
+                        const r = await fetch(`http://localhost:8000/workmap/${nodeObj.id}`);
+                        if (r.ok) this.updateWorkmapNodes(nodeObj.id, await r.json());
+                    } catch (_) { /* ignore */ }
+                }
+            }
+        }, 5000);
     }
 
     centerView() {

@@ -128,6 +128,196 @@ def save_plan_json(steps, task, agent_id):
     return plan_path
 
 
+async def generate_workmap(task, agent_id, api_key, provider, agents_info=""):
+    """
+    Generate a DAG workmap for master agents.
+    Calls the LLM with a structured prompt that returns a JSON array of nodes.
+    Includes robust regex pre-processing before json.loads() to strip reasoning
+    preamble and markdown code fences that LLMs commonly include.
+    Falls back to a sequential node list derived from generate_plan() if parsing fails.
+    """
+    safe_log(f"[STATUS:{agent_id}] Generating DAG workmap...")
+
+    agents_context = f"\n\nAVAILABLE CONNECTED AGENTS:\n{agents_info}" if agents_info else ""
+
+    prompt = f"""You are a task planner for an autonomous multi-agent system.
+Your job is to decompose the following task into a Directed Acyclic Graph (DAG) of work nodes.{agents_context}
+
+TASK: {task}
+
+OUTPUT RULES (STRICT):
+1. Return ONLY a valid JSON array. No markdown, no explanation, no preamble.
+2. Each node must have: "id" (string, e.g. "node_1"), "agent" (agent ID string or "self"), "task" (clear instruction string), "dependencies" (array of node IDs that must complete first, empty [] for root nodes).
+3. Maximum 6 nodes. Keep each task focused on a single research or execution action.
+4. The FINAL node should always generate the report/deliverable.
+5. Parallel nodes (no shared dependencies) will be dispatched concurrently — use this for independent research tasks.
+
+EXAMPLE OUTPUT:
+[
+  {{"id": "node_1", "agent": "agent-geopolitics-001", "task": "Search for current military positions and recent engagements.", "dependencies": []}},
+  {{"id": "node_2", "agent": "agent-economics-002", "task": "Research economic sanctions and trade disruptions.", "dependencies": []}},
+  {{"id": "node_3", "agent": "self", "task": "Generate final PDF report synthesizing all research.", "dependencies": ["node_1", "node_2"]}}
+]
+
+YOUR DAG (JSON array only):"""
+
+    text = await _call_llm_direct(prompt, api_key, provider, mode="think")
+
+    nodes = None
+    if text:
+        try:
+            # Step 1: Extract the JSON array, stripping any preamble or postamble
+            raw = re.sub(r"^[\s\S]*?(\[[\s\S]*\])[\s\S]*$", r"\1", text, flags=re.DOTALL)
+            # Step 2: Remove markdown code fences if present
+            raw = re.sub(r"```(?:json)?|```", "", raw).strip()
+            nodes = json.loads(raw)
+        except Exception as e:
+            safe_log(f"!!! [WORKMAP] JSON parse failed ({e}), falling back to generate_plan()")
+
+    # Fallback: convert flat steps to sequential single-dep nodes
+    if not nodes:
+        fallback_steps = await generate_plan(task, agent_id, api_key, provider, agents_info, autonomous=True)
+        nodes = []
+        for i, step in enumerate(fallback_steps):
+            nodes.append({
+                "id": f"node_{i+1}",
+                "agent": agent_id,
+                "task": step,
+                "dependencies": [f"node_{i}"] if i > 0 else []
+            })
+
+    workmap = {
+        "project_id": f"proj_{int(time.time())}",
+        "status": "PAUSED",
+        "deadline_hours": 48,
+        "api_key": api_key,
+        "provider": provider,
+        "nodes": [
+            {
+                "id": n.get("id", f"node_{i+1}"),
+                "agent": n.get("agent", agent_id),
+                "task": n.get("task", ""),
+                "dependencies": n.get("dependencies", []),
+                "status": "PENDING",
+                "result_summary": ""
+            }
+            for i, n in enumerate(nodes)
+        ]
+    }
+
+    safe_log(f"[STATUS:{agent_id}] Workmap generated: {len(workmap['nodes'])} nodes")
+    return workmap
+
+
+def save_workmap_json(workmap, agent_id):
+    """Persist the DAG workmap to agents_code/{agent_id}/workmap.json."""
+    agent_dir = os.path.join(AGENTS_CODE_DIR, agent_id)
+    os.makedirs(agent_dir, exist_ok=True)
+    workmap_path = os.path.join(agent_dir, "workmap.json")
+    with open(workmap_path, "w", encoding="utf-8") as f:
+        json.dump(workmap, f, indent=2)
+    return workmap_path
+
+
+async def execute_next_node(agent_id, api_key, provider):
+    """
+    Tick engine entry point: reads workmap.json, finds the next eligible PENDING node
+    (all dependencies COMPLETED), marks it IN_PROGRESS, runs it, and saves the result.
+
+    Returns: "done" | "in_progress" | "blocked" | "paused" | "no_workmap"
+
+    IMPORTANT: IN_PROGRESS is written to disk before any await so the tick thread's
+    double-dispatch guard (which reads the file) works correctly.
+    """
+    workmap_path = os.path.join(AGENTS_CODE_DIR, agent_id, "workmap.json")
+    if not os.path.exists(workmap_path):
+        return "no_workmap"
+
+    with open(workmap_path, "r", encoding="utf-8") as f:
+        workmap = json.load(f)
+
+    if workmap.get("status") != "RUNNING":
+        return "paused"
+
+    nodes = workmap.get("nodes", [])
+    completed_ids = {n["id"] for n in nodes if n["status"] == "COMPLETED"}
+
+    # Find first PENDING node whose dependencies are all COMPLETED
+    next_node = None
+    for node in nodes:
+        if node["status"] == "PENDING":
+            deps = node.get("dependencies", [])
+            if all(d in completed_ids for d in deps):
+                next_node = node
+                break
+
+    if next_node is None:
+        all_done = all(n["status"] in ("COMPLETED", "ERROR") for n in nodes)
+        if all_done:
+            workmap["status"] = "COMPLETED"
+            with open(workmap_path, "w", encoding="utf-8") as f:
+                json.dump(workmap, f, indent=2)
+            safe_log(f"[TICK] {agent_id}: All nodes complete — workmap COMPLETED")
+            return "done"
+        return "blocked"
+
+    # Mark IN_PROGRESS synchronously (before any await) so the tick guard sees it
+    next_node["status"] = "IN_PROGRESS"
+    with open(workmap_path, "w", encoding="utf-8") as f:
+        json.dump(workmap, f, indent=2)
+
+    # Reconstruct accumulated context from completed nodes' summaries
+    accumulated_context = "\n".join(
+        f"### {n['task'][:60]}\n{n['result_summary']}"
+        for n in nodes
+        if n["status"] == "COMPLETED" and n.get("result_summary")
+    )
+
+    step_num = next((i + 1 for i, n in enumerate(nodes) if n["id"] == next_node["id"]), 1)
+    total = len(nodes)
+    target_agent = next_node.get("agent", agent_id)
+    # If agent is "self" or the master itself, use agent_id
+    if target_agent in ("self", "", None):
+        target_agent = agent_id
+
+    PDF_KEYWORDS = ["report_generation", "pdf", "create a pdf", "generate a pdf", "final report"]
+    is_pdf = any(w in next_node["task"].lower() for w in PDF_KEYWORDS)
+    session_id = workmap.get("project_id", f"wm_{int(time.time())}")
+
+    safe_log(f"[TICK] {agent_id}: Executing node {next_node['id']} — {next_node['task'][:60]}")
+
+    result = await execute_step(
+        step_num, total,
+        next_node["task"],
+        target_agent,
+        accumulated_context,
+        api_key, provider,
+        is_pdf_step=is_pdf,
+        session_id=session_id
+    )
+
+    # Reload workmap to avoid overwriting concurrent changes
+    with open(workmap_path, "r", encoding="utf-8") as f:
+        workmap = json.load(f)
+
+    # Find and update the node
+    for node in workmap.get("nodes", []):
+        if node["id"] == next_node["id"]:
+            node["status"] = "ERROR" if str(result).startswith("Step failed") else "COMPLETED"
+            node["result_summary"] = str(result)[:300]
+            break
+
+    # Check if all nodes are now done
+    all_done = all(n["status"] in ("COMPLETED", "ERROR") for n in workmap.get("nodes", []))
+    if all_done:
+        workmap["status"] = "COMPLETED"
+
+    with open(workmap_path, "w", encoding="utf-8") as f:
+        json.dump(workmap, f, indent=2)
+
+    return "in_progress"
+
+
 def _clear_internal_history(agent_id):
     """
     Wipe the agent's internal history before each autonomous step.
@@ -225,45 +415,91 @@ async def execute_step(step_num, total_steps, step_text, agent_id, accumulated_c
 
 async def run_autonomous(agent_id, task, api_key, provider, agents_info="", autonomous=False):
     """
-    Phase 1: Generate the intentions only.
+    Phase 1: Generate the intentions (plan.json) AND the DAG workmap (workmap.json).
     autonomous=True: skips the ask_user check-in step (used for master agents).
+    Returns the step list for backward-compatible UI rendering.
     """
     safe_log(f"[STATUS:{agent_id}] Autonomous deliberation complete: Plan generated")
+
+    # Generate flat step list for plan.json (used by worker agents and UI display)
     steps = await generate_plan(task, agent_id, api_key, provider, agents_info, autonomous=autonomous)
     if steps:
         save_plan_json(steps, task, agent_id)
+
+    # Generate DAG workmap for master tick engine (runs in parallel with plan generation)
+    try:
+        workmap = await generate_workmap(task, agent_id, api_key, provider, agents_info)
+        save_workmap_json(workmap, agent_id)
+        safe_log(f"[STATUS:{agent_id}] Workmap saved — {len(workmap['nodes'])} nodes, status: PAUSED")
+    except Exception as e:
+        safe_log(f"!!! [WORKMAP] Failed to generate workmap: {e}")
+
     return steps
+
 
 async def run_execution_loop(agent_id, task, api_key, provider):
     """
-    Phase 2: Actual step-by-step execution loop.
-    Clears the Blackboard at start, injects EXTRACTION MODE into each step,
-    and pulls from the Blackboard (not accumulated context) for the PDF step.
+    Phase 2: Trigger execution.
+
+    If a workmap.json exists for this agent, set its status to RUNNING and return
+    immediately — the background tick engine (execution_engine_tick in interpreter.py)
+    will process nodes one at a time via execute_next_node().
+
+    Falls back to the legacy linear loop (_run_linear_execution_loop) for agents
+    that don't have a workmap (worker agents receiving ad-hoc tasks via message_agent).
     """
-    safe_log(f"[STATUS:{agent_id}] Autonomous execution loop started")
-    
+    workmap_path = os.path.join(AGENTS_CODE_DIR, agent_id, "workmap.json")
+
+    if os.path.exists(workmap_path):
+        # DAG path: hand off to tick engine
+        try:
+            with open(workmap_path, "r", encoding="utf-8") as f:
+                workmap = json.load(f)
+            workmap["status"] = "RUNNING"
+            workmap["api_key"] = api_key
+            workmap["provider"] = provider
+            with open(workmap_path, "w", encoding="utf-8") as f:
+                json.dump(workmap, f, indent=2)
+            node_count = len(workmap.get("nodes", []))
+            safe_log(f"[STATUS:{agent_id}] Workmap activated — {node_count} nodes queued for tick engine")
+            return (
+                f"Execution started. The tick engine is now processing your workmap "
+                f"({node_count} nodes). Monitor progress in the canvas — nodes will turn "
+                f"blue while running and green when complete."
+            )
+        except Exception as e:
+            safe_log(f"!!! [WORKMAP] Failed to activate workmap: {e}")
+            # Fall through to linear loop on error
+
+    # Legacy linear path (no workmap, or workmap activation failed)
+    return await _run_linear_execution_loop(agent_id, task, api_key, provider)
+
+
+async def _run_linear_execution_loop(agent_id, task, api_key, provider):
+    """
+    Original blocking step-by-step execution loop.
+    Used for worker agents and as a fallback when no workmap.json exists.
+    """
+    safe_log(f"[STATUS:{agent_id}] Autonomous execution loop started (linear mode)")
+
     # CLEAR VOLATILE LEDGER: Start with a fresh slate
     import brf
     brf.clear_volatile_beliefs()
     safe_log(f"--- [CLEANUP] Volatile ledger (base_facts) cleared for new task.")
 
-    # TIERED BELIEF PERSISTENCE: beliefs_base.json is NOT cleared.
-    # Instead, brf.py handles session-based relevance and promotions.
-    # We create a unique session ID for this execution run.
     session_id = f"sess_{int(time.time())}"
     safe_log(f"--- [BDI] Session initialized: {session_id}")
 
-    # Load from plan.json (Unified BDI Source)
     agent_dir = os.path.join(AGENTS_CODE_DIR, agent_id)
     plan_path = os.path.join(agent_dir, "plan.json")
-    
+
     steps = []
     if os.path.exists(plan_path):
         try:
             with open(plan_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 steps = data.get("steps", [])
-                task = data.get("objective", task) 
+                task = data.get("objective", task)
         except Exception as e:
             safe_log(f"!!! [PLAN_RUNNER] Error reading plan.json: {e}")
 
@@ -273,20 +509,17 @@ async def run_execution_loop(agent_id, task, api_key, provider):
     accumulated_context = ""
     step_results = []
 
-    # Detect if last step is a PDF generation step
     PDF_KEYWORDS = ["report_generation", "pdf", "create a pdf", "generate a pdf"]
     last_step_lower = steps[-1].lower()
     last_is_pdf = any(w in last_step_lower for w in PDF_KEYWORDS)
 
     for i, step in enumerate(steps, 1):
-        # ─── CLOSED-LOOP COMMITMENT (CHECK-IN) ──────────────────────
-        # Every 3 steps, ask the deliberator if we should pivot
+        # Closed-loop commitment check every 3 steps
         if i > 1 and i % 3 == 0:
             import deliberator
             from interpreter import get_beliefs_context
             beliefs_ctx = get_beliefs_context()
-            
-            # Load history for deliberator context
+
             history = []
             history_path = os.path.join(agent_dir, "history.json")
             if os.path.exists(history_path):
@@ -294,16 +527,17 @@ async def run_execution_loop(agent_id, task, api_key, provider):
                     with open(history_path, "r", encoding="utf-8") as f:
                         history = json.load(f)
                 except: pass
-                
-            decision, reason = await deliberator.deliberate(agent_id, f"Ongoing task: {task}. Next step: {step}", api_key, provider, beliefs_ctx, history=history)
-            
+
+            decision, reason = await deliberator.deliberate(
+                agent_id, f"Ongoing task: {task}. Next step: {step}",
+                api_key, provider, beliefs_ctx, history=history
+            )
+
             if decision == "RE-PLAN":
                 safe_log(f"!!! [PIVOT] Deliberator signals RE-PLAN: {reason}")
-                # Archive current intentions and trigger a new cycle
-                # (Recursive call to generate new plan based on current beliefs)
                 new_steps = await run_autonomous(agent_id, task, api_key, provider)
                 if new_steps:
-                    return await run_execution_loop(agent_id, task, api_key, provider)
+                    return await _run_linear_execution_loop(agent_id, task, api_key, provider)
                 else:
                     return f"Pivot failed: Could not generate new intentions. Reason: {reason}"
 
@@ -316,22 +550,21 @@ async def run_execution_loop(agent_id, task, api_key, provider):
             is_pdf_step=is_pdf, session_id=session_id
         )
 
-        # --- NEW: HUMAN-IN-THE-LOOP INTERCEPTOR ---
         if "HALT_AND_ASK|" in str(result):
             question = result.split("HALT_AND_ASK|")[-1].strip()
             safe_log(f"[STATUS:{agent_id}] Autonomous loop paused by agent. Waiting for user.")
-            
-            # Delete the remaining intentions because the plan is paused
-            if os.path.exists(plan_path): 
+            if os.path.exists(plan_path):
                 try: os.remove(plan_path)
                 except: pass
-            
-            return f"### 🛑 Pausing for Your Direction\n\n**Agent asks:** {question}\n\n*(Reply to this message to steer the agent and it will generate a new plan based on your feedback.)*"
+            return (
+                f"### Pausing for Your Direction\n\n**Agent asks:** {question}\n\n"
+                f"*(Reply to this message to steer the agent and it will generate a new plan based on your feedback.)*"
+            )
+
         step_results.append((step, result))
         if not is_pdf:
             accumulated_context += f"\n### Step {i}: {step}\n{result}\n"
 
-    # Final PDF compilation logic
     if last_is_pdf:
         final_response = step_results[-1][1]
     else:
@@ -339,25 +572,10 @@ async def run_execution_loop(agent_id, task, api_key, provider):
         result = await execute_step(
             len(steps) + 1, len(steps) + 1,
             f"Create a PDF report for: {task}",
-            agent_id,
-            accumulated_context, api_key, provider,
+            agent_id, accumulated_context, api_key, provider,
             is_pdf_step=True, session_id=session_id
         )
         final_response = result
 
     safe_log(f"[STATUS:{agent_id}] Autonomous task complete")
-    
-    # FINAL CLEANUP: (Deletion of volatile findings and plans commented out to fix 'Clean Slate' bug)
-    # if os.path.exists(volatile_path):
-    #     try:
-    #         os.remove(volatile_path)
-    #         safe_log(f"--- [CLEANUP] Volatile ledger deleted after task completion.")
-    #     except: pass
-
-    # if os.path.exists(intentions_path):
-    #     try:
-    #         os.remove(intentions_path)
-    #         safe_log(f"--- [BDI CLEANUP] intentions.md deleted after task completion.")
-    #     except: pass
-
     return final_response
