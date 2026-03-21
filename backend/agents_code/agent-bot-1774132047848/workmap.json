@@ -1,0 +1,53 @@
+{
+  "project_id": "proj_1774133672",
+  "status": "PAUSED",
+  "deadline_hours": 10,
+  "api_key": "AIzaSyCz0j85qREYsRYx8YCBZvAqm4TRNCOlvVI",
+  "provider": "gemini",
+  "nodes": [
+    {
+      "id": "node_1",
+      "agent": "agent-sociopolitical-001",
+      "task": "Analyze the religious drivers and political landscape of Iran and its regional alliances in a 2026 conflict scenario.",
+      "dependencies": [],
+      "status": "COMPLETED",
+      "result_summary": "Okay, I understand. I will analyze the religious drivers and political landscape of Iran and its regional alliances in a 2026 conflict scenario, extracting verbatim text and posting each finding with its source URL. I will then provide a brief summary of the extraction process.\n\nI will start by sear",
+      "x": -192.0,
+      "y": -65.0
+    },
+    {
+      "id": "node_2",
+      "agent": "agent-geospatial-002",
+      "task": "Identify strategic geographic choke points, military positioning, and territorial vulnerabilities in the Iranian theater for 2026.",
+      "dependencies": [],
+      "status": "COMPLETED",
+      "result_summary": "Okay, I will now focus on identifying strategic geographic choke points, military positioning, and territorial vulnerabilities in the Iranian theater for 2026. I will use web search and deep search to gather information, extract verbatim text, and post each finding with its source URL.\n\n",
+      "x": 225.0,
+      "y": -320.0
+    },
+    {
+      "id": "node_3",
+      "agent": "agent-science-tech-003",
+      "task": "Project Iranian scientific advancements by 2026, focusing on cyber warfare, missile technology, and nuclear capabilities.",
+      "dependencies": [],
+      "status": "COMPLETED",
+      "result_summary": "Okay, I understand. I will now focus on projecting Iranian scientific advancements by 2026, focusing on cyber warfare, missile technology, and nuclear capabilities. I will use web search and deep search to gather information, extract verbatim text, and post each finding with its source URL.\n\n",
+      "x": 646.0,
+      "y": -280.0
+    },
+    {
+      "id": "node_4",
+      "agent": "self",
+      "task": "Synthesize research from all domains to generate the final report on the hypothetical 'War of 2026' involving Iran.",
+      "dependencies": [
+        "node_1",
+        "node_2",
+        "node_3"
+      ],
+      "status": "COMPLETED",
+      "result_summary": "\n\nReport generated: Report_The_2026_Iran_War_Escalation_Cyber_Warfare_and.pdf. (Saved in D:\\New folder)",
+      "x": 373.0,
+      "y": 182.0
+    }
+  ]
+}

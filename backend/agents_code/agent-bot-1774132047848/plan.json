@@ -1,0 +1,9 @@
+{
+  "objective": "Create a report on a hypothetical \"War of 2026\" involving Iran, focusing on religion, politics, geolocation, and science. Deadline: 5 minutes.",
+  "steps": [
+    "Ask Geopolitical Analyst (agent-pol-001) to draft a scenario for 2026 Iranian political and religious shifts, focusing on leadership transitions and regional proxy dynamics.",
+    "Ask Strategic Geographer (agent-geo-002) to identify key territorial flashpoints and ask Military Scientist (agent-sci-003) to project 2026-era scientific developments in electronic warfare and nuclear capabilities.",
+    "Use generate_report to synthesize all gathered intelligence into a final report on the hypothetical \"War of 2026\" covering religion, politics, geolocation, and science."
+  ],
+  "completed": []
+}

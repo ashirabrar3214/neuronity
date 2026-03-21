@@ -176,27 +176,56 @@ window.openTrainingPanel = async (agentId, agentName) => {
         const history = await histRes.json();
 
         if (history && history.length > 0) {
-            // Filter out internal agent-to-agent system messages
+            // Filter out internal system messages AND stale tool-call artifacts
             const visibleHistory = history.filter(h => {
                 const c = h.content || '';
-                return !c.startsWith('[MESSAGE FROM ANOTHER AGENT]') && !c.startsWith('SYSTEM TOOL RESULT:');
+                if (c.startsWith('[MESSAGE FROM ANOTHER AGENT]')) return false;
+                if (c.startsWith('SYSTEM TOOL RESULT:')) return false;
+                // Filter out bare "Executed: tool_name" lines from old history files
+                if (/^Executed:\s*\w+\s*$/.test(c.trim())) return false;
+                return true;
             });
 
             if (visibleHistory.length > 0) {
-                // Clear the default greeting since we have real history
                 chatArea.innerHTML = '';
+                let hasWorkmapMessage = false;
+
                 visibleHistory.forEach(h => {
                     const isUser = h.role === 'user';
                     const msgDiv = document.createElement('div');
                     msgDiv.className = `message ${isUser ? 'user-message' : 'agent-message'}`;
+
+                    // Strip any remaining "Executed: ..." lines from mixed content
+                    let content = h.content;
+                    if (!isUser) {
+                        content = content.replace(/^Executed:\s*\w+\s*$/gm, '').trim();
+                    }
+
                     if (isUser) {
-                        msgDiv.textContent = h.content;
+                        msgDiv.textContent = content;
                     } else {
-                        msgDiv.innerHTML = _markdownToHtml(h.content);
+                        msgDiv.innerHTML = _markdownToHtml(content);
+                        // Detect workmap-related responses to inject button later
+                        if (/workmap|Workmap|PLAY.*canvas|execution.*engine/i.test(content)) {
+                            hasWorkmapMessage = true;
+                        }
                     }
                     chatArea.appendChild(msgDiv);
                 });
-                // Scroll to bottom after loading
+
+                // Re-inject "View Project Workmap" button if history contains workmap messages
+                if (hasWorkmapMessage && agentId) {
+                    const btnDiv = document.createElement('div');
+                    btnDiv.style.textAlign = 'center';
+                    btnDiv.style.padding = '6px 0';
+                    const btn = document.createElement('button');
+                    btn.className = 'view-workmap-btn';
+                    btn.textContent = '\u{1F5FA}  View Project Workmap';
+                    btn.addEventListener('click', () => openWorkmapView(agentId));
+                    btnDiv.appendChild(btn);
+                    chatArea.appendChild(btnDiv);
+                }
+
                 chatArea.scrollTop = chatArea.scrollHeight;
             }
         }
@@ -796,15 +825,43 @@ function initTrainingUI() {
     }
 
     function processPlanResponse(responseText, originalTask, isAlreadyDisplayed = false) {
+        // Detect workmap creation — inject a "View Workmap" button into chat
+        const isWorkmapResponse = (
+            responseText.includes("workmap") || responseText.includes("Workmap") ||
+            responseText.includes("PLAY") || responseText.includes("canvas")
+        );
+
+        if (isWorkmapResponse && activeAgentId) {
+            // Show the response text first
+            if (!isAlreadyDisplayed) {
+                addMessage(responseText, false);
+            }
+            // Refresh the agent canvas — workmap generation may have auto-created new agents
+            if (window.agentCanvasInstance && typeof window.agentCanvasInstance.loadAgents === 'function') {
+                window.agentCanvasInstance.loadAgents();
+            }
+            // Inject the "View Workmap" button into the chat
+            const chatArea = document.getElementById('chat-area');
+            const btnDiv = document.createElement('div');
+            btnDiv.style.textAlign = 'center';
+            btnDiv.style.padding = '6px 0';
+            const btn = document.createElement('button');
+            btn.className = 'view-workmap-btn';
+            btn.textContent = '🗺  View Project Workmap';
+            btn.addEventListener('click', () => openWorkmapView(activeAgentId));
+            btnDiv.appendChild(btn);
+            chatArea.appendChild(btnDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+            return;
+        }
+
         // Check if this is an execution plan response using varied headers
         if (responseText.includes("Execution Plan Generated") ||
             responseText.includes("### 📝") ||
             responseText.includes("### 🎯")) {
-            // Extract plan steps and show in dedicated area
             const planAreaDiv = document.getElementById('autonomous-plan-area');
             const planContentDiv = document.getElementById('plan-content');
 
-            // Extract the steps (lines starting with number followed by period)
             const stepsMatch = responseText.match(/(\d+\.\s+.+?)(?=\n\d+\.|Plan file|$)/gs);
             if (stepsMatch) {
                 const stepsHtml = stepsMatch
@@ -813,18 +870,13 @@ function initTrainingUI() {
                     .join('');
                 planContentDiv.innerHTML = stepsHtml;
                 planAreaDiv.style.display = 'block';
-
-                // Store plan info for execution button
                 planAreaDiv.dataset.agentId = activeAgentId;
                 planAreaDiv.dataset.task = originalTask;
-
-                // Don't show this in chat, only show a summary message
-                addMessage(`✓ Execution plan generated with ${stepsMatch.length} steps. Use the plan panel to execute.`, false);
+                addMessage(`Execution plan generated with ${stepsMatch.length} steps. Use the plan panel to execute.`, false);
             } else if (!isAlreadyDisplayed) {
                 addMessage(responseText, false);
             }
         } else {
-            // Only add to chat if it wasn't a stream (which already added it)
             if (!isAlreadyDisplayed) {
                 addMessage(responseText, false);
             }
@@ -965,3 +1017,665 @@ if (document.readyState === 'loading') {
 } else {
     initTrainingUI();
 }
+
+
+// ── WORKMAP TREE VIEW (Full-Screen DAG Canvas) ──────────────────────
+
+let _workmapPollInterval = null;
+let _workmapAgentId = null;
+let _workmapCache = null;          // cached workmap data for modal use
+let _availableAgents = [];         // cached agent list for dropdowns
+let _editingNodeId = null;         // currently editing node
+
+// ── PAN + ZOOM STATE ─────────────────────────────────────────────────
+let _wmPan = { x: 0, y: 0 };
+let _wmZoom = 1;
+let _wmIsPanning = false;
+let _wmPanEventsAttached = false;
+
+function _wmApplyTransform() {
+    const panLayer = document.getElementById('workmap-pan-layer');
+    const grid = document.querySelector('.wm-grid-layer');
+    if (panLayer) {
+        panLayer.style.transform = `translate(${_wmPan.x}px, ${_wmPan.y}px) scale(${_wmZoom})`;
+    }
+    if (grid) {
+        grid.style.backgroundPosition = `${_wmPan.x}px ${_wmPan.y}px`;
+        grid.style.backgroundSize = `${24 * _wmZoom}px ${24 * _wmZoom}px`;
+    }
+}
+
+function _wmInitPanZoom() {
+    if (_wmPanEventsAttached) return;
+    const container = document.getElementById('workmap-tree-container');
+    if (!container) return;
+    _wmPanEventsAttached = true;
+
+    // Pan — mousedown on empty canvas area
+    container.addEventListener('mousedown', (e) => {
+        // Ignore clicks on nodes (they open the edit modal) or toolbar
+        if (e.target.closest('.wm-node') || e.target.closest('.workmap-toolbar')) return;
+        if (e.button !== 0) return;
+        _wmIsPanning = true;
+        container.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!_wmIsPanning) return;
+        _wmPan.x += e.movementX;
+        _wmPan.y += e.movementY;
+        _wmApplyTransform();
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!_wmIsPanning) return;
+        _wmIsPanning = false;
+        const container = document.getElementById('workmap-tree-container');
+        if (container) container.style.cursor = 'grab';
+    });
+
+    // Zoom — mouse wheel
+    container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.08 : 0.08;
+        const newZoom = Math.min(2.5, Math.max(0.25, _wmZoom + delta));
+
+        // Zoom toward mouse pointer
+        const rect = container.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const scale = newZoom / _wmZoom;
+        _wmPan.x = mx - scale * (mx - _wmPan.x);
+        _wmPan.y = my - scale * (my - _wmPan.y);
+        _wmZoom = newZoom;
+
+        _wmApplyTransform();
+    }, { passive: false });
+}
+
+function _wmResetView() {
+    _wmPan = { x: 0, y: 0 };
+    _wmZoom = 1;
+    _wmApplyTransform();
+}
+
+function openWorkmapView(agentId) {
+    _workmapAgentId = agentId;
+    const overlay = document.getElementById('workmap-overlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+
+    // Init pan/zoom (event listeners attach once)
+    _wmInitPanZoom();
+    _wmResetView();
+
+    // Load available agents for dropdowns
+    _loadAvailableAgents(agentId);
+
+    // Fetch and render immediately
+    fetchAndRenderWorkmap(agentId);
+
+    // Start live polling (every 3s while the view is open)
+    clearInterval(_workmapPollInterval);
+    _workmapPollInterval = setInterval(() => fetchAndRenderWorkmap(agentId), 3000);
+}
+window.openWorkmapView = openWorkmapView;
+
+function closeWorkmapView() {
+    const overlay = document.getElementById('workmap-overlay');
+    if (overlay) overlay.style.display = 'none';
+    clearInterval(_workmapPollInterval);
+    _workmapPollInterval = null;
+    _workmapAgentId = null;
+    _workmapCache = null;
+    _wmIsPanning = false;
+    closeNodeModal();
+}
+
+async function _loadAvailableAgents(agentId) {
+    try {
+        const r = await fetch(`http://localhost:8000/workmap/${agentId}/agents`);
+        if (r.ok) _availableAgents = await r.json();
+    } catch (_) {
+        _availableAgents = [{ id: 'self', name: 'Master (self)' }];
+    }
+}
+
+async function fetchAndRenderWorkmap(agentId) {
+    try {
+        const r = await fetch(`http://localhost:8000/workmap/${agentId}`);
+        if (!r.ok) return;
+        const wm = await r.json();
+        _workmapCache = wm;
+        renderWorkmapTree(wm, agentId);
+    } catch (_) {}
+}
+
+function _wmAutoLayout(nodes) {
+    // Topological BFS to assign levels, then compute x/y for each node
+    const NODE_W = 270, NODE_H = 150, GAP_X = 60, GAP_Y = 100, PAD = 80;
+    const levels = {};
+    const visited = new Set();
+    const queue = [];
+
+    nodes.forEach(n => {
+        if (!n.dependencies || n.dependencies.length === 0) {
+            levels[n.id] = 0; queue.push(n.id); visited.add(n.id);
+        }
+    });
+    while (queue.length > 0) {
+        const cur = queue.shift();
+        nodes.forEach(n => {
+            if (n.dependencies && n.dependencies.includes(cur) && !visited.has(n.id)) {
+                if (n.dependencies.every(d => visited.has(d))) {
+                    levels[n.id] = Math.max(...n.dependencies.map(d => levels[d] || 0)) + 1;
+                    visited.add(n.id); queue.push(n.id);
+                }
+            }
+        });
+    }
+    nodes.forEach(n => { if (!(n.id in levels)) levels[n.id] = 0; });
+
+    const maxLevel = Math.max(...Object.values(levels), 0);
+    const levelGroups = [];
+    for (let i = 0; i <= maxLevel; i++) levelGroups.push(nodes.filter(n => levels[n.id] === i));
+
+    // Find the widest level to center everything around it
+    const maxGroupWidth = Math.max(...levelGroups.map(g => g.length * NODE_W + (g.length - 1) * GAP_X));
+    const centerX = PAD + maxGroupWidth / 2;
+
+    const positions = {};
+    levelGroups.forEach((group, lvl) => {
+        const totalW = group.length * NODE_W + (group.length - 1) * GAP_X;
+        const startX = centerX - totalW / 2;
+        group.forEach((n, idx) => {
+            positions[n.id] = {
+                x: Math.max(PAD, startX + idx * (NODE_W + GAP_X)),
+                y: PAD + lvl * (NODE_H + GAP_Y)
+            };
+        });
+    });
+    return positions;
+}
+
+function renderWorkmapTree(workmap, agentId) {
+    const nodesContainer = document.getElementById('workmap-nodes');
+    const edgesSvg = document.getElementById('workmap-edges');
+    const statusBadge = document.getElementById('workmap-status-badge');
+    const titleEl = document.getElementById('workmap-title');
+    const deadlineInput = document.getElementById('wm-deadline-input');
+    if (!nodesContainer || !edgesSvg) return;
+
+    // Update toolbar
+    const st = (workmap.status || 'PAUSED').toUpperCase();
+    statusBadge.textContent = st;
+    statusBadge.className = 'workmap-badge workmap-badge-' + st.toLowerCase();
+    titleEl.textContent = 'Project Workmap — ' + (workmap.project_id || '');
+
+    if (deadlineInput && document.activeElement !== deadlineInput) {
+        deadlineInput.value = workmap.deadline_hours || '';
+    }
+
+    const nodes = workmap.nodes || [];
+    if (nodes.length === 0) {
+        nodesContainer.innerHTML = '<div style="color:rgba(255,255,255,0.3); text-align:center; padding:60px;">No nodes yet. Click "+ Add Node" or right-click to add.</div>';
+        return;
+    }
+
+    // Compute auto-layout for nodes that don't have saved positions
+    const autoPos = _wmAutoLayout(nodes);
+    // Render nodes with absolute positioning
+    nodesContainer.style.position = 'relative';
+    nodesContainer.innerHTML = '';
+
+    nodes.forEach(n => {
+        const posX = (n.x != null) ? n.x : (autoPos[n.id] ? autoPos[n.id].x : 60);
+        const posY = (n.y != null) ? n.y : (autoPos[n.id] ? autoPos[n.id].y : 60);
+
+        const statusKey = (n.status || 'PENDING').toLowerCase().replace('_', '-');
+        const timeStr = n.estimated_minutes ? `<span class="wm-node-time">${n.estimated_minutes}m</span>` : '';
+        const el = document.createElement('div');
+        el.className = `wm-node wm-node-${statusKey} wm-node-abs`;
+        el.setAttribute('data-node-id', n.id);
+        el.style.left = posX + 'px';
+        el.style.top = posY + 'px';
+        el.innerHTML = `
+            <div class="wm-node-header wm-node-drag-handle">
+                <span class="wm-node-id">${n.id}</span>
+                <div class="wm-node-header-right">
+                    ${timeStr}
+                    <span class="wm-node-status">${n.status || 'PENDING'}</span>
+                </div>
+            </div>
+            <div class="wm-node-task">${n.task}</div>
+            <div class="wm-node-agent">${n.agent === agentId || n.agent === 'self' ? 'Master (self)' : n.agent}</div>
+            ${n.dependencies && n.dependencies.length ? `<div class="wm-node-deps">deps: ${n.dependencies.join(', ')}</div>` : ''}
+        `;
+
+        // Double-click to edit
+        el.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            openNodeModal(n.id);
+        });
+
+        // Right-click on node — show context with Edit + Remove
+        el.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            _wmShowContextMenu(e.clientX, e.clientY, n.id);
+        });
+
+        // Drag to move
+        _wmMakeNodeDraggable(el, n.id);
+
+        nodesContainer.appendChild(el);
+    });
+
+    requestAnimationFrame(() => drawWorkmapEdges(nodes, nodesContainer, edgesSvg));
+}
+
+function drawWorkmapEdges(nodes, container, svg) {
+    // Nodes are absolutely positioned inside the container — read left/top + size directly
+    let paths = '';
+    let maxRight = 0, maxBottom = 0;
+
+    nodes.forEach(node => {
+        if (!node.dependencies) return;
+        const targetEl = container.querySelector(`[data-node-id="${node.id}"]`);
+        if (!targetEl) return;
+
+        node.dependencies.forEach(depId => {
+            const sourceEl = container.querySelector(`[data-node-id="${depId}"]`);
+            if (!sourceEl) return;
+
+            // Read positions from style (absolute coords within nodes container)
+            const sx = sourceEl.offsetLeft + sourceEl.offsetWidth / 2;
+            const sy = sourceEl.offsetTop + sourceEl.offsetHeight;
+            const tx = targetEl.offsetLeft + targetEl.offsetWidth / 2;
+            const ty = targetEl.offsetTop;
+
+            maxRight = Math.max(maxRight, sx, tx);
+            maxBottom = Math.max(maxBottom, sy, ty);
+
+            const depNode = nodes.find(n => n.id === depId);
+            let edgeClass = 'wm-edge';
+            if (node.status === 'IN_PROGRESS') edgeClass = 'wm-edge wm-edge-active';
+            else if (depNode && depNode.status === 'COMPLETED' && node.status === 'COMPLETED') edgeClass = 'wm-edge wm-edge-done';
+
+            const midY = (sy + ty) / 2;
+            paths += `<path class="${edgeClass}" d="M ${sx} ${sy} C ${sx} ${midY}, ${tx} ${midY}, ${tx} ${ty}" />\n`;
+        });
+    });
+
+    svg.innerHTML = paths;
+    svg.style.width = (maxRight + 300) + 'px';
+    svg.style.height = (maxBottom + 200) + 'px';
+}
+
+function _wmRedrawEdgesLive() {
+    // Redraw edges using cached data while dragging — avoids a full re-render
+    if (!_workmapCache) return;
+    const container = document.getElementById('workmap-nodes');
+    const svg = document.getElementById('workmap-edges');
+    if (container && svg) drawWorkmapEdges(_workmapCache.nodes || [], container, svg);
+}
+
+
+// ── NODE DRAGGING ────────────────────────────────────────────────────
+
+let _wmDragState = null;   // { el, nodeId, startX, startY, origLeft, origTop, moved }
+
+function _wmMakeNodeDraggable(el, nodeId) {
+    // Entire node is the drag handle (like the agent canvas)
+    el.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;     // left click only
+        e.stopPropagation();            // don't trigger canvas pan
+        _wmDragState = {
+            el,
+            nodeId,
+            startX: e.clientX,
+            startY: e.clientY,
+            origLeft: parseInt(el.style.left) || 0,
+            origTop: parseInt(el.style.top) || 0,
+            moved: false
+        };
+        el.classList.add('wm-node-dragging');
+    });
+}
+
+document.addEventListener('mousemove', (e) => {
+    if (!_wmDragState) return;
+    const dx = (e.clientX - _wmDragState.startX) / _wmZoom;
+    const dy = (e.clientY - _wmDragState.startY) / _wmZoom;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) _wmDragState.moved = true;
+    _wmDragState.el.style.left = (_wmDragState.origLeft + dx) + 'px';
+    _wmDragState.el.style.top = (_wmDragState.origTop + dy) + 'px';
+    _wmRedrawEdgesLive();
+});
+
+document.addEventListener('mouseup', () => {
+    if (!_wmDragState) return;
+    const { el, nodeId, moved } = _wmDragState;
+    el.classList.remove('wm-node-dragging');
+
+    if (moved && _workmapAgentId) {
+        const newX = parseInt(el.style.left) || 0;
+        const newY = parseInt(el.style.top) || 0;
+
+        // Persist position to backend (fire-and-forget)
+        fetch(`http://localhost:8000/workmap/${_workmapAgentId}/node/${nodeId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ x: newX, y: newY })
+        }).catch(() => {});
+
+        // Update local cache so polling doesn't snap it back
+        if (_workmapCache) {
+            const n = (_workmapCache.nodes || []).find(nd => nd.id === nodeId);
+            if (n) { n.x = newX; n.y = newY; }
+        }
+    }
+    _wmDragState = null;
+});
+
+
+// ── RIGHT-CLICK CONTEXT MENU ─────────────────────────────────────────
+
+let _wmCtxNodeId = null;    // node that was right-clicked (null = empty canvas)
+let _wmCtxX = 0;            // canvas-relative X for new node placement
+let _wmCtxY = 0;
+
+function _wmShowContextMenu(clientX, clientY, nodeId) {
+    const menu = document.getElementById('wm-context-menu');
+    if (!menu) return;
+    _wmCtxNodeId = nodeId || null;
+
+    // Position menu at cursor
+    menu.style.left = clientX + 'px';
+    menu.style.top = clientY + 'px';
+    menu.style.display = 'flex';
+
+    // Show/hide node-specific actions
+    menu.querySelector('[data-action="edit-step"]').style.display = nodeId ? 'block' : 'none';
+    menu.querySelector('[data-action="remove-step"]').style.display = nodeId ? 'block' : 'none';
+
+    // Calculate canvas-relative position for the new node
+    const panLayer = document.getElementById('workmap-pan-layer');
+    if (panLayer) {
+        const rect = panLayer.getBoundingClientRect();
+        _wmCtxX = (clientX - rect.left) / _wmZoom;
+        _wmCtxY = (clientY - rect.top) / _wmZoom;
+    }
+}
+
+function _wmHideContextMenu() {
+    const menu = document.getElementById('wm-context-menu');
+    if (menu) menu.style.display = 'none';
+    _wmCtxNodeId = null;
+}
+
+// Wire up context menu on the tree container (empty canvas right-click)
+document.addEventListener('DOMContentLoaded', () => {
+    const treeContainer = document.getElementById('workmap-tree-container');
+    if (treeContainer) {
+        treeContainer.addEventListener('contextmenu', (e) => {
+            // Only fire if we're in the workmap overlay
+            const overlay = document.getElementById('workmap-overlay');
+            if (!overlay || overlay.style.display === 'none') return;
+            e.preventDefault();
+            // If right-click was on a node, that node's own handler fired first
+            if (e.target.closest('.wm-node')) return;
+            _wmShowContextMenu(e.clientX, e.clientY, null);
+        });
+    }
+
+    // Context menu action dispatch
+    const ctxMenu = document.getElementById('wm-context-menu');
+    if (ctxMenu) {
+        ctxMenu.addEventListener('click', async (e) => {
+            const action = e.target.getAttribute('data-action');
+            if (!action) return;
+            _wmHideContextMenu();
+
+            if (action === 'add-step') {
+                // Open the add-node modal, pre-set position
+                openAddNodeModal(_wmCtxX, _wmCtxY);
+            } else if (action === 'edit-step' && _wmCtxNodeId) {
+                openNodeModal(_wmCtxNodeId);
+            } else if (action === 'remove-step' && _wmCtxNodeId) {
+                const ok = confirm(`Delete ${_wmCtxNodeId}? Dependencies will be cleaned up.`);
+                if (!ok) return;
+                try {
+                    await fetch(`http://localhost:8000/workmap/${_workmapAgentId}/node/${_wmCtxNodeId}`, { method: 'DELETE' });
+                } catch (_) {}
+                fetchAndRenderWorkmap(_workmapAgentId);
+            }
+        });
+    }
+
+    // Close context menu on any left click or Escape
+    document.addEventListener('click', _wmHideContextMenu);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') _wmHideContextMenu(); });
+});
+
+
+// ── NODE EDIT MODAL ──────────────────────────────────────────────────
+
+function openNodeModal(nodeId) {
+    if (!_workmapCache || !_workmapAgentId) return;
+    const node = (_workmapCache.nodes || []).find(n => n.id === nodeId);
+    if (!node) return;
+
+    _editingNodeId = nodeId;
+
+    // Populate fields
+    document.getElementById('wm-edit-node-id').value = nodeId;
+    document.getElementById('wm-modal-title').textContent = `Edit ${nodeId}`;
+    document.getElementById('wm-edit-task').value = node.task || '';
+    document.getElementById('wm-edit-status').value = node.status || 'PENDING';
+    document.getElementById('wm-edit-time').value = node.estimated_minutes || '';
+
+    // Populate agent dropdown
+    const agentSel = document.getElementById('wm-edit-agent');
+    agentSel.innerHTML = _availableAgents.map(a =>
+        `<option value="${a.id}" ${a.id === node.agent ? 'selected' : ''}>${a.name}</option>`
+    ).join('');
+
+    // Populate dependencies as toggleable chips
+    const depsContainer = document.getElementById('wm-edit-deps');
+    const otherNodes = (_workmapCache.nodes || []).filter(n => n.id !== nodeId);
+    const currentDeps = new Set(node.dependencies || []);
+    depsContainer.innerHTML = otherNodes.map(n => {
+        const active = currentDeps.has(n.id) ? 'active' : '';
+        return `<button class="wm-dep-chip ${active}" data-dep="${n.id}" type="button">${n.id}</button>`;
+    }).join('');
+
+    // Toggle chip on click
+    depsContainer.querySelectorAll('.wm-dep-chip').forEach(chip => {
+        chip.addEventListener('click', () => chip.classList.toggle('active'));
+    });
+
+    // Show/hide delete button (don't show for the last remaining node)
+    const deleteBtn = document.getElementById('wm-modal-delete');
+    deleteBtn.style.display = (_workmapCache.nodes || []).length > 1 ? 'inline-flex' : 'none';
+
+    // Show modal
+    document.getElementById('wm-node-modal-overlay').style.display = 'flex';
+}
+
+let _newNodeX = 0, _newNodeY = 0;  // position for newly created nodes
+
+function openAddNodeModal(x, y) {
+    if (!_workmapCache || !_workmapAgentId) return;
+
+    _editingNodeId = null; // null signals "create new"
+    _newNodeX = x || 0;
+    _newNodeY = y || 0;
+
+    document.getElementById('wm-edit-node-id').value = '';
+    document.getElementById('wm-modal-title').textContent = 'Add New Node';
+    document.getElementById('wm-edit-task').value = '';
+    document.getElementById('wm-edit-status').value = 'PENDING';
+    document.getElementById('wm-edit-time').value = '';
+
+    // Agent dropdown
+    const agentSel = document.getElementById('wm-edit-agent');
+    agentSel.innerHTML = _availableAgents.map(a =>
+        `<option value="${a.id}">${a.name}</option>`
+    ).join('');
+
+    // Dependencies — all existing nodes available as chips
+    const depsContainer = document.getElementById('wm-edit-deps');
+    depsContainer.innerHTML = (_workmapCache.nodes || []).map(n =>
+        `<button class="wm-dep-chip" data-dep="${n.id}" type="button">${n.id}</button>`
+    ).join('');
+    depsContainer.querySelectorAll('.wm-dep-chip').forEach(chip => {
+        chip.addEventListener('click', () => chip.classList.toggle('active'));
+    });
+
+    // Hide delete button for new nodes
+    document.getElementById('wm-modal-delete').style.display = 'none';
+
+    document.getElementById('wm-node-modal-overlay').style.display = 'flex';
+}
+
+function closeNodeModal() {
+    document.getElementById('wm-node-modal-overlay').style.display = 'none';
+    _editingNodeId = null;
+}
+
+function _getSelectedDeps() {
+    return Array.from(document.querySelectorAll('#wm-edit-deps .wm-dep-chip.active'))
+        .map(chip => chip.getAttribute('data-dep'));
+}
+
+async function saveNodeChanges() {
+    if (!_workmapAgentId) return;
+
+    const task = document.getElementById('wm-edit-task').value.trim();
+    if (!task) { alert('Task description is required.'); return; }
+
+    const agent = document.getElementById('wm-edit-agent').value;
+    const status = document.getElementById('wm-edit-status').value;
+    const time = parseInt(document.getElementById('wm-edit-time').value) || 0;
+    const deps = _getSelectedDeps();
+
+    try {
+        if (_editingNodeId) {
+            // UPDATE existing node
+            await fetch(`http://localhost:8000/workmap/${_workmapAgentId}/node/${_editingNodeId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task, agent, status, estimated_minutes: time, dependencies: deps })
+            });
+        } else {
+            // CREATE new node at the position where user right-clicked (or 0,0)
+            await fetch(`http://localhost:8000/workmap/${_workmapAgentId}/node`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task, agent, dependencies: deps, estimated_minutes: time, x: _newNodeX, y: _newNodeY })
+            });
+        }
+    } catch (err) {
+        console.error('Save node error:', err);
+    }
+
+    closeNodeModal();
+    fetchAndRenderWorkmap(_workmapAgentId);
+}
+
+async function deleteCurrentNode() {
+    if (!_editingNodeId || !_workmapAgentId) return;
+
+    const confirmed = confirm(`Delete ${_editingNodeId}? This will also remove it from other nodes' dependencies.`);
+    if (!confirmed) return;
+
+    try {
+        await fetch(`http://localhost:8000/workmap/${_workmapAgentId}/node/${_editingNodeId}`, {
+            method: 'DELETE'
+        });
+    } catch (err) {
+        console.error('Delete node error:', err);
+    }
+
+    closeNodeModal();
+    fetchAndRenderWorkmap(_workmapAgentId);
+}
+
+async function saveDeadline(value) {
+    if (!_workmapAgentId) return;
+    const hours = parseInt(value);
+    if (isNaN(hours) || hours < 1) return;
+    try {
+        await fetch(`http://localhost:8000/workmap/${_workmapAgentId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deadline_hours: hours })
+        });
+    } catch (err) {
+        console.error('Save deadline error:', err);
+    }
+}
+
+
+// ── WIRE UP ALL TOOLBAR + MODAL BUTTONS ──────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+    const backBtn = document.getElementById('workmap-back-btn');
+    const playBtn = document.getElementById('workmap-play-btn');
+    const pauseBtn = document.getElementById('workmap-pause-btn');
+    const addNodeBtn = document.getElementById('workmap-add-node-btn');
+    const deadlineInput = document.getElementById('wm-deadline-input');
+
+    if (backBtn) backBtn.addEventListener('click', closeWorkmapView);
+
+    if (playBtn) playBtn.addEventListener('click', async () => {
+        if (!_workmapAgentId) return;
+        await fetch(`http://localhost:8000/workmap/${_workmapAgentId}/play`, { method: 'POST' });
+        fetchAndRenderWorkmap(_workmapAgentId);
+    });
+
+    if (pauseBtn) pauseBtn.addEventListener('click', async () => {
+        if (!_workmapAgentId) return;
+        await fetch(`http://localhost:8000/workmap/${_workmapAgentId}/pause`, { method: 'POST' });
+        fetchAndRenderWorkmap(_workmapAgentId);
+    });
+
+    if (addNodeBtn) addNodeBtn.addEventListener('click', () => {
+        // Place new node near the center of the visible viewport
+        const panLayer = document.getElementById('workmap-pan-layer');
+        const container = document.getElementById('workmap-tree-container');
+        let cx = 300, cy = 200;
+        if (panLayer && container) {
+            const cRect = container.getBoundingClientRect();
+            cx = (cRect.width / 2 - _wmPan.x) / _wmZoom;
+            cy = (cRect.height / 2 - _wmPan.y) / _wmZoom;
+        }
+        openAddNodeModal(cx, cy);
+    });
+
+    // Deadline — save on blur or Enter
+    if (deadlineInput) {
+        deadlineInput.addEventListener('change', (e) => saveDeadline(e.target.value));
+        deadlineInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.target.blur(); saveDeadline(e.target.value); }
+        });
+    }
+
+    // Modal buttons
+    const modalClose = document.getElementById('wm-modal-close');
+    const modalCancel = document.getElementById('wm-modal-cancel');
+    const modalSave = document.getElementById('wm-modal-save');
+    const modalDelete = document.getElementById('wm-modal-delete');
+    const modalOverlay = document.getElementById('wm-node-modal-overlay');
+
+    if (modalClose) modalClose.addEventListener('click', closeNodeModal);
+    if (modalCancel) modalCancel.addEventListener('click', closeNodeModal);
+    if (modalSave) modalSave.addEventListener('click', saveNodeChanges);
+    if (modalDelete) modalDelete.addEventListener('click', deleteCurrentNode);
+
+    // Close modal on background click
+    if (modalOverlay) modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) closeNodeModal();
+    });
+});

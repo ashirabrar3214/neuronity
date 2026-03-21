@@ -1,0 +1,50 @@
+[
+  {
+    "role": "user",
+    "content": "[AUTO_STEP 1/4] AUTONOMOUS EXECUTION MODE \u2014 EXTRACTION PHASE.\nExecute ONLY this specific research step. Return the result to the plan runner.\n\nSTEP: Analyze the religious drivers and political landscape of Iran and its regional alliances in a 2026 conflict scenario.\n\n\n## EXTRACTION MODE RULES (MANDATORY):\n1. Do NOT summarize findings. Store the VERBATIM text from each source.\n2. For EVERY fact found, make a SEPARATE [TOOL: post_finding(verbatim text. Source: URL)] call.\n3. Include the EXACT source URL in every post_finding call.\n4. After storing all facts, write a brief 2-3 line summary for the plan runner to track progress.\n5. You are FORBIDDEN from synthesizing or drawing conclusions. Just extract and store raw facts."
+  },
+  {
+    "role": "assistant",
+    "content": "[TOOL: web_search({\"query\": \"Iran religious drivers political landscape regional alliances 2026\"})]"
+  },
+  {
+    "role": "user",
+    "content": "SYSTEM TOOL RESULT: Title: Iran\u2013Israel relations - Wikipedia\nURL: https://en.wikipedia.org/wiki/Destruction_of_Israel_in_Iranian_policy\nSnippet: In 2024, amid increasingregionaltensions stemming from the Gaza war ,Iran\u2013Israel tensions escalated to a period of direct conflict ; both ...\n\n---\n\nTitle: ReligioninIran- Wikipedia\nURL: https://en.wikipedia.org/wiki/Religion_in_Iran\nSnippet: ReligioninIranhas been shaped by multiplereligionsand sects over the course of the country's history.ReligionandPoliticsin ContemporaryIran: clergy-state relations in the Pahlavi period.\n\n---\n\nTitle: Iran Conflicts in the Middle East | Your Daily Dose of Trending\nURL: https://hitznews.com/iran-conflictos-medio-oriente/\nSnippet: From the ancient Persian Empire to the modern Islamic Republic,Iranhas played a significant role in shaping thepoliticalandreligiouslandscape...\n\n---\n\nTitle: Iran Keeps Low Profile in Iraq's Vote, Still Pulls Strings\nURL: https://english.aawsat.com/features/5138594-iran-keeps-low-profile-iraqs-vote-still-pulls-strings\nSnippet: ... and shifting map ofalliancesis taking shape in Iraq\u2019s Shi\u2019itepoliticallandscapeahead of the November 2025 parliamentary elections, asIran...\n\n---\n\nTitle: Iran-Azerbaijan: A new cold war? | Responsible Statecraft\nURL: https://responsiblestatecraft.org/2021/11/24/iran-azerbaijan-a-new-cold-war/\nSnippet: ... using the crisis with Tehran to launch a crackdown on alleged \u201cIransympathizers\u201d in the country, by closing down a number of Shiitereligious...\n\n---\n\nTitle: Iraqi cleric accuses Iran's allies of meddling, as\nURL: https://www.timesofisrael.com/iraqi-cleric-accuses-irans-allies-of-meddling-as-political-tensions-continue/\nSnippet: Munaf Al-Musawi, apoliticalanalyst and director of the Baghdad Center for Strategic Studies, said that the statement by al-Sadr againstIran\u2019s ...\n\n---\n\nTitle: IAEA: Iran must 'seriously improve' nuclear\nURL: https://www.timesofisrael.com/liveblog_entry/iaea-iran-must-seriously-improve-nuclear-cooperation-to-avoid-higher-tensions/\nSnippet: Iranmust \u201c seriously improve \u201d cooperation with UN inspectors to avoid heightening tensions with the West, International Atomic Energy ...\n\n---\n\nTitle: Geopolitical Shifts in the Middle East - per Concordiam\nURL: https://perconcordiam.com/geopolitical-shifts-in-the-middle-east/\nSnippet: At the same time,driversofpoliticalviolence in theregionare increasing, even as dynastic and autocratic regimes uphold the macro-level status ...\n\n---\n\nTitle: TRANSCEND MEDIA SERVICE \u00bb Iran\u2019s Role in the Shifting\nURL: https://www.transcend.org/tms/2021/09/irans-role-in-the-shifting-political-landscape-of-the-middle-east/\nSnippet: What is less understood is the counter-revolutionary role thatIranplays in theregion\u2019spolitics. ...Iranas a \u201crevolutionary\u201d state in the ...\n\n---\n\nTitle: Iran - SpecialEurasia\nURL: https://www.specialeurasia.com/category/monitoring-analysis/iran/\nSnippet: ...Iranfor the fifth round of bilateralpoliticalconsultations, highlighting a desire to advance the bilateral partnership amid a complex geopolitical ...\n\n---\n\nTitle: The Implications of Climate Change in Iran \u2014 American\nURL: https://www.us-iran.org/news/2021/7/2/covid-19-in-iran-r6by5\nSnippet: However, some issues like water scarcity are becoming increasingly pressing and may ultimately refocusregionalalliancesand cooperation in the ...\n\n---\n\nTitle: Top 20 Maps and Charts That ExplainIranand the Road to the2026...\nURL: https://geoawesome.com/top-20-maps-and-charts-that-explain-iran-and-the-road-to-the-2026-conflict/\nSnippet: Religiously,Iranis predominantly Shia Muslim, with about 90 percent of the population following Shia Islam, which is also the official statereligion. Sunni Muslims and other Muslim sects account for roughly 9 percent of the population.\n\n---\n\nTitle: At the dawn of a new \u00abAxis about that.\u00bbHow the war withIranis...\nURL: https://global-south.ru/en/articles/\u043d\u0430-\u0437\u0430\u0440\u0435-\u043d\u043e\u0432\u043e\u0439-\u043e\u0441\u0438-\u043a\u0430\u043a-\u0432\u043e\u0439\u043d\u0430-\u0441-\u0438\u0440\u0430\u043d\u043e\u043c/\nSnippet: \u00abThe HexagonalAlliance\u00bb India is speaking. A few days before the start of the war withIran, Indian Prime Minister Narendra Modi paid a visit to the Jewish state, during which the parties raised the level of relations to a special strategic partnership.\n\n---\n\nTitle: Iran\u2019s Supreme Leader Mojtaba Khamenei... - HOKANEWS.COM\nURL: https://www.hokanews.com/2026/03/irans-supreme-leader-mojtaba-khamenei.html\nSnippet: Iran\u2019s Position in International Relations.Iran\u2019s foreignpolicyhas long been shaped by a combination ofregionaldynamics and global diplomatic interactions. The country maintains relationships with various nations andpoliticalgroups while also navigating complex tensions with others.\n\n---\n\nTitle: EXPLAINER: What Does 'Diya' Mean inIran\u2019s Response to Aggression?\nURL: https://www.palestinechronicle.com/explainer-what-does-diya-mean-in-irans-response-to-aggression/\nSnippet: Key Takeaways.Iran\u2019s leadership often draws on layeredreligiousand civilizational language that cannot be reduced to literal translation. The term \u2018diya\u2019 signals moral accountability and structured response, not transactional \u201cprice\u201d or simple retaliation."
+  },
+  {
+    "role": "assistant",
+    "content": "[TOOL: post_finding({\"tool_input\": \"Iran\\u2019s leadership often draws on layeredreligiousand civilizational language that cannot be reduced to literal translation. The term \\u2018diya\\u2019 signals moral accountability and structured response, not transactional \\u201cprice\\u201d or simple retaliation. Source: https://www.palestinechronicle.com/explainer-what-does-diya-mean-in-irans-response-to-aggression/\"})]"
+  },
+  {
+    "role": "user",
+    "content": "SYSTEM TOOL RESULT: Success: Fact recorded in Belief Base."
+  },
+  {
+    "role": "assistant",
+    "content": "[TOOL: post_finding({\"tool_input\": \"Religiously,Iranis predominantly Shia Muslim, with about 90 percent of the population following Shia Islam, which is also the official statereligion. Sunni Muslims and other Muslim sects account for roughly 9 percent of the population. Source: https://geoawesome.com/top-20-maps-and-charts-that-explain-iran-and-the-road-to-the-2026-conflict/\"})]"
+  },
+  {
+    "role": "user",
+    "content": "SYSTEM TOOL RESULT: Success: Fact recorded in Belief Base."
+  },
+  {
+    "role": "assistant",
+    "content": "[TOOL: post_finding({\"tool_input\": \"In 2024, amid increasingregionaltensions stemming from the Gaza war ,Iran\\u2013Israel tensions escalated to a period of direct conflict ; both ... Source: https://en.wikipedia.org/wiki/Destruction_of_Israel_in_Iranian_policy\"})]"
+  },
+  {
+    "role": "user",
+    "content": "SYSTEM TOOL RESULT: Success: Fact recorded in Belief Base."
+  },
+  {
+    "role": "assistant",
+    "content": "[TOOL: post_finding({\"tool_input\": \"... and shifting map ofalliancesis taking shape in Iraq\\u2019s Shi\\u2019itepoliticallandscapeahead of the November 2025 parliamentary elections, asIran... Source: https://english.aawsat.com/features/5138594-iran-keeps-low-profile-iraqs-vote-still-pulls-strings\"})]"
+  },
+  {
+    "role": "user",
+    "content": "SYSTEM TOOL RESULT: Success: Fact recorded in Belief Base."
+  },
+  {
+    "role": "assistant",
+    "content": ""
+  }
+]

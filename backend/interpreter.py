@@ -1460,7 +1460,20 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
                                 chunk = json.loads(json_str)
                                 candidate = chunk.get("candidates", [{}])[0]
                                 finish_reason = candidate.get("finishReason", "")
-                                if finish_reason and finish_reason != "STOP":
+                                if finish_reason == "MALFORMED_FUNCTION_CALL":
+                                    # Gemini tried to call a tool but mangled the args.
+                                    # Don't kill the turn — inject a corrective hint and retry.
+                                    safe_log(f"!!! [GEMINI] MALFORMED_FUNCTION_CALL — will retry turn")
+                                    history.append({"role": "user", "content": (
+                                        "SYSTEM: Your last tool call was malformed. "
+                                        "You MUST call the tool using the exact parameter names from the schema. "
+                                        "For create_project_workmap, the parameter is 'finalized_task' (a string). "
+                                        "Try again."
+                                    )})
+                                    tool_call_found = None
+                                    current_turn_text = ""
+                                    break  # break the SSE read loop to retry the turn
+                                elif finish_reason and finish_reason != "STOP":
                                     yield f"data: {json.dumps({'type': 'error', 'content': f'Model halted early: {finish_reason}'})}\n\n"
                                     break
                                     
@@ -1549,11 +1562,21 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
     ui_history = []
     for h in history:
         if h["role"] == "user" and "SYSTEM TOOL" in str(h["content"]): continue
-        
+        # Skip [AUTO_STEP] messages from autonomous execution
+        if h["role"] == "user" and "[AUTO_STEP" in str(h["content"]): continue
+
         content = str(h["content"])
         if h["role"] == "assistant":
-            # Sanitize: replace [TOOL: name(args)] with Executed: name to keep UI clean
-            content = re.sub(r'\[TOOL:\s*(\w+)\(.*?\)]', r'Executed: \1', content)
+            # Strip tool-call blocks ([\s\S] handles multi-line args unlike .)
+            stripped = re.sub(r'\[TOOL:\s*\w+\([\s\S]*?\)]', '', content).strip()
+            if not stripped:
+                continue
+            # Remove any inline tool call fragments from mixed messages
+            content = re.sub(r'\[TOOL:\s*\w+\([\s\S]*?\)]\s*', '', content).strip()
+            # Remove any residual "Executed: tool_name" lines
+            content = re.sub(r'^Executed:\s*\w+\s*$', '', content, flags=re.MULTILINE).strip()
+            if not content:
+                continue
 
         ui_history.append({"role": h["role"], "content": sanitize_ruthlessly(content)})
     with open(history_path, "w", encoding="utf-8") as f:
@@ -1684,6 +1707,165 @@ async def pause_workmap(agent_id: str):
     with open(wm_path, "w", encoding="utf-8") as f:
         json.dump(wm, f, indent=2)
     return {"status": "PAUSED", "agent_id": agent_id}
+
+
+# --- WORKMAP CRUD ENDPOINTS --------------------------------------------------
+
+class NodeUpdate(BaseModel):
+    task: Optional[str] = None
+    agent: Optional[str] = None
+    dependencies: Optional[List[str]] = None
+    status: Optional[str] = None
+    estimated_minutes: Optional[int] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
+
+class NodeCreate(BaseModel):
+    task: str
+    agent: str = "self"
+    dependencies: List[str] = []
+    estimated_minutes: int = 0
+    x: float = 0
+    y: float = 0
+
+class WorkmapUpdate(BaseModel):
+    deadline_hours: Optional[int] = None
+    status: Optional[str] = None
+
+
+def _load_workmap(agent_id: str):
+    wm_path = os.path.join(AGENTS_CODE_DIR, agent_id, "workmap.json")
+    if not os.path.exists(wm_path):
+        raise HTTPException(status_code=404, detail="No workmap found for this agent")
+    with open(wm_path, "r", encoding="utf-8") as f:
+        return json.load(f), wm_path
+
+def _save_workmap(wm, wm_path):
+    with open(wm_path, "w", encoding="utf-8") as f:
+        json.dump(wm, f, indent=2)
+
+
+@app.patch("/workmap/{agent_id}")
+async def update_workmap(agent_id: str, body: WorkmapUpdate):
+    """Update workmap-level metadata (deadline, status)."""
+    wm, wm_path = _load_workmap(agent_id)
+    if body.deadline_hours is not None:
+        wm["deadline_hours"] = body.deadline_hours
+    if body.status is not None and body.status in ("PAUSED", "RUNNING", "COMPLETED"):
+        wm["status"] = body.status
+    _save_workmap(wm, wm_path)
+    return wm
+
+
+@app.put("/workmap/{agent_id}/node/{node_id}")
+async def update_node(agent_id: str, node_id: str, body: NodeUpdate):
+    """Update fields on an existing workmap node."""
+    wm, wm_path = _load_workmap(agent_id)
+    node = next((n for n in wm.get("nodes", []) if n["id"] == node_id), None)
+    if not node:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+
+    if body.task is not None:
+        node["task"] = body.task
+    if body.agent is not None:
+        node["agent"] = body.agent
+    if body.status is not None and body.status in ("PENDING", "IN_PROGRESS", "COMPLETED", "ERROR"):
+        node["status"] = body.status
+    if body.estimated_minutes is not None:
+        node["estimated_minutes"] = body.estimated_minutes
+    if body.x is not None:
+        node["x"] = body.x
+    if body.y is not None:
+        node["y"] = body.y
+    if body.dependencies is not None:
+        # Validate: no self-references, all dep IDs must exist
+        all_ids = {n["id"] for n in wm["nodes"]}
+        for dep in body.dependencies:
+            if dep == node_id:
+                raise HTTPException(status_code=400, detail="A node cannot depend on itself")
+            if dep not in all_ids:
+                raise HTTPException(status_code=400, detail=f"Dependency '{dep}' does not exist")
+        node["dependencies"] = body.dependencies
+
+    _save_workmap(wm, wm_path)
+    return node
+
+
+@app.post("/workmap/{agent_id}/node")
+async def add_node(agent_id: str, body: NodeCreate):
+    """Add a new node to the workmap DAG."""
+    wm, wm_path = _load_workmap(agent_id)
+    nodes = wm.get("nodes", [])
+
+    # Generate next node ID
+    existing_nums = []
+    for n in nodes:
+        parts = n["id"].split("_")
+        if len(parts) == 2 and parts[1].isdigit():
+            existing_nums.append(int(parts[1]))
+    next_num = max(existing_nums, default=0) + 1
+    new_id = f"node_{next_num}"
+
+    # Validate dependencies exist
+    all_ids = {n["id"] for n in nodes}
+    for dep in body.dependencies:
+        if dep not in all_ids:
+            raise HTTPException(status_code=400, detail=f"Dependency '{dep}' does not exist")
+
+    new_node = {
+        "id": new_id,
+        "agent": body.agent,
+        "task": body.task,
+        "dependencies": body.dependencies,
+        "status": "PENDING",
+        "result_summary": "",
+        "estimated_minutes": body.estimated_minutes,
+        "x": body.x,
+        "y": body.y
+    }
+    nodes.append(new_node)
+    wm["nodes"] = nodes
+    _save_workmap(wm, wm_path)
+    return new_node
+
+
+@app.delete("/workmap/{agent_id}/node/{node_id}")
+async def delete_node(agent_id: str, node_id: str):
+    """Delete a node and remove it from all dependency lists."""
+    wm, wm_path = _load_workmap(agent_id)
+    nodes = wm.get("nodes", [])
+
+    found = any(n["id"] == node_id for n in nodes)
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+
+    # Remove the node
+    wm["nodes"] = [n for n in nodes if n["id"] != node_id]
+    # Clean up dangling dependency references
+    for n in wm["nodes"]:
+        if node_id in n.get("dependencies", []):
+            n["dependencies"].remove(node_id)
+
+    _save_workmap(wm, wm_path)
+    return {"deleted": node_id, "remaining_nodes": len(wm["nodes"])}
+
+
+@app.get("/workmap/{agent_id}/agents")
+async def get_available_agents(agent_id: str):
+    """Return list of agents available for assignment (the master + connected workers)."""
+    agents = load_data()
+    sender = next((a for a in agents if a["id"] == agent_id), None)
+    if not sender:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    connections = sender.get("connections", [])
+    result = [{"id": "self", "name": "Master (self)"}]
+    for a in agents:
+        if a["id"] == agent_id:
+            continue
+        if a["id"] in connections or agent_id in a.get("connections", []):
+            result.append({"id": a["id"], "name": a.get("name", a["id"])})
+    return result
 
 
 if __name__ == "__main__":

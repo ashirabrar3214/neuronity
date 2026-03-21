@@ -603,27 +603,20 @@ class AgentCanvas {
     }
 
     startWorkmapPolling() {
-        // Poll every 5000ms — matches the backend tick interval.
-        // Only polls agents whose DAG section is already visible (master agents
-        // that have a workmap). Worker agents 404 and are silently skipped.
-        setInterval(async () => {
+        // Polls all agents for workmaps every 5 seconds (matches backend tick interval).
+        // Also runs once immediately so existing workmaps render on page load.
+        const pollAll = async () => {
             for (const nodeObj of this.nodes) {
-                const dagEl = document.getElementById(`dag-${nodeObj.id}`);
-                // Skip polling agents whose workmap is not yet visible
-                if (dagEl && dagEl.style.display === 'none') {
-                    // Still try a probe fetch so new workmaps become visible
-                    try {
-                        const r = await fetch(`http://localhost:8000/workmap/${nodeObj.id}`);
-                        if (r.ok) this.updateWorkmapNodes(nodeObj.id, await r.json());
-                    } catch (_) { /* worker agent — no workmap */ }
-                } else if (dagEl) {
-                    try {
-                        const r = await fetch(`http://localhost:8000/workmap/${nodeObj.id}`);
-                        if (r.ok) this.updateWorkmapNodes(nodeObj.id, await r.json());
-                    } catch (_) { /* ignore */ }
-                }
+                try {
+                    const r = await fetch(`http://localhost:8000/workmap/${nodeObj.id}`);
+                    if (r.ok) this.updateWorkmapNodes(nodeObj.id, await r.json());
+                } catch (_) { /* worker agent — no workmap, expected */ }
             }
-        }, 5000);
+        };
+
+        // Run immediately on startup, then every 5 seconds
+        pollAll();
+        setInterval(pollAll, 5000);
     }
 
     centerView() {

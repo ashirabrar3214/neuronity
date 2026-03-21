@@ -147,16 +147,16 @@ TASK: {task}
 
 OUTPUT RULES (STRICT):
 1. Return ONLY a valid JSON array. No markdown, no explanation, no preamble.
-2. Each node must have: "id" (string, e.g. "node_1"), "agent" (agent ID string or "self"), "task" (clear instruction string), "dependencies" (array of node IDs that must complete first, empty [] for root nodes).
+2. Each node must have: "id" (string, use "task_1", "task_2" etc.), "label" (short 2-4 word title for this step, e.g. "Oil Price Analysis"), "agent" (agent ID string or "self"), "task" (clear instruction string), "dependencies" (array of node IDs that must complete first, empty [] for root nodes).
 3. Maximum 6 nodes. Keep each task focused on a single research or execution action.
 4. The FINAL node should always generate the report/deliverable.
 5. Parallel nodes (no shared dependencies) will be dispatched concurrently — use this for independent research tasks.
 
 EXAMPLE OUTPUT:
 [
-  {{"id": "node_1", "agent": "agent-geopolitics-001", "task": "Search for current military positions and recent engagements.", "dependencies": []}},
-  {{"id": "node_2", "agent": "agent-economics-002", "task": "Research economic sanctions and trade disruptions.", "dependencies": []}},
-  {{"id": "node_3", "agent": "self", "task": "Generate final PDF report synthesizing all research.", "dependencies": ["node_1", "node_2"]}}
+  {{"id": "task_1", "label": "Military Analysis", "agent": "agent-geopolitics-001", "task": "Search for current military positions and recent engagements.", "dependencies": []}},
+  {{"id": "task_2", "label": "Economic Impact", "agent": "agent-economics-002", "task": "Research economic sanctions and trade disruptions.", "dependencies": []}},
+  {{"id": "task_3", "label": "Final Report", "agent": "self", "task": "Generate final PDF report synthesizing all research.", "dependencies": ["task_1", "task_2"]}}
 ]
 
 YOUR DAG (JSON array only):"""
@@ -180,10 +180,11 @@ YOUR DAG (JSON array only):"""
         nodes = []
         for i, step in enumerate(fallback_steps):
             nodes.append({
-                "id": f"node_{i+1}",
+                "id": f"task_{i+1}",
+                "label": f"Step {i+1}",
                 "agent": agent_id,
                 "task": step,
-                "dependencies": [f"node_{i}"] if i > 0 else []
+                "dependencies": [f"task_{i}"] if i > 0 else []
             })
 
     workmap = {
@@ -194,7 +195,8 @@ YOUR DAG (JSON array only):"""
         "provider": provider,
         "nodes": [
             {
-                "id": n.get("id", f"node_{i+1}"),
+                "id": n.get("id", f"task_{i+1}"),
+                "label": n.get("label", n.get("task", "")[:30]),
                 "agent": n.get("agent", agent_id),
                 "task": n.get("task", ""),
                 "dependencies": n.get("dependencies", []),
@@ -217,6 +219,95 @@ def save_workmap_json(workmap, agent_id):
     with open(workmap_path, "w", encoding="utf-8") as f:
         json.dump(workmap, f, indent=2)
     return workmap_path
+
+
+def provision_workmap_agents(workmap, master_agent_id):
+    """
+    Auto-create any agents referenced in the workmap that don't yet exist.
+    Registers them in agents.json, generates their directory structure,
+    connects them to the master, and positions them on the canvas.
+    """
+    from interpreter import load_data, save_data, generate_agent_structure
+
+    agents = load_data()
+    if agents is None:
+        agents = []
+    existing_ids = {a["id"] for a in agents}
+
+    # Find the master agent for positioning and connection
+    master = next((a for a in agents if a["id"] == master_agent_id), None)
+    master_x = master.get("x", 0) if master else 0
+    master_y = master.get("y", 0) if master else 0
+
+    nodes = workmap.get("nodes", [])
+    referenced_agents = set()
+    for node in nodes:
+        agent = node.get("agent", "")
+        if agent and agent not in ("self", "", master_agent_id):
+            referenced_agents.add(agent)
+
+    created = []
+    offset = 0
+    for agent_id in referenced_agents:
+        if agent_id in existing_ids:
+            continue
+
+        # Derive a human-readable name from the ID (e.g. "agent-energy-001" → "Energy")
+        parts = agent_id.replace("agent-", "").split("-")
+        name_part = parts[0] if parts else agent_id
+        display_name = name_part.replace("_", " ").title()
+
+        # Find the task description from the first node using this agent
+        task_hint = ""
+        for node in nodes:
+            if node.get("agent") == agent_id:
+                task_hint = node.get("task", "")[:120]
+                break
+
+        # Position in a fan below the master
+        offset += 1
+        new_x = master_x + (offset * 320) - 320
+        new_y = master_y + 280
+
+        # Create a subfolder inside the master's workingDir for this agent
+        master_work_dir = (master.get("workingDir", "") if master else "") or ""
+        if master_work_dir:
+            agent_work_dir = os.path.join(master_work_dir, agent_id)
+            os.makedirs(agent_work_dir, exist_ok=True)
+            safe_log(f"    [PROVISION] Created work directory: {agent_work_dir}")
+        else:
+            agent_work_dir = ""
+
+        new_agent = {
+            "id": agent_id,
+            "name": display_name,
+            "description": task_hint or f"Worker agent for {display_name} tasks",
+            "brain": master.get("brain", "") if master else "",
+            "channel": "Gmail",
+            "workingDir": agent_work_dir,
+            "permissions": ["web search", "file access"],
+            "tools": "Custom",
+            "responsibility": task_hint or f"{display_name} research and analysis",
+            "agentType": "worker",
+            "x": new_x,
+            "y": new_y,
+            "connections": []
+        }
+
+        agents.append(new_agent)
+        generate_agent_structure(new_agent)
+        created.append(agent_id)
+        safe_log(f"+++ [PROVISION] Auto-created agent '{display_name}' (ID: {agent_id})")
+
+    if created:
+        # Connect master → new agents
+        if master:
+            existing_conns = master.get("connections", [])
+            master["connections"] = existing_conns + created
+        save_data(agents)
+        safe_log(f"[PROVISION] {len(created)} agents provisioned and connected to {master_agent_id}")
+
+    return created
 
 
 async def execute_next_node(agent_id, api_key, provider):
@@ -429,6 +520,8 @@ async def run_autonomous(agent_id, task, api_key, provider, agents_info="", auto
     # Generate DAG workmap for master tick engine (runs in parallel with plan generation)
     try:
         workmap = await generate_workmap(task, agent_id, api_key, provider, agents_info)
+        # Auto-create any agents referenced in the workmap that don't exist yet
+        provision_workmap_agents(workmap, agent_id)
         save_workmap_json(workmap, agent_id)
         safe_log(f"[STATUS:{agent_id}] Workmap saved — {len(workmap['nodes'])} nodes, status: PAUSED")
     except Exception as e:

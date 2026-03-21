@@ -159,6 +159,88 @@
         </div>
     </div>
 
+    <!-- Workmap Tree Canvas (replaces the agent canvas when open) -->
+    <div id="workmap-overlay" style="display:none;">
+        <div class="workmap-toolbar">
+            <button id="workmap-back-btn" class="workmap-toolbar-btn">← Back to Canvas</button>
+            <span id="workmap-title" class="workmap-toolbar-title">Project Workmap</span>
+            <div class="workmap-toolbar-actions">
+                <div class="wm-deadline-group">
+                    <label class="wm-deadline-label">Deadline</label>
+                    <input type="number" id="wm-deadline-input" class="wm-deadline-input" min="1" placeholder="hrs">
+                    <span class="wm-deadline-unit">hrs</span>
+                </div>
+                <button id="workmap-add-node-btn" class="workmap-toolbar-btn workmap-btn-add">+ Add Node</button>
+                <span id="workmap-status-badge" class="workmap-badge">PAUSED</span>
+                <button id="workmap-play-btn" class="workmap-toolbar-btn workmap-btn-play">▶ Play</button>
+                <button id="workmap-pause-btn" class="workmap-toolbar-btn workmap-btn-pause">⏸ Pause</button>
+            </div>
+        </div>
+        <div id="workmap-tree-container">
+            <div class="wm-grid-layer"></div>
+            <div id="workmap-pan-layer">
+                <svg id="workmap-edges"></svg>
+                <div id="workmap-nodes"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workmap Node Edit Modal -->
+    <div id="wm-node-modal-overlay" class="wm-modal-overlay" style="display:none;">
+        <div class="wm-modal">
+            <div class="wm-modal-header">
+                <span class="wm-modal-title" id="wm-modal-title">Edit Node</span>
+                <button id="wm-modal-close" class="wm-modal-close-btn">&times;</button>
+            </div>
+            <div class="wm-modal-body">
+                <input type="hidden" id="wm-edit-node-id">
+                <div class="wm-field">
+                    <label>Task Description</label>
+                    <textarea id="wm-edit-task" rows="3" placeholder="What should this node do?"></textarea>
+                </div>
+                <div class="wm-field-row">
+                    <div class="wm-field wm-field-half">
+                        <label>Assigned Agent</label>
+                        <select id="wm-edit-agent"></select>
+                    </div>
+                    <div class="wm-field wm-field-half">
+                        <label>Status</label>
+                        <select id="wm-edit-status">
+                            <option value="PENDING">PENDING</option>
+                            <option value="IN_PROGRESS">IN_PROGRESS</option>
+                            <option value="COMPLETED">COMPLETED</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="wm-field-row">
+                    <div class="wm-field wm-field-half">
+                        <label>Dependencies</label>
+                        <div id="wm-edit-deps" class="wm-deps-container"></div>
+                    </div>
+                    <div class="wm-field wm-field-half">
+                        <label>Est. Time (minutes)</label>
+                        <input type="number" id="wm-edit-time" min="0" placeholder="0">
+                    </div>
+                </div>
+            </div>
+            <div class="wm-modal-footer">
+                <button id="wm-modal-delete" class="wm-modal-btn wm-btn-delete">Delete Node</button>
+                <div class="wm-modal-footer-right">
+                    <button id="wm-modal-cancel" class="wm-modal-btn wm-btn-cancel">Cancel</button>
+                    <button id="wm-modal-save" class="wm-modal-btn wm-btn-save">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workmap Right-Click Context Menu -->
+    <div id="wm-context-menu" class="wm-context-menu" style="display:none;">
+        <button class="wm-ctx-item" data-action="add-step">+ Add Step Here</button>
+        <button class="wm-ctx-item wm-ctx-edit" data-action="edit-step" style="display:none;">Edit Step</button>
+        <button class="wm-ctx-item wm-ctx-danger" data-action="remove-step" style="display:none;">Remove Step</button>
+    </div>
+
     <!-- Custom Confirm Modal -->
     <div id="custom-confirm-overlay" class="custom-modal-overlay" style="display: none;">
         <div class="custom-modal-box">
