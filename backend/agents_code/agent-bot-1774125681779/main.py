@@ -4,7 +4,7 @@ class agent_bot_1774125681779:
         self.id = "agent-bot-1774125681779"
         self.name = "MasterAgnet"
         self.working_dir = r"D:\New folder"
-        self.permissions = ['file access']
+        self.permissions = ['web search', 'report generation', 'file access']
         self.tools = "Custom"
         
     def get_personality(self):

@@ -474,6 +474,29 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
     elif tool_name == "update_plan":
         return await toolkit.update_plan(agent_id, tool_input)
 
+    elif tool_name == "create_project_workmap":
+        # Build connected-agents context for the planner
+        connections = sender_data.get("connections", []) if sender_data else []
+        agents_info_lines = []
+        for a in agents:
+            if a["id"] == agent_id:
+                continue
+            if a["id"] in connections or agent_id in a.get("connections", []):
+                perms = ", ".join(a.get("permissions", [])) or "none"
+                agents_info_lines.append(
+                    f"- {a['name']} (ID: {a['id']}): {a.get('responsibility', '')} | Tools: {perms}"
+                )
+        agents_info = "\n".join(agents_info_lines)
+
+        import planner
+        await planner.run_autonomous(agent_id, tool_input, api_key, "gemini", agents_info, autonomous=True)
+
+        return (
+            "SYSTEM: Workmap successfully generated and saved to disk. "
+            "INSTRUCTION: Tell the user the plan is ready. Tell them to review the DAG Workmap "
+            "inside your agent card on the canvas, and click the PLAY button to start the background execution engine."
+        )
+
     elif tool_name == "ask_user":
         return await toolkit.ask_user(agent_id, tool_input)
 
@@ -1009,7 +1032,7 @@ def clear_history(agent_id: str):
         print(f"!!! [BACKEND ERROR] Could not clear history for {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest_only=False, is_training=False):
+def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest_only=False, is_training=False, is_master=False):
     """
     Translates agent permissions into Gemini-native tool declarations.
     If manifest_only is True, returns a human-readable string for system prompts.
@@ -1197,6 +1220,27 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest
             "parameters": {"type": "OBJECT", "properties": {}}
         })
 
+    # Master-only planning tool
+    if is_master:
+        declarations.append({
+            "name": "create_project_workmap",
+            "description": (
+                "Generates the Directed Acyclic Graph (DAG) execution tree for the project and saves it as a workmap. "
+                "Call this ONLY after Phase 1 (Scouting) is complete and the user has confirmed the specific goal and deadline. "
+                "Do NOT call this for casual questions or simple one-step tasks."
+            ),
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "finalized_task": {
+                        "type": "STRING",
+                        "description": "The detailed, finalized description of the project goal, scope, and deadline."
+                    }
+                },
+                "required": ["finalized_task"]
+            }
+        })
+
     if manifest_only:
         return "\n".join([f"- [TOOL: {d['name']}()]: {d['description']}" for d in declarations])
 
@@ -1295,7 +1339,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
         f"RESPONSIBILITY: {agent_data.get('responsibility', 'No responsibility set.')}\n"
     )
     
-    tool_manual_layer = f"## CAPABILITY MANIFEST\n{get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0, manifest_only=True)}\n"
+    tool_manual_layer = f"## CAPABILITY MANIFEST\n{get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0, manifest_only=True, is_master=is_master)}\n"
     
     # Injection: Agent Directory (Project-wide awareness)
     agent_dir_content = ""
@@ -1323,10 +1367,11 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
     
     if is_master and not is_training_mode:
         system_prompt += (
-            "\n## MASTER PROTOCOL\n"
-            "You are a MASTER agent. Your priority is task completion. If you are given a task, you MUST proceed immediately to the first execution step.\n"
-            "- Do NOT stop to ask for clarification on common topics unless it's truly ambiguous.\n"
-            "- Always prioritize calling a tool (web_search, etc.) over providing a conversational text response.\n"
+            "\n## MASTER PROTOCOL: STATE MACHINE\n"
+            "You are a Master Project Manager. You must follow a strict 2-phase workflow:\n"
+            "PHASE 1 (SCOUTING): When the user requests a complex project, do NOT start doing the research yourself. Ask clarifying questions (e.g., specific focus, deadline, scope). Use `web_search` for quick context only if needed.\n"
+            "PHASE 2 (PLANNING): Once the user provides the specific goal and deadline, YOU MUST call the `create_project_workmap` tool. Pass the finalized, highly detailed task description to this tool.\n"
+            "Once the workmap is created, tell the user to 'Review the plan on the canvas and press PLAY to begin execution.' Do NOT execute tasks manually in this chat window.\n"
         )
     
     if is_training_mode:
@@ -1390,7 +1435,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
             "contents": gemini_history,
             "systemInstruction": {"parts": [{"text": system_prompt}]},
             "generationConfig": gen_config,
-            "tools": get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0, is_training=is_training_mode)
+            "tools": get_gemini_tools_from_permissions(permissions, len(reachable_agents) > 0, is_training=is_training_mode, is_master=is_master)
         }
         
 

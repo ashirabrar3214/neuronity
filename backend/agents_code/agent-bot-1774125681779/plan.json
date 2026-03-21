@@ -1,8 +1,10 @@
 {
-  "objective": "",
+  "objective": "Objective: Make a report on Iran War",
   "steps": [
-    "Observe Workspace",
-    "Execute requested task"
+    "Step 1: Summarize the information from the two markdown files",
+    "Step 2: Formulate further research questions",
+    "Step 3: Research the answers to the questions",
+    "Step 4: Write the report"
   ],
   "completed": []
 }

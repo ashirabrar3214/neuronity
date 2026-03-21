@@ -7,6 +7,8 @@
     "channel": "Gmail",
     "workingDir": "D:\\New folder",
     "permissions": [
+      "web search",
+      "report generation",
       "file access"
     ],
     "tools": "Custom",
