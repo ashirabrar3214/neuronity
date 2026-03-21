@@ -4,7 +4,7 @@ class agent_MasterBot_001:
         self.id = "agent-MasterBot-001"
         self.name = "MasterBot"
         self.working_dir = r"D:\New folder"
-        self.permissions = ['web search', 'thinking', 'report generation', 'file access']
+        self.permissions = ['report generation', 'file access']
         self.tools = "Gmail"
         
     def get_personality(self):

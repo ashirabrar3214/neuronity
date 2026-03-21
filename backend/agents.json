@@ -7,8 +7,6 @@
     "channel": "Gmail",
     "workingDir": "D:\\New folder",
     "permissions": [
-      "web search",
-      "thinking",
       "report generation",
       "file access"
     ],
@@ -21,17 +19,79 @@
   },
   {
     "id": "agent-bot-1773947472648",
-    "name": "A",
+    "name": "Geopolitics",
+    "description": "Agent description...",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "D:\\New folder",
+    "permissions": [
+      "web search",
+      "file access"
+    ],
+    "tools": "Custom",
+    "responsibility": "",
+    "agentType": "worker",
+    "x": -230.0,
+    "y": 17.0,
+    "connections": [
+      "agent-MasterBot-001"
+    ]
+  },
+  {
+    "id": "agent-bot-1773965327852",
+    "name": "Religion",
     "description": "Agent description...",
     "brain": "",
     "channel": "Gmail",
     "workingDir": "",
-    "permissions": [],
+    "permissions": [
+      "web search",
+      "file access"
+    ],
     "tools": "Custom",
     "responsibility": "",
     "agentType": "worker",
-    "x": -263.0,
-    "y": 108.0,
+    "x": -246.0,
+    "y": 191.0,
+    "connections": [
+      "agent-MasterBot-001"
+    ]
+  },
+  {
+    "id": "agent-bot-1773965338441",
+    "name": "Natanyahu",
+    "description": "Agent description...",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [
+      "web search",
+      "file access"
+    ],
+    "tools": "Custom",
+    "responsibility": "",
+    "agentType": "worker",
+    "x": -258.0,
+    "y": 359.0,
+    "connections": [
+      "agent-MasterBot-001"
+    ]
+  },
+  {
+    "id": "agent-bot-1773965348959",
+    "name": "DJT",
+    "description": "Agent description...",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [
+      "web search"
+    ],
+    "tools": "Custom",
+    "responsibility": "",
+    "agentType": "worker",
+    "x": -253.0,
+    "y": 542.0,
     "connections": [
       "agent-MasterBot-001"
     ]

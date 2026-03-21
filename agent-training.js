@@ -581,7 +581,7 @@ function initTrainingUI() {
 
         addMessage(text, true);
         messageInput.value = '';
-
+        setBusy(true);
         showTypingIndicator();
 
         const toggleEl = document.getElementById('work-train-toggle');
@@ -596,6 +596,7 @@ function initTrainingUI() {
             endpoint = 'http://localhost:8000/run_autonomous';
         }
 
+        currentAbortController = new AbortController();
         try {
             const response = await fetch(endpoint, {
                 method: 'POST',
@@ -604,19 +605,26 @@ function initTrainingUI() {
                     agent_id: activeAgentId,
                     message: text,
                     mode: mode
-                })
+                }),
+                signal: currentAbortController.signal
             });
 
             if (!response.ok) {
                 removeTypingIndicator();
                 addMessage(`Error: ${response.statusText}`, false);
+                setBusy(false);
                 return;
             }
 
             await parseResponse(response, text);
         } catch (error) {
             removeTypingIndicator();
-            addMessage(`Error: ${error.message}`, false);
+            if (error.name !== 'AbortError') {
+                addMessage(`Error: ${error.message}`, false);
+            }
+        } finally {
+            setBusy(false);
+            currentAbortController = null;
         }
     }
 
@@ -724,9 +732,31 @@ function initTrainingUI() {
         }
     }
 
-    sendBtn.addEventListener('click', handleSend);
+    let isAgentBusy = false;
+    let currentAbortController = null;
+
+    const SEND_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+    const STOP_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+
+    function setBusy(busy) {
+        isAgentBusy = busy;
+        sendBtn.innerHTML = busy ? STOP_ICON : SEND_ICON;
+        sendBtn.title = busy ? 'Stop' : 'Send';
+        messageInput.disabled = busy;
+        sendBtn.classList.toggle('is-stop', busy);
+    }
+
+    sendBtn.addEventListener('click', () => {
+        if (isAgentBusy) {
+            if (currentAbortController) currentAbortController.abort();
+            setBusy(false);
+            removeTypingIndicator();
+        } else {
+            handleSend();
+        }
+    });
     messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSend();
+        if (e.key === 'Enter' && !isAgentBusy) handleSend();
     });
 
     // Generate Plan button handler

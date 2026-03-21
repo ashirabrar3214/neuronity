@@ -970,7 +970,7 @@ def get_gemini_tools_from_permissions(permissions, has_messaging=False, manifest
                 "type": "OBJECT",
                 "properties": {
                     "topic": {"type": "STRING", "description": "Report title."},
-                    "context": {"type": "STRING", "description": "Full research body."}
+                    "context": {"type": "STRING", "description": "The FULL, exact text of the finalized report draft from our conversation. Do NOT summarize it. Pass the entire text."}
                 },
                 "required": ["topic", "context"]
             }
@@ -1244,6 +1244,7 @@ async def execute_agent_turn(agent_id, message, api_key_input, provider="gemini"
             f"## YOUR CURRENT WORK PROMPT (prompt.md):\n```\n{current_agent_prompt}\n```\n"
             f"{training_tools_block}\n"
             f"{tool_manual_layer}\n"
+            f"{transient_task_layer}\n"
         )
     
     api_key = api_key_input or os.getenv("GEMINI_API_KEY", "")

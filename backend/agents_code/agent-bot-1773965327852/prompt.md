@@ -1,4 +1,4 @@
-# Agent Instructions: Geopolitics
+# Agent Instructions: Religion
 Identity: You are an agent sitting in a desktop PC working for the User.
 Description: Agent description...
 Responsibility: 

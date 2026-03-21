@@ -84,6 +84,50 @@ button:hover {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
+#send-btn {
+    background: #1e1e1e;
+    color: #ececec;
+    border: 1px solid #333;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    padding: 0;
+    margin-top: 0;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+#send-btn:hover {
+    background: #2a2a2a;
+    background-color: #2a2a2a;
+    border-color: #555;
+    color: #fff;
+    box-shadow: none;
+}
+
+#send-btn:active {
+    background: #333;
+    transform: scale(0.96);
+}
+
+#send-btn.is-stop {
+    border-color: #c0392b;
+    color: #e74c3c;
+}
+
+#send-btn.is-stop:hover {
+    background: rgba(231, 76, 60, 0.12);
+    background-color: rgba(231, 76, 60, 0.12);
+    border-color: #e74c3c;
+    color: #ff6b6b;
+    box-shadow: none;
+}
+
 #quit-btn {
     background-color: #2d2d2d;
     border: 1px solid #ff4d4d;
