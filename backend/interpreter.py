@@ -457,8 +457,6 @@ async def perform_tool_call(agent_id, tool_name, tool_input, agent_dir, api_key=
             return f"Error: My '{required_perm}' capability is currently disabled. I cannot use the tool '{tool_name}'. Please enable it in my settings if you want me to proceed with this action."
 
     if tool_name == "post_finding":
-        # â"€â"€ BELIEF REVISION (BRF) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-        import brf
         raw_snippet = tool_input.strip()
         url = ""
         

@@ -1,10 +1,12 @@
 {
-  "objective": "Objective: Make a report on Iran War",
+  "objective": "Objective",
   "steps": [
-    "Step 1: Summarize the information from the two markdown files",
-    "Step 2: Formulate further research questions",
-    "Step 3: Research the answers to the questions",
-    "Step 4: Write the report"
+    "Research Iran War",
+    "Gather Sources",
+    "Outline Report",
+    "Draft Report",
+    "Review Report",
+    "Generate Report"
   ],
   "completed": []
 }
