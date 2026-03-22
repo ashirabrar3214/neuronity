@@ -1234,22 +1234,27 @@ function renderWorkmapTree(workmap, agentId) {
 
         const statusKey = (n.status || 'PENDING').toLowerCase().replace('_', '-');
         const timeStr = n.estimated_minutes ? `<span class="wm-node-time">${n.estimated_minutes}m</span>` : '';
+        const label = n.label || n.id;
+        const agentDisplay = (n.agent === agentId || n.agent === 'self') ? 'Master (self)' : n.agent;
         const el = document.createElement('div');
         el.className = `wm-node wm-node-${statusKey} wm-node-abs`;
         el.setAttribute('data-node-id', n.id);
         el.style.left = posX + 'px';
         el.style.top = posY + 'px';
         el.innerHTML = `
-            <div class="wm-node-header wm-node-drag-handle">
-                <span class="wm-node-id">${n.id}</span>
+            <div class="wm-node-header">
+                <span class="wm-node-label">${label}</span>
                 <div class="wm-node-header-right">
                     ${timeStr}
                     <span class="wm-node-status">${n.status || 'PENDING'}</span>
                 </div>
             </div>
             <div class="wm-node-task">${n.task}</div>
-            <div class="wm-node-agent">${n.agent === agentId || n.agent === 'self' ? 'Master (self)' : n.agent}</div>
-            ${n.dependencies && n.dependencies.length ? `<div class="wm-node-deps">deps: ${n.dependencies.join(', ')}</div>` : ''}
+            <div class="wm-node-meta">
+                <span class="wm-node-agent">${agentDisplay}</span>
+                <span class="wm-node-id">${n.id}</span>
+            </div>
+            ${n.dependencies && n.dependencies.length ? `<div class="wm-node-deps">after: ${n.dependencies.map(d => { const dn = nodes.find(nd => nd.id === d); return dn && dn.label ? dn.label : d; }).join(', ')}</div>` : ''}
         `;
 
         // Double-click to edit
@@ -1470,7 +1475,8 @@ function openNodeModal(nodeId) {
 
     // Populate fields
     document.getElementById('wm-edit-node-id').value = nodeId;
-    document.getElementById('wm-modal-title').textContent = `Edit ${nodeId}`;
+    document.getElementById('wm-modal-title').textContent = `Edit: ${node.label || nodeId}`;
+    document.getElementById('wm-edit-label').value = node.label || '';
     document.getElementById('wm-edit-task').value = node.task || '';
     document.getElementById('wm-edit-status').value = node.status || 'PENDING';
     document.getElementById('wm-edit-time').value = node.estimated_minutes || '';
@@ -1513,7 +1519,8 @@ function openAddNodeModal(x, y) {
     _newNodeY = y || 0;
 
     document.getElementById('wm-edit-node-id').value = '';
-    document.getElementById('wm-modal-title').textContent = 'Add New Node';
+    document.getElementById('wm-modal-title').textContent = 'Add New Step';
+    document.getElementById('wm-edit-label').value = '';
     document.getElementById('wm-edit-task').value = '';
     document.getElementById('wm-edit-status').value = 'PENDING';
     document.getElementById('wm-edit-time').value = '';
@@ -1552,6 +1559,7 @@ function _getSelectedDeps() {
 async function saveNodeChanges() {
     if (!_workmapAgentId) return;
 
+    const label = document.getElementById('wm-edit-label').value.trim();
     const task = document.getElementById('wm-edit-task').value.trim();
     if (!task) { alert('Task description is required.'); return; }
 
@@ -1566,14 +1574,14 @@ async function saveNodeChanges() {
             await fetch(`http://localhost:8000/workmap/${_workmapAgentId}/node/${_editingNodeId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task, agent, status, estimated_minutes: time, dependencies: deps })
+                body: JSON.stringify({ label, task, agent, status, estimated_minutes: time, dependencies: deps })
             });
         } else {
             // CREATE new node at the position where user right-clicked (or 0,0)
             await fetch(`http://localhost:8000/workmap/${_workmapAgentId}/node`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task, agent, dependencies: deps, estimated_minutes: time, x: _newNodeX, y: _newNodeY })
+                body: JSON.stringify({ label: label || task.slice(0, 30), task, agent, dependencies: deps, estimated_minutes: time, x: _newNodeX, y: _newNodeY })
             });
         }
     } catch (err) {

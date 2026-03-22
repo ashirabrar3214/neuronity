@@ -191,7 +191,6 @@ YOUR DAG (JSON array only):"""
         "project_id": f"proj_{int(time.time())}",
         "status": "PAUSED",
         "deadline_hours": 48,
-        "api_key": api_key,
         "provider": provider,
         "nodes": [
             {
@@ -549,7 +548,6 @@ async def run_execution_loop(agent_id, task, api_key, provider):
             with open(workmap_path, "r", encoding="utf-8") as f:
                 workmap = json.load(f)
             workmap["status"] = "RUNNING"
-            workmap["api_key"] = api_key
             workmap["provider"] = provider
             with open(workmap_path, "w", encoding="utf-8") as f:
                 json.dump(workmap, f, indent=2)

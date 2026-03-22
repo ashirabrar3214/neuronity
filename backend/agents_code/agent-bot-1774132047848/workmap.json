@@ -2,7 +2,6 @@
   "project_id": "proj_1774133672",
   "status": "PAUSED",
   "deadline_hours": 10,
-  "api_key": "AIzaSyCz0j85qREYsRYx8YCBZvAqm4TRNCOlvVI",
   "provider": "gemini",
   "nodes": [
     {

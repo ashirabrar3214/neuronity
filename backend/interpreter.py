@@ -140,7 +140,7 @@ def execution_engine_tick():
                     # Guard: skip if a node is already in flight
                     if any(n.get("status") == "IN_PROGRESS" for n in wm.get("nodes", [])):
                         continue
-                    api_key = wm.get("api_key") or os.getenv("GEMINI_API_KEY", "")
+                    api_key = os.getenv("GEMINI_API_KEY", "")
                     provider = wm.get("provider", "gemini")
                     # FIRE AND FORGET — do not block the tick thread
                     asyncio.run_coroutine_threadsafe(
@@ -1712,6 +1712,7 @@ async def pause_workmap(agent_id: str):
 # --- WORKMAP CRUD ENDPOINTS --------------------------------------------------
 
 class NodeUpdate(BaseModel):
+    label: Optional[str] = None
     task: Optional[str] = None
     agent: Optional[str] = None
     dependencies: Optional[List[str]] = None
@@ -1721,6 +1722,7 @@ class NodeUpdate(BaseModel):
     y: Optional[float] = None
 
 class NodeCreate(BaseModel):
+    label: str = ""
     task: str
     agent: str = "self"
     dependencies: List[str] = []
@@ -1765,6 +1767,8 @@ async def update_node(agent_id: str, node_id: str, body: NodeUpdate):
     if not node:
         raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
 
+    if body.label is not None:
+        node["label"] = body.label
     if body.task is not None:
         node["task"] = body.task
     if body.agent is not None:
@@ -1797,14 +1801,14 @@ async def add_node(agent_id: str, body: NodeCreate):
     wm, wm_path = _load_workmap(agent_id)
     nodes = wm.get("nodes", [])
 
-    # Generate next node ID
+    # Generate next task ID
     existing_nums = []
     for n in nodes:
         parts = n["id"].split("_")
-        if len(parts) == 2 and parts[1].isdigit():
-            existing_nums.append(int(parts[1]))
+        if len(parts) >= 2 and parts[-1].isdigit():
+            existing_nums.append(int(parts[-1]))
     next_num = max(existing_nums, default=0) + 1
-    new_id = f"node_{next_num}"
+    new_id = f"task_{next_num}"
 
     # Validate dependencies exist
     all_ids = {n["id"] for n in nodes}
@@ -1814,6 +1818,7 @@ async def add_node(agent_id: str, body: NodeCreate):
 
     new_node = {
         "id": new_id,
+        "label": body.label or body.task[:30],
         "agent": body.agent,
         "task": body.task,
         "dependencies": body.dependencies,

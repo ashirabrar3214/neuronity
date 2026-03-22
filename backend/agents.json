@@ -38,7 +38,7 @@
     "tools": "Custom",
     "responsibility": "Project Iranian scientific advancements by 2026, focusing on cyber warfare, missile technology, and nuclear capabilities",
     "agentType": "worker",
-    "x": 319.0,
+    "x": 312.0,
     "y": 499.0,
     "connections": []
   },
@@ -56,8 +56,8 @@
     "tools": "Custom",
     "responsibility": "Identify strategic geographic choke points, military positioning, and territorial vulnerabilities in the Iranian theater",
     "agentType": "worker",
-    "x": 320.0,
-    "y": 276.0,
+    "x": 312.0,
+    "y": 279.0,
     "connections": []
   },
   {
@@ -74,8 +74,8 @@
     "tools": "Custom",
     "responsibility": "Analyze the religious drivers and political landscape of Iran and its regional alliances in a 2026 conflict scenario.",
     "agentType": "worker",
-    "x": 316.0,
-    "y": 737.0,
+    "x": 310.0,
+    "y": 729.0,
     "connections": []
   }
 ]
