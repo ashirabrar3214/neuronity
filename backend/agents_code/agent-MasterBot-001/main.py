@@ -1,11 +1,11 @@
 
-class agent_geopolitics_003:
+class agent_MasterBot_001:
     def __init__(self):
-        self.id = "agent-geopolitics-003"
-        self.name = "Geopolitics"
+        self.id = "agent-MasterBot-001"
+        self.name = "MasterBot"
         self.working_dir = r""
-        self.permissions = ['web search', 'file access']
-        self.tools = "Custom"
+        self.permissions = ['web search', 'thinking']
+        self.tools = "Gmail"
 
     def get_personality(self):
         import json
@@ -17,5 +17,5 @@ class agent_geopolitics_003:
             return {}
 
 if __name__ == "__main__":
-    agent = agent_geopolitics_003()
+    agent = agent_MasterBot_001()
     print(f"Agent {agent.name} initialized.")

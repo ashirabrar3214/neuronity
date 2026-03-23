@@ -184,9 +184,10 @@ Decide:
 3. RE-PLAN: New data contradicts current approach. Need to pivot.
 
 RULES:
-- If the message is a casual greeting with no clear objective, choose CLARIFY.
-- If history shows we already have the objective and user is following up, choose SOLVE.
+- If the user request is broad (e.g., "research the Iran war"), you MUST choose CLARIFY and state exactly what context you are missing.
+- If you are a 'master' agent, you MUST gather full context first. Only choose SOLVE to explicitly use the 'create_project_workmap' tool once you have perfect clarity.
 - NEVER choose RE-PLAN due to a "missing capability" if the required tool IS listed.
+
 
 Return ONLY a JSON object:
 {{"decision": "SOLVE" | "CLARIFY" | "RE-PLAN", "reason": "Short explanation."}}

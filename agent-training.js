@@ -872,9 +872,6 @@ function initTrainingUI() {
         // In work mode, master agents use /run_autonomous for tasks.
         const agentType = activeAgentData.agentType || 'worker';
         let endpoint = 'http://localhost:8000/chat';
-        if (!isTraining && agentType === 'master' && text.length > 10) {
-            endpoint = 'http://localhost:8000/run_autonomous';
-        }
 
         currentAbortController = new AbortController();
         try {

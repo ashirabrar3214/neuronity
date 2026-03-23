@@ -1,5 +1,5 @@
 {
-  "objective": "Collect recent news articles about Iran.",
+  "objective": "Coordinate all agents",
   "steps": [
     "Observe Workspace",
     "Execute requested task"

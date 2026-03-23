@@ -1,7 +1,7 @@
 {
-  "agent_id": "agent-editor-004",
+  "agent_id": "agent-MasterBot-001",
   "extraction_logic": "RAW_CHUNKS",
   "verification_required": false,
   "output_format": "STRUCTURED_FINDINGS",
-  "knowledge_gate": "WRITE_ONLY_LEDGER"
+  "knowledge_gate": "READ_WRITE"
 }
