@@ -30,14 +30,26 @@ def safe_log(message):
 # ---------------------------------------------------------------------------
 
 async def _call_llm(prompt: str, api_key: str, mode: str = "fast") -> str:
-    """One-shot LLM call for plan generation."""
-    try:
-        llm = get_llm(mode, api_key, streaming=False)
-        result = await llm.ainvoke([{"role": "user", "content": prompt}])
-        return result.content.strip()
-    except Exception as e:
-        safe_log(f"!!! [ORCHESTRATION] LLM error: {e}")
-        return ""
+    """One-shot LLM call for plan generation. Falls back to fast model on error."""
+    from langchain_core.messages import HumanMessage
+
+    for attempt_mode in ([mode, "fast"] if mode != "fast" else ["fast"]):
+        try:
+            llm = get_llm(attempt_mode, api_key, streaming=False)
+            result = await llm.ainvoke([HumanMessage(content=prompt)])
+            content = result.content
+            if isinstance(content, list):
+                text_parts = [p if isinstance(p, str) else p.get("text", "") for p in content]
+                text = text_parts[-1].strip() if text_parts else ""
+            else:
+                text = content.strip()
+            if text:
+                return text
+            safe_log(f"!!! [ORCHESTRATION] LLM returned empty with mode={attempt_mode}")
+        except Exception as e:
+            safe_log(f"!!! [ORCHESTRATION] LLM error (mode={attempt_mode}): {e}")
+
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -74,6 +86,12 @@ YOUR PLAN:"""
 
     text = await _call_llm(prompt, api_key, mode="think")
 
+    if not text:
+        safe_log(f"!!! [PLAN] LLM returned empty text for agent {agent_id}")
+        return []
+
+    safe_log(f"[PLAN] Raw LLM response ({len(text)} chars): {text[:200]}")
+
     steps = []
     for line in text.strip().split('\n'):
         line = line.strip()
@@ -81,6 +99,8 @@ YOUR PLAN:"""
             step = re.sub(r'^\d+[\.\)]\s*', '', line).strip()
             if step:
                 steps.append(step)
+
+    safe_log(f"[PLAN] Parsed {len(steps)} steps from response")
     return steps
 
 

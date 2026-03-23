@@ -6,6 +6,7 @@ Frontend expects events with types:
   thought, text, tool_start, tool_result, status, error, [DONE]
 """
 import json
+from langchain_core.messages import AIMessage
 from graph.tool_definitions import SILENT_TOOLS
 
 
@@ -27,6 +28,15 @@ async def langgraph_to_sse(graph, input_state: dict, config: dict):
                     reason = output.get("decision_reason", "")
                     if decision:
                         yield _sse({"type": "thought", "content": f"Deliberation: {decision} ({reason})"})
+
+            # --- Respond node output (for CLARIFY/RE-PLAN paths that skip LLM) ---
+            elif kind == "on_chain_end" and event.get("name") == "respond":
+                output = event.get("data", {}).get("output", {})
+                if isinstance(output, dict):
+                    messages = output.get("messages", [])
+                    for msg in messages:
+                        if isinstance(msg, AIMessage) and msg.content:
+                            yield _sse({"type": "text", "content": msg.content})
 
             # --- LLM streaming text ---
             elif kind == "on_chat_model_stream":

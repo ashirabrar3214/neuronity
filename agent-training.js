@@ -5,6 +5,181 @@ let isTrainingPanelOpen = false;
 let isTrainingUIInitialized = false;
 let saveTimeout = null;
 let autoSaveStatus = null;
+let connectedToolsSet = new Set(); // Tracks connected MCP tool IDs for the active agent
+
+// ─── MCP TOOLS REGISTRY ────────────────────────────────────────────────────
+const MCP_TOOLS_REGISTRY = [
+    // Search & Research
+    { id: 'brave-search',    name: 'Brave Search',    category: 'Search & Research', icon: 'icons/brave.svg',       description: 'Web search via Brave Search API' },
+    { id: 'tavily',          name: 'Tavily',           category: 'Search & Research', icon: 'icons/tavily.svg',      description: 'AI-optimized search engine' },
+    { id: 'exa',             name: 'Exa',              category: 'Search & Research', icon: 'icons/exa.svg',         description: 'Neural search for content discovery' },
+    { id: 'google-search',   name: 'Google Search',    category: 'Search & Research', icon: 'icons/google.svg',      description: 'Google Custom Search integration' },
+
+    // Communication
+    { id: 'gmail',           name: 'Gmail',            category: 'Communication',     icon: 'icons/gmail.svg',       description: 'Draft replies, summarize threads, and search your inbox' },
+    { id: 'slack',           name: 'Slack',            category: 'Communication',     icon: 'icons/slack.svg',       description: 'Send messages, create canvases, and fetch Slack data' },
+    { id: 'discord',         name: 'Discord',          category: 'Communication',     icon: 'icons/discord.svg',     description: 'Discord bot and server messaging' },
+    { id: 'ms-teams',        name: 'Microsoft Teams',  category: 'Communication',     icon: 'icons/teams.svg',       description: 'Teams messaging and channels' },
+    { id: 'telegram',        name: 'Telegram',         category: 'Communication',     icon: 'icons/telegram.svg',    description: 'Telegram Bot API messaging' },
+
+    // Productivity
+    { id: 'google-drive',    name: 'Google Drive',     category: 'Productivity',      icon: 'icons/gdrive.svg',      description: 'File storage and management' },
+    { id: 'google-docs',     name: 'Google Docs',      category: 'Productivity',      icon: 'icons/gdocs.svg',       description: 'Document creation and editing' },
+    { id: 'google-sheets',   name: 'Google Sheets',    category: 'Productivity',      icon: 'icons/gsheets.svg',     description: 'Spreadsheet operations' },
+    { id: 'google-calendar', name: 'Google Calendar',  category: 'Productivity',      icon: 'icons/gcalendar.svg',   description: 'Manage your schedule and coordinate meetings' },
+    { id: 'notion',          name: 'Notion',           category: 'Productivity',      icon: 'icons/notion.svg',      description: 'Connect your Notion workspace to search, update, and power workflows' },
+    { id: 'todoist',         name: 'Todoist',          category: 'Productivity',      icon: 'icons/todoist.svg',     description: 'Task and project management' },
+    { id: 'linear',          name: 'Linear',           category: 'Productivity',      icon: 'icons/linear.svg',      description: 'Manage issues, projects and team workflows' },
+
+    // Browser & Scraping
+    { id: 'puppeteer',       name: 'Puppeteer',        category: 'Browser',           icon: 'icons/puppeteer.svg',   description: 'Headless browser automation' },
+    { id: 'playwright',      name: 'Playwright',       category: 'Browser',           icon: 'icons/playwright.svg',  description: 'Cross-browser testing and scraping' },
+    { id: 'firecrawl',       name: 'Firecrawl',        category: 'Browser',           icon: 'icons/firecrawl.svg',   description: 'Web crawling and data extraction' },
+    { id: 'fetch',           name: 'Fetch',            category: 'Browser',           icon: 'icons/fetch.svg',       description: 'Simple HTTP request tool' },
+
+    // File System
+    { id: 'filesystem',      name: 'Filesystem',       category: 'File System',       icon: 'icons/filesystem.svg',  description: 'Local file system read/write access' },
+
+    // Code & Dev
+    { id: 'github',          name: 'GitHub',           category: 'Code & Dev',        icon: 'icons/github.svg',      description: 'Repos, issues, PRs, and actions' },
+    { id: 'gitlab',          name: 'GitLab',           category: 'Code & Dev',        icon: 'icons/gitlab.svg',      description: 'GitLab project management' },
+    { id: 'jira',            name: 'Jira',             category: 'Code & Dev',        icon: 'icons/jira.svg',        description: 'Jira issue tracking' },
+    { id: 'atlassian',       name: 'Atlassian',        category: 'Code & Dev',        icon: 'icons/atlassian.svg',   description: 'Access Jira and Confluence from your agent' },
+
+    // Database
+    { id: 'postgresql',      name: 'PostgreSQL',       category: 'Database',          icon: 'icons/postgresql.svg',  description: 'PostgreSQL database queries' },
+    { id: 'sqlite',          name: 'SQLite',           category: 'Database',          icon: 'icons/sqlite.svg',      description: 'SQLite local database access' },
+    { id: 'supabase',        name: 'Supabase',         category: 'Database',          icon: 'icons/supabase.svg',    description: 'Supabase backend services' },
+    { id: 'mongodb',         name: 'MongoDB',          category: 'Database',          icon: 'icons/mongodb.svg',     description: 'MongoDB document database' },
+
+    // Cloud & Infra
+    { id: 'aws',             name: 'AWS',              category: 'Cloud',             icon: 'icons/aws.svg',         description: 'Amazon Web Services integration' },
+    { id: 'cloudflare',      name: 'Cloudflare',       category: 'Cloud',             icon: 'icons/cloudflare.svg',  description: 'Cloudflare Workers, DNS, and KV' },
+    { id: 'vercel',          name: 'Vercel',           category: 'Cloud',             icon: 'icons/vercel.svg',      description: 'Frontend deployment platform' },
+
+    // Knowledge & Memory
+    { id: 'memory',          name: 'Memory',           category: 'Knowledge',         icon: 'icons/memory.svg',      description: 'Persistent knowledge graph' },
+    { id: 'qdrant',          name: 'Qdrant',           category: 'Knowledge',         icon: 'icons/qdrant.svg',      description: 'Vector similarity search engine' },
+
+    // Maps & Location
+    { id: 'google-maps',     name: 'Google Maps',      category: 'Maps',              icon: 'icons/gmaps.svg',       description: 'Maps, geocoding, and directions' },
+
+    // Media & Design
+    { id: 'canva',           name: 'Canva',            category: 'Media',             icon: 'icons/canva.svg',       description: 'Search, create, autofill and export Canva designs' },
+    { id: 'figma',           name: 'Figma',            category: 'Media',             icon: 'icons/figma.svg',       description: 'Generate diagrams and code from Figma context' },
+    { id: 'everart',         name: 'EverArt',          category: 'Media',             icon: 'icons/everart.svg',     description: 'AI image generation' },
+    { id: 'stability-ai',   name: 'Stability AI',     category: 'Media',             icon: 'icons/stability.svg',   description: 'Stable Diffusion image generation' },
+
+    // Other
+    { id: 'sequential-thinking', name: 'Sequential Thinking', category: 'Other',      icon: 'icons/thinking.svg',    description: 'Step-by-step structured reasoning' },
+    { id: 'sentry',          name: 'Sentry',           category: 'Other',             icon: 'icons/sentry.svg',      description: 'Error tracking and monitoring' },
+    { id: 'hubspot',         name: 'HubSpot',          category: 'Other',             icon: 'icons/hubspot.svg',     description: 'Chat with your CRM data for personalized insights' },
+    { id: 'intercom',        name: 'Intercom',         category: 'Other',             icon: 'icons/intercom.svg',    description: 'Access Intercom data for customer insights' },
+    { id: 'monday',          name: 'monday.com',       category: 'Other',             icon: 'icons/monday.svg',      description: 'Manage projects, boards, and workflows' },
+    { id: 'miro',            name: 'Miro',             category: 'Other',             icon: 'icons/miro.svg',        description: 'Online whiteboard collaboration' },
+    { id: 'gamma',           name: 'Gamma',            category: 'Other',             icon: 'icons/gamma.svg',       description: 'Create presentations, docs, socials, and sites with AI' },
+];
+
+// ─── MCP TOOLS RENDERING ────────────────────────────────────────────────────
+
+function renderMcpToolIcon(iconPath) {
+    // Try loading SVG icon, fallback to first letter
+    const name = iconPath.replace('icons/', '').replace('.svg', '');
+    return `<img src="${iconPath}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="mcp-icon-fallback" style="display:none">${name.charAt(0).toUpperCase()}</span>`;
+}
+
+function renderMcpToolsModal(activeCategory = 'All', searchQuery = '') {
+    const tabsContainer = document.getElementById('mcp-category-tabs');
+    const gridContainer = document.getElementById('mcp-tools-grid');
+    const countEl = document.getElementById('mcp-selected-count');
+    if (!tabsContainer || !gridContainer) return;
+
+    // Build unique category list
+    const categories = ['All', ...new Set(MCP_TOOLS_REGISTRY.map(t => t.category))];
+
+    // Render tabs
+    tabsContainer.innerHTML = categories.map(cat => `
+        <button class="mcp-cat-tab ${cat === activeCategory ? 'active' : ''}" data-category="${cat}">
+            ${cat}
+        </button>
+    `).join('');
+
+    // Tab click handlers
+    tabsContainer.querySelectorAll('.mcp-cat-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const search = document.getElementById('mcp-search-input')?.value || '';
+            renderMcpToolsModal(tab.dataset.category, search);
+        });
+    });
+
+    // Filter tools
+    let filtered = MCP_TOOLS_REGISTRY;
+    if (activeCategory !== 'All') {
+        filtered = filtered.filter(t => t.category === activeCategory);
+    }
+    if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        filtered = filtered.filter(t =>
+            t.name.toLowerCase().includes(q) ||
+            t.description.toLowerCase().includes(q) ||
+            t.category.toLowerCase().includes(q)
+        );
+    }
+
+    // Render cards
+    gridContainer.innerHTML = filtered.map(tool => {
+        const isConnected = connectedToolsSet.has(tool.id);
+        return `
+            <div class="mcp-tool-card ${isConnected ? 'connected' : ''}" data-tool-id="${tool.id}">
+                <div class="mcp-tool-icon">${renderMcpToolIcon(tool.icon)}</div>
+                <div class="mcp-tool-info">
+                    <div class="mcp-tool-name">${tool.name}</div>
+                    <div class="mcp-tool-desc">${tool.description}</div>
+                </div>
+                <button class="mcp-tool-connect-btn">${isConnected ? '&#10003;' : '+'}</button>
+            </div>
+        `;
+    }).join('');
+
+    // Card click handlers
+    gridContainer.querySelectorAll('.mcp-tool-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const toolId = card.dataset.toolId;
+            if (connectedToolsSet.has(toolId)) {
+                connectedToolsSet.delete(toolId);
+            } else {
+                connectedToolsSet.add(toolId);
+            }
+            renderMcpToolsModal(activeCategory, searchQuery);
+            updateToolsSummary();
+        });
+    });
+
+    // Update footer count
+    if (countEl) {
+        countEl.textContent = `${connectedToolsSet.size} tool${connectedToolsSet.size !== 1 ? 's' : ''} connected`;
+    }
+}
+
+function updateToolsSummary() {
+    const countEl = document.getElementById('mcp-tools-count');
+    const badgesEl = document.getElementById('mcp-connected-badges');
+
+    if (countEl) {
+        countEl.textContent = `${connectedToolsSet.size} connected`;
+    }
+
+    if (badgesEl) {
+        const connectedTools = MCP_TOOLS_REGISTRY.filter(t => connectedToolsSet.has(t.id));
+        const maxVisible = 6;
+        const visible = connectedTools.slice(0, maxVisible);
+        const remaining = connectedTools.length - maxVisible;
+
+        badgesEl.innerHTML = visible.map(t =>
+            `<span class="mcp-badge">${t.name}</span>`
+        ).join('') + (remaining > 0 ? `<span class="mcp-badge">+${remaining} more</span>` : '');
+    }
+}
 
 // ─── GLOBALS ────────────────────────────────────────────────────────────────
 window.activeTrainingAgentId = null;
@@ -140,7 +315,17 @@ window.openTrainingPanel = async (agentId, agentName) => {
     document.getElementById('detail-responsibility').value = agentData.responsibility || '';
     document.getElementById('detail-channel').value = agentData.channel || 'Gmail';
     document.getElementById('detail-workdir').value = agentData.workingDir || '';
-    document.getElementById('detail-tools').value = agentData.tools || '';
+    // Load connected MCP tools
+    if (agentData.connectedTools && Array.isArray(agentData.connectedTools)) {
+        connectedToolsSet = new Set(agentData.connectedTools);
+    } else {
+        // Migration: try matching old single-string 'tools' value to an MCP tool
+        const oldTool = (agentData.tools || '').toLowerCase();
+        const match = MCP_TOOLS_REGISTRY.find(t => t.name.toLowerCase() === oldTool);
+        connectedToolsSet = new Set(match ? [match.id] : []);
+    }
+    updateToolsSummary();
+
     const typeEl = document.getElementById('detail-agent-type');
     if (typeEl) typeEl.value = agentData.agentType || 'worker';
 
@@ -313,7 +498,7 @@ async function triggerSave() {
         responsibility: document.getElementById('detail-responsibility').value,
         channel: document.getElementById('detail-channel').value,
         workingDir: document.getElementById('detail-workdir').value,
-        tools: document.getElementById('detail-tools').value,
+        connectedTools: Array.from(connectedToolsSet),
         agentType: document.getElementById('detail-agent-type')?.value || activeAgentData.agentType || 'worker',
         permissions: permissions
     };
@@ -429,6 +614,46 @@ function initTrainingUI() {
         });
     });
 
+    // ── MCP Tools Modal Wiring ──────────────────────────────────────────────
+    const manageToolsBtn = document.getElementById('manage-tools-btn');
+    const mcpOverlay = document.getElementById('mcp-tools-overlay');
+    const mcpCloseBtn = document.getElementById('mcp-modal-close');
+    const mcpDoneBtn = document.getElementById('mcp-modal-done');
+    const mcpSearchInput = document.getElementById('mcp-search-input');
+
+    if (manageToolsBtn) {
+        manageToolsBtn.addEventListener('click', () => {
+            renderMcpToolsModal('All', '');
+            mcpOverlay.style.display = 'flex';
+            if (mcpSearchInput) {
+                mcpSearchInput.value = '';
+                mcpSearchInput.focus();
+            }
+        });
+    }
+
+    const closeMcpModal = () => {
+        if (mcpOverlay) mcpOverlay.style.display = 'none';
+        queueAutoSave();
+    };
+
+    if (mcpCloseBtn) mcpCloseBtn.addEventListener('click', closeMcpModal);
+    if (mcpDoneBtn) mcpDoneBtn.addEventListener('click', closeMcpModal);
+
+    if (mcpOverlay) {
+        mcpOverlay.addEventListener('click', (e) => {
+            if (e.target === mcpOverlay) closeMcpModal();
+        });
+    }
+
+    if (mcpSearchInput) {
+        mcpSearchInput.addEventListener('input', (e) => {
+            const activeTab = document.querySelector('.mcp-cat-tab.active');
+            const category = activeTab ? activeTab.dataset.category : 'All';
+            renderMcpToolsModal(category, e.target.value);
+        });
+    }
+
     // Agent Type change
     const typeSelect = document.getElementById('detail-agent-type');
     if (typeSelect) {
@@ -447,7 +672,7 @@ function initTrainingUI() {
     // Attach listeners to all inputs/selects for auto-save
     const autoSaveInputs = [
         'detail-name', 'detail-description', 'detail-responsibility',
-        'detail-channel', 'detail-tools', 'detail-workdir'
+        'detail-channel', 'detail-workdir'
     ];
 
     autoSaveInputs.forEach(id => {
@@ -708,7 +933,7 @@ function initTrainingUI() {
                                     thoughtDetails = document.createElement('details');
                                     thoughtDetails.className = 'thought-block';
                                     thoughtDetails.setAttribute('open', '');
-                                    thoughtDetails.innerHTML = `<summary>🧠 <div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></summary><div class="thought-content"></div>`;
+                                    thoughtDetails.innerHTML = `<summary>Thinking <div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></summary><div class="thought-content"></div>`;
                                     messageDiv.appendChild(thoughtDetails);
                                     thoughtContent = thoughtDetails.querySelector('.thought-content');
                                 }

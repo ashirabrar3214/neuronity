@@ -389,7 +389,8 @@ def get_tools_for_agent(permissions: list, has_connections: bool,
 
     if "web search" in permissions:
         tools.extend([web_search, deep_search])
-    if "report generation" in permissions:
+    # Master agents should never generate reports — only workers do
+    if "report generation" in permissions and not is_master:
         tools.extend([report_generation, generate_report])
     if "file access" in permissions:
         tools.extend([list_workspace, scout_file, read_file, write_file])

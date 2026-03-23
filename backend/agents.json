@@ -1,81 +1,17 @@
 [
   {
-    "id": "agent-bot-1774132047848",
-    "name": "Maater",
+    "id": "agent-bot-1774275028423",
+    "name": "MasterAgent",
     "description": "Agent description...",
     "brain": "",
-    "channel": "iMessage",
-    "workingDir": "D:\\New folder",
-    "permissions": [
-      "web search",
-      "thinking",
-      "report generation",
-      "scheduling",
-      "file access"
-    ],
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [],
     "tools": "Custom",
     "responsibility": "",
     "agentType": "master",
-    "x": -102.0,
-    "y": 436.0,
-    "connections": [
-      "agent-science-tech-003",
-      "agent-geospatial-002",
-      "agent-sociopolitical-001"
-    ]
-  },
-  {
-    "id": "agent-science-tech-003",
-    "name": "Science",
-    "description": "Project Iranian scientific advancements by 2026, focusing on cyber warfare, missile technology, and nuclear capabilities",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "D:\\New folder",
-    "permissions": [
-      "web search",
-      "file access"
-    ],
-    "tools": "Custom",
-    "responsibility": "Project Iranian scientific advancements by 2026, focusing on cyber warfare, missile technology, and nuclear capabilities",
-    "agentType": "worker",
-    "x": 312.0,
-    "y": 499.0,
-    "connections": []
-  },
-  {
-    "id": "agent-geospatial-002",
-    "name": "Geospatial",
-    "description": "Identify strategic geographic choke points, military positioning, and territorial vulnerabilities in the Iranian theater",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "D:\\New folder",
-    "permissions": [
-      "web search",
-      "file access"
-    ],
-    "tools": "Custom",
-    "responsibility": "Identify strategic geographic choke points, military positioning, and territorial vulnerabilities in the Iranian theater",
-    "agentType": "worker",
-    "x": 312.0,
-    "y": 279.0,
-    "connections": []
-  },
-  {
-    "id": "agent-sociopolitical-001",
-    "name": "Sociopolitical",
-    "description": "Analyze the religious drivers and political landscape of Iran and its regional alliances in a 2026 conflict scenario.",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "D:\\New folder",
-    "permissions": [
-      "web search",
-      "file access"
-    ],
-    "tools": "Custom",
-    "responsibility": "Analyze the religious drivers and political landscape of Iran and its regional alliances in a 2026 conflict scenario.",
-    "agentType": "worker",
-    "x": 310.0,
-    "y": 729.0,
+    "x": 114.0,
+    "y": 414.0,
     "connections": []
   }
 ]

@@ -1,12 +1,12 @@
 
-class agent_geospatial_002:
+class agent_bot_1774275028423:
     def __init__(self):
-        self.id = "agent-geospatial-002"
-        self.name = "Geospatial"
-        self.working_dir = r"D:\New folder"
-        self.permissions = ['web search', 'file access']
+        self.id = "agent-bot-1774275028423"
+        self.name = "MasterAgent"
+        self.working_dir = r""
+        self.permissions = []
         self.tools = "Custom"
-        
+
     def get_personality(self):
         import json
         import os
@@ -17,5 +17,5 @@ class agent_geospatial_002:
             return {}
 
 if __name__ == "__main__":
-    agent = agent_geospatial_002()
+    agent = agent_bot_1774275028423()
     print(f"Agent {agent.name} initialized.")

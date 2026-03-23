@@ -611,23 +611,37 @@ async def run_autonomous_agent(request: ChatRequest):
     agents_info = "\n".join(agents_info_lines)
 
     from graph.orchestration_graph import run_autonomous
-    steps = await run_autonomous(
-        request.agent_id, request.message, api_key, provider,
-        agents_info, autonomous=True
-    )
+    try:
+        steps = await run_autonomous(
+            request.agent_id, request.message, api_key, provider,
+            agents_info, autonomous=True
+        )
+    except Exception as e:
+        safe_log(f"!!! [RUN_AUTONOMOUS] Error: {e}")
+        steps = None
 
     if not steps:
-        return await chat_with_agent(request)
+        # Don't fall back to free-form chat — retry plan with just the fast model
+        safe_log(f"[RUN_AUTONOMOUS] Plan generation failed, retrying with fast model...")
+        try:
+            steps = await run_autonomous(
+                request.agent_id, request.message, api_key, provider,
+                agents_info, autonomous=True
+            )
+        except Exception as e:
+            safe_log(f"!!! [RUN_AUTONOMOUS] Retry also failed: {e}")
+            steps = None
 
-    plan_path = os.path.join(AGENTS_CODE_DIR, request.agent_id, "intentions.json")
+    if not steps:
+        return {"response": "Plan generation failed. Please check your API key and try again."}
+
     steps_md = "\n".join([f"{i + 1}. {s}" for i, s in enumerate(steps)])
     final_response = (
-        f"### Intentions Generated\n\n"
-        f"I've committed to the following intentions:\n\n"
+        f"### Workmap Generated\n\n"
+        f"I've created a project Workmap with the following steps:\n\n"
         f"{steps_md}\n\n"
         f"---\n"
-        f"**Intentions file:** `{plan_path}`\n\n"
-        f"Click 'Start Execution' to begin following these intentions."
+        f"Open the Workmap on the canvas to review, edit, or add steps — then click PLAY to start execution."
     )
     return {"response": final_response}
 

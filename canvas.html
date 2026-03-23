@@ -147,16 +147,11 @@
                         </div>
                         <div class="detail-item">
                             <label>Tools</label>
-                            <select id="detail-tools" class="sidebar-select">
-                                <option>Gmail</option>
-                                <option>Google Meet</option>
-                                <option>Zoom</option>
-                                <option>Google Calendar</option>
-                                <option>Microsoft Teams</option>
-                                <option>Google Docs</option>
-                                <option>Google Sheets</option>
-                                <option>Custom</option>
-                            </select>
+                            <div class="mcp-tools-summary">
+                                <span id="mcp-tools-count" class="mcp-tools-count">0 connected</span>
+                                <button id="manage-tools-btn" class="manage-tools-btn">Manage Tools</button>
+                            </div>
+                            <div id="mcp-connected-badges" class="mcp-connected-badges"></div>
                         </div>
                     </div>
 
@@ -333,6 +328,28 @@
             <div class="custom-modal-actions">
                 <button id="custom-confirm-cancel" class="custom-btn-secondary">Cancel</button>
                 <button id="custom-confirm-ok" class="custom-btn-danger">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MCP Tools Connector Modal -->
+    <div id="mcp-tools-overlay" class="mcp-modal-overlay" style="display:none;">
+        <div class="mcp-modal">
+            <div class="mcp-modal-header">
+                <span class="mcp-modal-title">Connectors</span>
+                <div class="mcp-modal-header-actions">
+                    <input type="text" id="mcp-search-input" class="mcp-search-input" placeholder="Search...">
+                    <button id="mcp-modal-close" class="mcp-modal-close-btn">&times;</button>
+                </div>
+            </div>
+            <div class="mcp-modal-subtitle">Connect your agent to apps, files, and services. Select the tools your agent needs.</div>
+            <div class="mcp-modal-body">
+                <div id="mcp-category-tabs" class="mcp-category-tabs"></div>
+                <div id="mcp-tools-grid" class="mcp-tools-grid"></div>
+            </div>
+            <div class="mcp-modal-footer">
+                <span id="mcp-selected-count" class="mcp-selected-count">0 tools connected</span>
+                <button id="mcp-modal-done" class="mcp-modal-done-btn">Done</button>
             </div>
         </div>
     </div>

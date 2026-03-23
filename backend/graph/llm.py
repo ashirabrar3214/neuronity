@@ -2,7 +2,7 @@ import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 FAST_MODEL = os.getenv("FAST_MODEL", "gemini-2.0-flash")
-REASONING_MODEL = os.getenv("REASONING_MODEL", "gemini-3-flash-preview")
+REASONING_MODEL = os.getenv("REASONING_MODEL", "gemini-2.0-flash")
 
 
 def get_llm(mode: str = "fast", api_key: str = "", streaming: bool = True):
