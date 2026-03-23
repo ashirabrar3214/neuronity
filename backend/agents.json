@@ -1,17 +1,17 @@
 [
   {
-    "id": "agent-bot-1774275028423",
-    "name": "MasterAgent",
-    "description": "Agent description...",
-    "brain": "",
-    "channel": "Gmail",
-    "workingDir": "",
-    "permissions": [],
-    "tools": "Custom",
-    "responsibility": "",
+    "id": "agent-MasterBot-001",
+    "name": "MasterBot",
+    "description": "Main orchestrator agent.",
     "agentType": "master",
-    "x": 114.0,
-    "y": 414.0,
-    "connections": []
+    "x": 100,
+    "y": 150,
+    "brain": "Gemini",
+    "tools": "Gmail",
+    "responsibility": "Coordinate all agents",
+    "permissions": [
+      "web search",
+      "thinking"
+    ]
   }
 ]

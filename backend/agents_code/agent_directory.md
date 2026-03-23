@@ -1,5 +1,6 @@
 ## PROJECT AGENT DIRECTORY
 Below are all agents currently in this project. Use this to identify who to delegate tasks to.
 
-- **MasterAgent** (ID: `agent-bot-1774275028423`): 
+- **MasterBot** (ID: `agent-MasterBot-001`): Coordinate all agents
+  Capabilities: web search, thinking
 
