@@ -19,7 +19,6 @@ def get_training_context():
 1. update_prompt(new_content): Use this to directly rewrite your own system instructions (prompt.md). Use this to fix behavioral bugs or refine your identity.
 2. read_prompt(): Use this to see your current identity and behavioral rules.
 3. read_memory(): Use this to read your long-term memory summary (summary.json).
-4. read_beliefs_context(): Use this to read the project's global overarching objective (blackboard identity).
 """
 
 # ─────────────────────────────────────────────────
@@ -670,23 +669,8 @@ def write_file(agent_id, input_str, working_dir):
 
 
 # ─────────────────────────────────────────────────
-# GLOBAL KNOWLEDGE & BDI PLANNING
+# PLANNING
 # ─────────────────────────────────────────────────
-
-async def post_finding(agent_id, tool_input, session_id=None):
-    """
-    Writes a key insight to the Belief Base (Shared Ledger). 
-    """
-    try:
-        from brf import update_belief_base
-        parts = tool_input.split("|", 1)
-        insight = parts[0].strip()
-        source = parts[1].strip() if len(parts) > 1 else ""
-        
-        update_belief_base(agent_id, insight, source, session_id=session_id)
-        return f"Success: Insight recorded in the Belief Base."
-    except Exception as e:
-        return f"Error posting finding: {e}"
 
 async def update_plan(agent_id, tool_input):
     """

@@ -747,6 +747,12 @@ function initTrainingUI() {
                 if (initialStatus) initialStatus.remove();
                 const sEl = messageDiv.querySelector('.stream-status');
                 if (sEl) sEl.remove();
+                // Stop the brain/dot animation in the thought block
+                if (thoughtDetails) {
+                    const miniIndicator = thoughtDetails.querySelector('.typing-indicator-mini');
+                    if (miniIndicator) miniIndicator.remove();
+                    thoughtDetails.removeAttribute('open');
+                }
             }
 
             processPlanResponse(responseContent, originalText, true);

@@ -6,7 +6,7 @@ class agent_bot_1774132047848:
         self.working_dir = r"D:\New folder"
         self.permissions = ['web search', 'thinking', 'report generation', 'scheduling', 'file access']
         self.tools = "Custom"
-        
+
     def get_personality(self):
         import json
         import os

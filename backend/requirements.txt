@@ -5,6 +5,7 @@ requests
 ddgs
 python-dotenv
 httpx
-chromadb
 beautifulsoup4
-sentence-transformers
+langchain-core
+langchain-google-genai
+langgraph
