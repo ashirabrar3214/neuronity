@@ -237,12 +237,22 @@ async def call_model(state: AgentState) -> dict:
 
 async def respond(state: AgentState) -> dict:
     """Terminal node — no-op, the last message in state is the response."""
-    # If we came from CLARIFY, inject a clarification message
+    # If we came from CLARIFY, inject an interactive clarification message
     if state["decision"] == "CLARIFY":
         reason = state["decision_reason"]
-        msg = AIMessage(content=f"I need more information to proceed. {reason}")
+        
+        # NEW: Claude-style interactive prompt
+        content = (
+            f"🧠 **Clarification Required:**\n{reason}\n\n"
+            f"How would you like me to proceed?\n"
+            f"[BUTTON: Proceed using your best judgment]\n"
+            f"[BUTTON: Wait, I will provide more context]"
+        )
+        msg = AIMessage(content=content)
         return {"messages": [msg]}
+        
     return {}
+
 
 
 # ---------------------------------------------------------------------------

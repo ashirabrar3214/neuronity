@@ -1,17 +1,94 @@
 [
   {
-    "id": "agent-MasterBot-001",
-    "name": "MasterBot",
-    "description": "Main orchestrator agent.",
+    "id": "agent-bot-1774280698143",
+    "name": "MasterAgent",
+    "description": "Agent description...",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [],
+    "tools": "Custom",
+    "responsibility": "",
     "agentType": "master",
-    "x": 100,
-    "y": 150,
-    "brain": "Gemini",
-    "tools": "Gmail",
-    "responsibility": "Coordinate all agents",
+    "x": 657.0,
+    "y": 108.0,
+    "connections": [
+      "agent-news-001",
+      "agent-editor-004",
+      "agent-geopolitics-003",
+      "agent-history-002"
+    ]
+  },
+  {
+    "id": "agent-news-001",
+    "name": "News",
+    "description": "Collect recent news articles about Iran.",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "",
     "permissions": [
       "web search",
-      "thinking"
-    ]
+      "file access"
+    ],
+    "tools": "Custom",
+    "responsibility": "Collect recent news articles about Iran.",
+    "agentType": "worker",
+    "x": 535.0,
+    "y": 543.0,
+    "connections": []
+  },
+  {
+    "id": "agent-editor-004",
+    "name": "Editor",
+    "description": "Proofread and edit the report.",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [
+      "web search",
+      "file access"
+    ],
+    "tools": "Custom",
+    "responsibility": "Proofread and edit the report.",
+    "agentType": "worker",
+    "x": 855.0,
+    "y": 543.0,
+    "connections": []
+  },
+  {
+    "id": "agent-geopolitics-003",
+    "name": "Geopolitics",
+    "description": "Evaluate geopolitical implications.",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [
+      "web search",
+      "file access"
+    ],
+    "tools": "Custom",
+    "responsibility": "Evaluate geopolitical implications.",
+    "agentType": "worker",
+    "x": 1175.0,
+    "y": 543.0,
+    "connections": []
+  },
+  {
+    "id": "agent-history-002",
+    "name": "History",
+    "description": "Research historical context and causes.",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "",
+    "permissions": [
+      "web search",
+      "file access"
+    ],
+    "tools": "Custom",
+    "responsibility": "Research historical context and causes.",
+    "agentType": "worker",
+    "x": 1495.0,
+    "y": 543.0,
+    "connections": []
   }
 ]

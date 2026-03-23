@@ -1,0 +1,77 @@
+{
+  "project_id": "proj_1774280717",
+  "status": "PAUSED",
+  "deadline_hours": 48,
+  "provider": "Gemini",
+  "nodes": [
+    {
+      "id": "task_1",
+      "label": "Gather Background",
+      "agent": "agent-news-001",
+      "task": "Collect recent news articles about Iran.",
+      "dependencies": [],
+      "status": "PENDING",
+      "result_summary": ""
+    },
+    {
+      "id": "task_2",
+      "label": "Analyze Causes",
+      "agent": "agent-history-002",
+      "task": "Research historical context and causes.",
+      "dependencies": [],
+      "status": "PENDING",
+      "result_summary": ""
+    },
+    {
+      "id": "task_3",
+      "label": "Assess Impact",
+      "agent": "agent-geopolitics-003",
+      "task": "Evaluate geopolitical implications.",
+      "dependencies": [
+        "task_1",
+        "task_2"
+      ],
+      "status": "PENDING",
+      "result_summary": ""
+    },
+    {
+      "id": "task_4",
+      "label": "Draft Report",
+      "agent": "self",
+      "task": "Compile findings into a report draft.",
+      "dependencies": [
+        "task_3"
+      ],
+      "status": "PENDING",
+      "result_summary": "",
+      "x": 260.0,
+      "y": 538.0
+    },
+    {
+      "id": "task_5",
+      "label": "Review & Edit",
+      "agent": "agent-editor-004",
+      "task": "Proofread and edit the report.",
+      "dependencies": [
+        "task_4"
+      ],
+      "status": "PENDING",
+      "result_summary": "",
+      "x": 258.0,
+      "y": 728.0
+    },
+    {
+      "id": "task_6",
+      "label": "Finalize Report",
+      "agent": "self",
+      "task": "Generate the final report document.",
+      "dependencies": [
+        "task_5"
+      ],
+      "status": "PENDING",
+      "result_summary": "",
+      "x": 296.0,
+      "y": 925.0
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "objective": "Collect recent news articles about Iran.",
+  "steps": [
+    "Observe Workspace",
+    "Execute requested task"
+  ],
+  "completed": []
+}

@@ -49,9 +49,21 @@ async def langgraph_to_sse(graph, input_state: dict, config: dict):
             # --- Tool execution start ---
             elif kind == "on_tool_start":
                 tool_name = event.get("name", "unknown")
+                
+                # NEW: Extract the first argument to show what the agent is doing
+                tool_input = event.get("data", {}).get("input", {})
+                arg_preview = ""
+                if isinstance(tool_input, dict) and tool_input:
+                    # Get the first value (usually the query or filepath)
+                    first_val = str(list(tool_input.values())[0])
+                    arg_preview = f" ({first_val[:35]}...)" if len(first_val) > 35 else f" ({first_val})"
+
                 yield _sse({"type": "tool_start", "content": tool_name})
-                status_msg = "Action: " + tool_name.replace("_", " ").title()
+                
+                # Format: "Running web_search (latest AI news...)"
+                status_msg = f"Running {tool_name}{arg_preview}"
                 yield _sse({"type": "status", "content": status_msg})
+
 
             # --- Tool execution end ---
             elif kind == "on_tool_end":

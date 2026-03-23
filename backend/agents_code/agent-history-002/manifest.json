@@ -1,0 +1,7 @@
+{
+  "agent_id": "agent-history-002",
+  "extraction_logic": "RAW_CHUNKS",
+  "verification_required": false,
+  "output_format": "STRUCTURED_FINDINGS",
+  "knowledge_gate": "WRITE_ONLY_LEDGER"
+}

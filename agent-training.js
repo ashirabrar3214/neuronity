@@ -10,74 +10,74 @@ let connectedToolsSet = new Set(); // Tracks connected MCP tool IDs for the acti
 // ─── MCP TOOLS REGISTRY ────────────────────────────────────────────────────
 const MCP_TOOLS_REGISTRY = [
     // Search & Research
-    { id: 'brave-search',    name: 'Brave Search',    category: 'Search & Research', icon: 'icons/brave.svg',       description: 'Web search via Brave Search API' },
-    { id: 'tavily',          name: 'Tavily',           category: 'Search & Research', icon: 'icons/tavily.svg',      description: 'AI-optimized search engine' },
-    { id: 'exa',             name: 'Exa',              category: 'Search & Research', icon: 'icons/exa.svg',         description: 'Neural search for content discovery' },
-    { id: 'google-search',   name: 'Google Search',    category: 'Search & Research', icon: 'icons/google.svg',      description: 'Google Custom Search integration' },
+    { id: 'brave-search', name: 'Brave Search', category: 'Search & Research', icon: 'icons/brave.svg', description: 'Web search via Brave Search API' },
+    { id: 'tavily', name: 'Tavily', category: 'Search & Research', icon: 'icons/tavily.svg', description: 'AI-optimized search engine' },
+    { id: 'exa', name: 'Exa', category: 'Search & Research', icon: 'icons/exa.svg', description: 'Neural search for content discovery' },
+    { id: 'google-search', name: 'Google Search', category: 'Search & Research', icon: 'icons/google.svg', description: 'Google Custom Search integration' },
 
     // Communication
-    { id: 'gmail',           name: 'Gmail',            category: 'Communication',     icon: 'icons/gmail.svg',       description: 'Draft replies, summarize threads, and search your inbox' },
-    { id: 'slack',           name: 'Slack',            category: 'Communication',     icon: 'icons/slack.svg',       description: 'Send messages, create canvases, and fetch Slack data' },
-    { id: 'discord',         name: 'Discord',          category: 'Communication',     icon: 'icons/discord.svg',     description: 'Discord bot and server messaging' },
-    { id: 'ms-teams',        name: 'Microsoft Teams',  category: 'Communication',     icon: 'icons/teams.svg',       description: 'Teams messaging and channels' },
-    { id: 'telegram',        name: 'Telegram',         category: 'Communication',     icon: 'icons/telegram.svg',    description: 'Telegram Bot API messaging' },
+    { id: 'gmail', name: 'Gmail', category: 'Communication', icon: 'icons/gmail.svg', description: 'Draft replies, summarize threads, and search your inbox' },
+    { id: 'slack', name: 'Slack', category: 'Communication', icon: 'icons/slack.svg', description: 'Send messages, create canvases, and fetch Slack data' },
+    { id: 'discord', name: 'Discord', category: 'Communication', icon: 'icons/discord.svg', description: 'Discord bot and server messaging' },
+    { id: 'ms-teams', name: 'Microsoft Teams', category: 'Communication', icon: 'icons/teams.svg', description: 'Teams messaging and channels' },
+    { id: 'telegram', name: 'Telegram', category: 'Communication', icon: 'icons/telegram.svg', description: 'Telegram Bot API messaging' },
 
     // Productivity
-    { id: 'google-drive',    name: 'Google Drive',     category: 'Productivity',      icon: 'icons/gdrive.svg',      description: 'File storage and management' },
-    { id: 'google-docs',     name: 'Google Docs',      category: 'Productivity',      icon: 'icons/gdocs.svg',       description: 'Document creation and editing' },
-    { id: 'google-sheets',   name: 'Google Sheets',    category: 'Productivity',      icon: 'icons/gsheets.svg',     description: 'Spreadsheet operations' },
-    { id: 'google-calendar', name: 'Google Calendar',  category: 'Productivity',      icon: 'icons/gcalendar.svg',   description: 'Manage your schedule and coordinate meetings' },
-    { id: 'notion',          name: 'Notion',           category: 'Productivity',      icon: 'icons/notion.svg',      description: 'Connect your Notion workspace to search, update, and power workflows' },
-    { id: 'todoist',         name: 'Todoist',          category: 'Productivity',      icon: 'icons/todoist.svg',     description: 'Task and project management' },
-    { id: 'linear',          name: 'Linear',           category: 'Productivity',      icon: 'icons/linear.svg',      description: 'Manage issues, projects and team workflows' },
+    { id: 'google-drive', name: 'Google Drive', category: 'Productivity', icon: 'icons/gdrive.svg', description: 'File storage and management' },
+    { id: 'google-docs', name: 'Google Docs', category: 'Productivity', icon: 'icons/gdocs.svg', description: 'Document creation and editing' },
+    { id: 'google-sheets', name: 'Google Sheets', category: 'Productivity', icon: 'icons/gsheets.svg', description: 'Spreadsheet operations' },
+    { id: 'google-calendar', name: 'Google Calendar', category: 'Productivity', icon: 'icons/gcalendar.svg', description: 'Manage your schedule and coordinate meetings' },
+    { id: 'notion', name: 'Notion', category: 'Productivity', icon: 'icons/notion.svg', description: 'Connect your Notion workspace to search, update, and power workflows' },
+    { id: 'todoist', name: 'Todoist', category: 'Productivity', icon: 'icons/todoist.svg', description: 'Task and project management' },
+    { id: 'linear', name: 'Linear', category: 'Productivity', icon: 'icons/linear.svg', description: 'Manage issues, projects and team workflows' },
 
     // Browser & Scraping
-    { id: 'puppeteer',       name: 'Puppeteer',        category: 'Browser',           icon: 'icons/puppeteer.svg',   description: 'Headless browser automation' },
-    { id: 'playwright',      name: 'Playwright',       category: 'Browser',           icon: 'icons/playwright.svg',  description: 'Cross-browser testing and scraping' },
-    { id: 'firecrawl',       name: 'Firecrawl',        category: 'Browser',           icon: 'icons/firecrawl.svg',   description: 'Web crawling and data extraction' },
-    { id: 'fetch',           name: 'Fetch',            category: 'Browser',           icon: 'icons/fetch.svg',       description: 'Simple HTTP request tool' },
+    { id: 'puppeteer', name: 'Puppeteer', category: 'Browser', icon: 'icons/puppeteer.svg', description: 'Headless browser automation' },
+    { id: 'playwright', name: 'Playwright', category: 'Browser', icon: 'icons/playwright.svg', description: 'Cross-browser testing and scraping' },
+    { id: 'firecrawl', name: 'Firecrawl', category: 'Browser', icon: 'icons/firecrawl.svg', description: 'Web crawling and data extraction' },
+    { id: 'fetch', name: 'Fetch', category: 'Browser', icon: 'icons/fetch.svg', description: 'Simple HTTP request tool' },
 
     // File System
-    { id: 'filesystem',      name: 'Filesystem',       category: 'File System',       icon: 'icons/filesystem.svg',  description: 'Local file system read/write access' },
+    { id: 'filesystem', name: 'Filesystem', category: 'File System', icon: 'icons/filesystem.svg', description: 'Local file system read/write access' },
 
     // Code & Dev
-    { id: 'github',          name: 'GitHub',           category: 'Code & Dev',        icon: 'icons/github.svg',      description: 'Repos, issues, PRs, and actions' },
-    { id: 'gitlab',          name: 'GitLab',           category: 'Code & Dev',        icon: 'icons/gitlab.svg',      description: 'GitLab project management' },
-    { id: 'jira',            name: 'Jira',             category: 'Code & Dev',        icon: 'icons/jira.svg',        description: 'Jira issue tracking' },
-    { id: 'atlassian',       name: 'Atlassian',        category: 'Code & Dev',        icon: 'icons/atlassian.svg',   description: 'Access Jira and Confluence from your agent' },
+    { id: 'github', name: 'GitHub', category: 'Code & Dev', icon: 'icons/github.svg', description: 'Repos, issues, PRs, and actions' },
+    { id: 'gitlab', name: 'GitLab', category: 'Code & Dev', icon: 'icons/gitlab.svg', description: 'GitLab project management' },
+    { id: 'jira', name: 'Jira', category: 'Code & Dev', icon: 'icons/jira.svg', description: 'Jira issue tracking' },
+    { id: 'atlassian', name: 'Atlassian', category: 'Code & Dev', icon: 'icons/atlassian.svg', description: 'Access Jira and Confluence from your agent' },
 
     // Database
-    { id: 'postgresql',      name: 'PostgreSQL',       category: 'Database',          icon: 'icons/postgresql.svg',  description: 'PostgreSQL database queries' },
-    { id: 'sqlite',          name: 'SQLite',           category: 'Database',          icon: 'icons/sqlite.svg',      description: 'SQLite local database access' },
-    { id: 'supabase',        name: 'Supabase',         category: 'Database',          icon: 'icons/supabase.svg',    description: 'Supabase backend services' },
-    { id: 'mongodb',         name: 'MongoDB',          category: 'Database',          icon: 'icons/mongodb.svg',     description: 'MongoDB document database' },
+    { id: 'postgresql', name: 'PostgreSQL', category: 'Database', icon: 'icons/postgresql.svg', description: 'PostgreSQL database queries' },
+    { id: 'sqlite', name: 'SQLite', category: 'Database', icon: 'icons/sqlite.svg', description: 'SQLite local database access' },
+    { id: 'supabase', name: 'Supabase', category: 'Database', icon: 'icons/supabase.svg', description: 'Supabase backend services' },
+    { id: 'mongodb', name: 'MongoDB', category: 'Database', icon: 'icons/mongodb.svg', description: 'MongoDB document database' },
 
     // Cloud & Infra
-    { id: 'aws',             name: 'AWS',              category: 'Cloud',             icon: 'icons/aws.svg',         description: 'Amazon Web Services integration' },
-    { id: 'cloudflare',      name: 'Cloudflare',       category: 'Cloud',             icon: 'icons/cloudflare.svg',  description: 'Cloudflare Workers, DNS, and KV' },
-    { id: 'vercel',          name: 'Vercel',           category: 'Cloud',             icon: 'icons/vercel.svg',      description: 'Frontend deployment platform' },
+    { id: 'aws', name: 'AWS', category: 'Cloud', icon: 'icons/aws.svg', description: 'Amazon Web Services integration' },
+    { id: 'cloudflare', name: 'Cloudflare', category: 'Cloud', icon: 'icons/cloudflare.svg', description: 'Cloudflare Workers, DNS, and KV' },
+    { id: 'vercel', name: 'Vercel', category: 'Cloud', icon: 'icons/vercel.svg', description: 'Frontend deployment platform' },
 
     // Knowledge & Memory
-    { id: 'memory',          name: 'Memory',           category: 'Knowledge',         icon: 'icons/memory.svg',      description: 'Persistent knowledge graph' },
-    { id: 'qdrant',          name: 'Qdrant',           category: 'Knowledge',         icon: 'icons/qdrant.svg',      description: 'Vector similarity search engine' },
+    { id: 'memory', name: 'Memory', category: 'Knowledge', icon: 'icons/memory.svg', description: 'Persistent knowledge graph' },
+    { id: 'qdrant', name: 'Qdrant', category: 'Knowledge', icon: 'icons/qdrant.svg', description: 'Vector similarity search engine' },
 
     // Maps & Location
-    { id: 'google-maps',     name: 'Google Maps',      category: 'Maps',              icon: 'icons/gmaps.svg',       description: 'Maps, geocoding, and directions' },
+    { id: 'google-maps', name: 'Google Maps', category: 'Maps', icon: 'icons/gmaps.svg', description: 'Maps, geocoding, and directions' },
 
     // Media & Design
-    { id: 'canva',           name: 'Canva',            category: 'Media',             icon: 'icons/canva.svg',       description: 'Search, create, autofill and export Canva designs' },
-    { id: 'figma',           name: 'Figma',            category: 'Media',             icon: 'icons/figma.svg',       description: 'Generate diagrams and code from Figma context' },
-    { id: 'everart',         name: 'EverArt',          category: 'Media',             icon: 'icons/everart.svg',     description: 'AI image generation' },
-    { id: 'stability-ai',   name: 'Stability AI',     category: 'Media',             icon: 'icons/stability.svg',   description: 'Stable Diffusion image generation' },
+    { id: 'canva', name: 'Canva', category: 'Media', icon: 'icons/canva.svg', description: 'Search, create, autofill and export Canva designs' },
+    { id: 'figma', name: 'Figma', category: 'Media', icon: 'icons/figma.svg', description: 'Generate diagrams and code from Figma context' },
+    { id: 'everart', name: 'EverArt', category: 'Media', icon: 'icons/everart.svg', description: 'AI image generation' },
+    { id: 'stability-ai', name: 'Stability AI', category: 'Media', icon: 'icons/stability.svg', description: 'Stable Diffusion image generation' },
 
     // Other
-    { id: 'sequential-thinking', name: 'Sequential Thinking', category: 'Other',      icon: 'icons/thinking.svg',    description: 'Step-by-step structured reasoning' },
-    { id: 'sentry',          name: 'Sentry',           category: 'Other',             icon: 'icons/sentry.svg',      description: 'Error tracking and monitoring' },
-    { id: 'hubspot',         name: 'HubSpot',          category: 'Other',             icon: 'icons/hubspot.svg',     description: 'Chat with your CRM data for personalized insights' },
-    { id: 'intercom',        name: 'Intercom',         category: 'Other',             icon: 'icons/intercom.svg',    description: 'Access Intercom data for customer insights' },
-    { id: 'monday',          name: 'monday.com',       category: 'Other',             icon: 'icons/monday.svg',      description: 'Manage projects, boards, and workflows' },
-    { id: 'miro',            name: 'Miro',             category: 'Other',             icon: 'icons/miro.svg',        description: 'Online whiteboard collaboration' },
-    { id: 'gamma',           name: 'Gamma',            category: 'Other',             icon: 'icons/gamma.svg',       description: 'Create presentations, docs, socials, and sites with AI' },
+    { id: 'sequential-thinking', name: 'Sequential Thinking', category: 'Other', icon: 'icons/thinking.svg', description: 'Step-by-step structured reasoning' },
+    { id: 'sentry', name: 'Sentry', category: 'Other', icon: 'icons/sentry.svg', description: 'Error tracking and monitoring' },
+    { id: 'hubspot', name: 'HubSpot', category: 'Other', icon: 'icons/hubspot.svg', description: 'Chat with your CRM data for personalized insights' },
+    { id: 'intercom', name: 'Intercom', category: 'Other', icon: 'icons/intercom.svg', description: 'Access Intercom data for customer insights' },
+    { id: 'monday', name: 'monday.com', category: 'Other', icon: 'icons/monday.svg', description: 'Manage projects, boards, and workflows' },
+    { id: 'miro', name: 'Miro', category: 'Other', icon: 'icons/miro.svg', description: 'Online whiteboard collaboration' },
+    { id: 'gamma', name: 'Gamma', category: 'Other', icon: 'icons/gamma.svg', description: 'Create presentations, docs, socials, and sites with AI' },
 ];
 
 // ─── MCP TOOLS RENDERING ────────────────────────────────────────────────────
@@ -195,6 +195,24 @@ window.copyToClipboard = (btn) => {
     });
 };
 
+window.sendInteractiveReply = (text) => {
+    const input = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+
+    if (input && sendBtn) {
+        // Drop the text in the input and click send automatically
+        input.value = text;
+        sendBtn.click();
+
+        // Optional: Disable buttons in the chat history so they can't be double-clicked
+        document.querySelectorAll('.glass-box-btn').forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+        });
+    }
+};
+
 // ─── Module-level markdown renderer (Enhanced & Robust) ──────────────────────
 function _markdownToHtml(text) {
     if (!text) return "";
@@ -253,6 +271,14 @@ function _markdownToHtml(text) {
     html = html.replace(/`(.+?)`/g, '<code>$1</code>');
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="msg-link">$1</a>');
     html = html.replace(/\(Source: (.+?)\)/g, '<span class="msg-citation">Source: $1</span>');
+
+    // NEW: Interactive Glass Box Buttons
+    html = html.replace(/\[BUTTON:\s*(.+?)\]/g, (match, btnText) => {
+        const id = `__INTERACTIVE_${interactiveElements.length}__`;
+        // Create a button that calls a global function with the button's text
+        interactiveElements.push(`<button class="glass-box-btn" onclick="window.sendInteractiveReply('${btnText.replace(/'/g, "\\'")}')">${btnText}</button>`);
+        return id;
+    });
 
     // 7. Paragraph Wrapping
     const blocks = html.split(/\n\n+/);
@@ -1379,7 +1405,7 @@ async function fetchAndRenderWorkmap(agentId) {
         const wm = await r.json();
         _workmapCache = wm;
         renderWorkmapTree(wm, agentId);
-    } catch (_) {}
+    } catch (_) { }
 }
 
 function _wmAutoLayout(nodes) {
@@ -1603,7 +1629,7 @@ document.addEventListener('mouseup', () => {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ x: newX, y: newY })
-        }).catch(() => {});
+        }).catch(() => { });
 
         // Update local cache so polling doesn't snap it back
         if (_workmapCache) {
@@ -1683,7 +1709,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!ok) return;
                 try {
                     await fetch(`http://localhost:8000/workmap/${_workmapAgentId}/node/${_wmCtxNodeId}`, { method: 'DELETE' });
-                } catch (_) {}
+                } catch (_) { }
                 fetchAndRenderWorkmap(_workmapAgentId);
             }
         });

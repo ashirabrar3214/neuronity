@@ -1,0 +1,10 @@
+{
+  "objective": "make a report on iran war",
+  "steps": [
+    "**Information Gathering (ResearchAgent-12):** Conduct preliminary research on the Iran-Iraq War using reputable news sources, academic databases, and government reports to gather background information and identify key events, figures, and causes.",
+    "**Source Verification (FactCheckerAgent-23):** Verify the credibility and bias of the sources identified by ResearchAgent-12. Prioritize sources with a history of accuracy and impartiality.",
+    "**Timeline Construction (DataAnalystAgent-34):** Create a chronological timeline of the Iran-Iraq War, highlighting major battles, political developments, and international involvement, based on the verified information.",
+    "**Report Generation (ReportAgent-45):** Generate a comprehensive report on the Iran-Iraq War, incorporating the timeline, key events, figures, causes, and verified information."
+  ],
+  "completed": []
+}
