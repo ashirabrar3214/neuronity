@@ -88,6 +88,36 @@ async def generate_report(
 
 
 # ---------------------------------------------------------------------------
+# SCRAPE & REFLECT TOOLS
+# ---------------------------------------------------------------------------
+
+@tool
+async def scrape_website(
+    url: str,
+    objective: str,
+    state: Annotated[dict, InjectedState],
+) -> str:
+    """Fetch and extract the full content of a webpage. Use this to read articles, docs, or any URL found during research. Provide the objective so irrelevant content can be filtered out."""
+    import toolkit
+    agent_id = _get(state, "agent_id")
+    api_key = _get(state, "api_key")
+    print(f">>> [TOOL_DEF:scrape_website] agent={agent_id} url={url[:60]!r}", flush=True)
+    return await toolkit.scrape_website(url, objective, agent_id, api_key)
+
+
+@tool
+async def reflect_and_plan(
+    current_findings: str,
+    state: Annotated[dict, InjectedState],
+) -> str:
+    """Pause and evaluate your research progress. Use when you notice gaps, contradictions, or need to re-plan your investigation strategy. Summarize what you have found so far."""
+    import toolkit
+    agent_id = _get(state, "agent_id")
+    print(f">>> [TOOL_DEF:reflect_and_plan] agent={agent_id} findings_len={len(current_findings)}", flush=True)
+    return await toolkit.reflect_and_plan(agent_id, current_findings)
+
+
+# ---------------------------------------------------------------------------
 # AGENT-TO-AGENT COMMUNICATION
 # ---------------------------------------------------------------------------
 
@@ -432,6 +462,8 @@ def get_tools_for_agent(permissions: list, has_connections: bool,
 
     # Web search is always available
     tools.extend([web_search, deep_search])
+    if "scrape website" in permissions:
+        tools.extend([scrape_website, reflect_and_plan])
     if "report generation" in permissions:
         tools.extend([report_generation, generate_report])
     if has_working_dir:

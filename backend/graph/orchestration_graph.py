@@ -465,12 +465,37 @@ async def execute_next_node(agent_id, api_key, provider):
     with open(workmap_path, "r", encoding="utf-8") as f:
         workmap = json.load(f)
 
+    result_str = str(result)
+
     for node in workmap.get("nodes", []):
         if node["id"] == next_node["id"]:
-            node["status"] = "ERROR" if str(result).startswith("Step failed") else "COMPLETED"
-            node["result_summary"] = str(result)[:300]
+            node["status"] = "ERROR" if result_str.startswith("Step failed") else "COMPLETED"
+            node["result_summary"] = result_str[:300]
             safe_log(f"+++ [TICK_NODE] {next_node['id']} -> {node['status']} summary_len={len(node['result_summary'])}")
             break
+
+    # Recursive research: detect RE-EVALUATE signal or contradictions
+    # and inject a verification step before the final report node
+    if "RE-EVALUATE" in result_str or "contradiction" in result_str.lower():
+        safe_log(f">>> [RECURSION] {agent_id} detected a gap. Injecting refinement step.")
+        new_node = {
+            "id": f"refine_{int(time.time())}",
+            "label": "Deep Dive Verification",
+            "agent": agent_id,
+            "task": f"Verify and resolve contradiction: {result_str[:100]}...",
+            "dependencies": [next_node["id"]],
+            "status": "PENDING",
+            "result_summary": ""
+        }
+        nodes = workmap.get("nodes", [])
+        # Insert before the final report node (if any), otherwise append
+        report_idx = next(
+            (i for i, n in enumerate(nodes) if "report" in n.get("label", "").lower()),
+            len(nodes)
+        )
+        nodes.insert(report_idx, new_node)
+        workmap["nodes"] = nodes
+        safe_log(f"+++ [RECURSION] Injected node {new_node['id']} at position {report_idx}")
 
     all_done = all(n["status"] in ("COMPLETED", "ERROR") for n in workmap.get("nodes", []))
     if all_done:

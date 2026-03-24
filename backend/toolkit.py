@@ -5,6 +5,7 @@ import json
 import httpx
 import asyncio
 import re
+from bs4 import BeautifulSoup
 from pdf_generator import ReportPDFGenerator
 
 # -- LLM Models (Abstracting for easy upgrades) --
@@ -738,3 +739,54 @@ async def ask_user(agent_id, tool_input):
     question = tool_input.strip()
     safe_log(f"[STATUS:{agent_id}] Halting to ask user: {question[:40]}...")
     return f"HALT_AND_ASK|{question}"
+
+
+# ─────────────────────────────────────────────────
+# SCRAPE WEBSITE CAPABILITY
+# ─────────────────────────────────────────────────
+
+async def scrape_website(url, objective, agent_id, api_key):
+    """
+    Fetches full content of a website. If the content is too long,
+    it uses Gemini-Flash to extract only the facts relevant to the objective.
+    """
+    safe_log(f"[STATUS:{agent_id}] Scraping: {url[:60]}...", agent_id=agent_id)
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=15, follow_redirects=True)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Remove non-content elements
+            for element in soup(["script", "style", "nav", "footer", "header", "aside", "iframe"]):
+                element.decompose()
+
+            text = soup.get_text(separator=' ', strip=True)
+
+            # Token protection: if too large, distill relevant facts
+            if len(text) > 12000:
+                safe_log(f"[STATUS:{agent_id}] Page too large ({len(text)} chars). Distilling facts...", agent_id=agent_id)
+                distilled = await synthesize_fact_with_gemini(
+                    f"Extract facts about: {objective}", text[:25000], api_key
+                )
+                return f"SOURCE: {url}\nDISTILLED CONTENT:\n{distilled}"
+
+            return f"SOURCE: {url}\nFULL CONTENT:\n{text}"
+    except httpx.HTTPStatusError as e:
+        return f"Error scraping {url}: HTTP {e.response.status_code}"
+    except Exception as e:
+        return f"Error scraping {url}: {str(e)}"
+
+
+# ─────────────────────────────────────────────────
+# REFLECT AND PLAN CAPABILITY
+# ─────────────────────────────────────────────────
+
+async def reflect_and_plan(agent_id, current_findings):
+    """
+    Forces the agent to stop and evaluate its research progress.
+    Returns a RE-EVALUATE signal that the orchestrator can detect
+    to inject additional verification steps.
+    """
+    safe_log(f"[STATUS:{agent_id}] Reflecting on findings...", agent_id=agent_id)
+    return f"RE-EVALUATE|{current_findings}"

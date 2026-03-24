@@ -21,9 +21,9 @@ const AGENT_GALLERY = [
         id: 'deep-web-researcher',
         name: 'Deep Web Researcher',
         icon: '🔍',
-        description: 'Expert at finding hard-to-reach information across the web with deep search and report generation',
-        permissions: ['report generation'],
-        responsibility: 'Deep web research and comprehensive analysis',
+        description: 'Iterative researcher that scrapes full articles and resolves contradictions using an investigative detective model',
+        permissions: ['scrape website', 'report generation'],
+        responsibility: 'Perform deep, multi-source investigative research and verify facts.',
     },
 ];
 
