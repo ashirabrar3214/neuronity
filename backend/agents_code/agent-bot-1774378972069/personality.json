@@ -1,0 +1,6 @@
+{
+  "name": "Deep Web Researcher",
+  "description": "Iterative researcher that scrapes full articles and resolves contradictions using an investigative detective model",
+  "responsibility": "Perform deep, multi-source investigative research and verify facts.",
+  "tools": "Custom"
+}

@@ -481,7 +481,7 @@ async def _run_tool(tool_name: str, tool_args: dict, state: dict, summaries: lis
     connected   = state["connected_agents"]
     permissions = state["permissions"]
 
-    tools_list       = get_tools_for_agent(permissions, len(connected) > 0, False, state["agent_type"] == "master")
+    tools_list       = get_tools_for_agent(permissions, len(connected) > 0, False, state["agent_type"] == "master", bool(working_dir))
     allowed          = {t.name for t in tools_list}
 
     if tool_name not in allowed:
@@ -560,6 +560,15 @@ async def _run_tool(tool_name: str, tool_args: dict, state: dict, summaries: lis
                         joined = joined[:6000]
                     context = "RESEARCH DATA (use URLs for citations):\n\n" + joined
             return await tk.report_generation(agent_id, f"{topic}|{context}", working_dir, api_key, agent_name)
+
+        elif tool_name == "scrape_website":
+            url       = tool_args.get("url", "")
+            objective = tool_args.get("objective", "")
+            return await tk.scrape_website(url, objective, agent_id, api_key)
+
+        elif tool_name == "reflect_and_plan":
+            findings = tool_args.get("current_findings", "")
+            return await tk.reflect_and_plan(agent_id, findings)
 
         elif tool_name == "message_agent":
             target_id = tool_args.get("target_agent_id", "")

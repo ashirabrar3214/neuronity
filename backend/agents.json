@@ -1,1 +1,21 @@
-[]
+[
+  {
+    "id": "agent-bot-1774378972069",
+    "name": "Deep Web Researcher",
+    "description": "Iterative researcher that scrapes full articles and resolves contradictions using an investigative detective model",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "D:\\New folder",
+    "permissions": [
+      "scrape website",
+      "report generation"
+    ],
+    "tools": "Custom",
+    "responsibility": "Perform deep, multi-source investigative research and verify facts.",
+    "agentType": "master",
+    "specialRole": "deep-web-researcher",
+    "x": 230.0,
+    "y": 223.0,
+    "connections": []
+  }
+]

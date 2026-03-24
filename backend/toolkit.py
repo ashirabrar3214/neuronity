@@ -116,33 +116,59 @@ Select between 3 and 8 sources. Prioritize: relevance, authority (Wikipedia, maj
 async def synthesize_fact_with_gemini(query, search_results, api_key):
     """
     Specialized synthesis for quick facts, targeted data, or small snippets.
-    Returns a structured JSON object containing the fact, source URLs, and confidence.
+    Accepts either a list of search result dicts OR a raw text string.
+    Uses Gemini-Flash to extract relevant facts.
     """
     safe_log(f"[STATUS] Extracting specific facts with semantic attribution")
-    
+
+    # Handle both raw text (from scrape_website) and search result dicts
     if isinstance(search_results, str):
-        return search_results
-    
-    raw_context = "\n\n".join([f"Source: {r['title']}\nURL: {r['href']}\nContent: {r['body']}" for r in search_results])
-    
-    fact_prompt = f"""You are a helpful research assistant. Your goal is to answer the user's question directly and concisely using the provided search results.
-    
-USER REQUEST: {query}
+        raw_context = search_results
+    else:
+        raw_context = "\n\n".join([
+            f"Source: {r['title']}\nURL: {r['href']}\nContent: {r['body']}"
+            for r in search_results
+        ])
 
-SEARCH DATA:
-{raw_context}
+    fact_prompt = f"""You are an intelligence analyst extracting high-resolution facts from source material.
 
-STRICT RULE: You must return ONLY a JSON object with the following structure:
-{{
-  "fact": "The direct answer to the question.",
-  "sources": ["URL1", "URL2", ...],
-  "confidence_score": 0.0 to 1.0 based on source reliability
-}}
+RESEARCH OBJECTIVE: {query}
 
-If the information is not found, set "fact" to "Information not found" and "sources" to [].
+SOURCE MATERIAL:
+{raw_context[:25000]}
+
+INSTRUCTIONS:
+- Extract every specific, surgical fact relevant to the objective: exact numbers, names, dates, locations, quotes, statistics.
+- Do NOT summarize generically. Pull the precise data points a researcher would need.
+- Organize facts as a bulleted list grouped by sub-topic.
+- If there are conflicting claims, note both with their sources.
+- Omit filler, opinions, and boilerplate content.
 """
 
-    return json.dumps({"fact": "Could not extract fact. Synthesis tool currently limited.", "sources": [], "confidence_score": 0})
+    model = FAST_MODEL
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": fact_prompt}]}],
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload, timeout=60)
+            if response.status_code == 200:
+                res_json = response.json()
+                candidates = res_json.get("candidates", [])
+                if candidates and len(candidates) > 0:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts and len(parts) > 0:
+                        return parts[0].get("text", "Fact extraction failed: empty response.")
+                return "Fact extraction failed: no candidates."
+            else:
+                safe_log(f"!!! [FACT_EXTRACT] Gemini error {response.status_code}: {response.text[:200]}")
+                return f"Fact extraction failed (HTTP {response.status_code}). Raw excerpt:\n{raw_context[:3000]}"
+    except Exception as e:
+        safe_log(f"!!! [FACT_EXTRACT] Exception: {e}")
+        return f"Fact extraction failed: {e}. Raw excerpt:\n{raw_context[:3000]}"
 
 async def web_search(query, agent_id, api_key):
     """
@@ -745,6 +771,12 @@ async def ask_user(agent_id, tool_input):
 # SCRAPE WEBSITE CAPABILITY
 # ─────────────────────────────────────────────────
 
+_SCRAPE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
 async def scrape_website(url, objective, agent_id, api_key):
     """
     Fetches full content of a website. If the content is too long,
@@ -752,28 +784,38 @@ async def scrape_website(url, objective, agent_id, api_key):
     """
     safe_log(f"[STATUS:{agent_id}] Scraping: {url[:60]}...", agent_id=agent_id)
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, timeout=15, follow_redirects=True)
+        async with httpx.AsyncClient(headers=_SCRAPE_HEADERS) as client:
+            response = await client.get(url, timeout=20, follow_redirects=True)
             response.raise_for_status()
+
+            content_type = response.headers.get("content-type", "")
+            if "text/html" not in content_type and "text/plain" not in content_type:
+                return f"Error scraping {url}: unsupported content type '{content_type}'"
+
             soup = BeautifulSoup(response.text, 'html.parser')
 
             # Remove non-content elements
-            for element in soup(["script", "style", "nav", "footer", "header", "aside", "iframe"]):
+            for element in soup(["script", "style", "nav", "footer", "header", "aside", "iframe", "noscript"]):
                 element.decompose()
 
-            text = soup.get_text(separator=' ', strip=True)
+            # Prefer article body if present
+            article = soup.find("article") or soup.find("main") or soup.find("body")
+            text = article.get_text(separator='\n', strip=True) if article else soup.get_text(separator='\n', strip=True)
 
-            # Token protection: if too large, distill relevant facts
+            if len(text.strip()) < 100:
+                return f"Error scraping {url}: page returned minimal content (possibly blocked or paywall)"
+
+            # Token protection: if too large, distill relevant facts via LLM
             if len(text) > 12000:
-                safe_log(f"[STATUS:{agent_id}] Page too large ({len(text)} chars). Distilling facts...", agent_id=agent_id)
-                distilled = await synthesize_fact_with_gemini(
-                    f"Extract facts about: {objective}", text[:25000], api_key
-                )
-                return f"SOURCE: {url}\nDISTILLED CONTENT:\n{distilled}"
+                safe_log(f"[STATUS:{agent_id}] Page large ({len(text)} chars). Distilling facts...", agent_id=agent_id)
+                distilled = await synthesize_fact_with_gemini(objective, text[:25000], api_key)
+                return f"SOURCE: {url}\nDISTILLED FACTS:\n{distilled}"
 
             return f"SOURCE: {url}\nFULL CONTENT:\n{text}"
     except httpx.HTTPStatusError as e:
         return f"Error scraping {url}: HTTP {e.response.status_code}"
+    except httpx.TimeoutException:
+        return f"Error scraping {url}: request timed out"
     except Exception as e:
         return f"Error scraping {url}: {str(e)}"
 
