@@ -84,7 +84,7 @@ Return ONLY a numbered list.
 
 YOUR PLAN:"""
 
-    text = await _call_llm(prompt, api_key, mode="think")
+    text = await _call_llm(prompt, api_key, mode="fast")
 
     if not text:
         safe_log(f"!!! [PLAN] LLM returned empty text for agent {agent_id}")
@@ -146,19 +146,22 @@ EXAMPLE OUTPUT:
 
 YOUR DAG (JSON array only):"""
 
-    text = await _call_llm(prompt, api_key, mode="think")
+    text = await _call_llm(prompt, api_key, mode="fast")
 
     nodes = None
     if text:
+        safe_log(f"    [WORKMAP] LLM response {len(text)} chars — parsing JSON...")
         try:
             raw = re.sub(r"^[\s\S]*?(\[[\s\S]*\])[\s\S]*$", r"\1", text, flags=re.DOTALL)
             raw = re.sub(r"```(?:json)?|```", "", raw).strip()
             nodes = json.loads(raw)
+            safe_log(f"+++ [WORKMAP] JSON parsed OK — {len(nodes)} nodes")
         except Exception as e:
             safe_log(f"!!! [WORKMAP] JSON parse failed ({e}), falling back to generate_plan()")
 
     # Fallback: convert flat steps to sequential nodes
     if not nodes:
+        safe_log(f"    [WORKMAP] Using sequential fallback from generate_plan")
         fallback_steps = await generate_plan(task, agent_id, api_key, provider, agents_info, autonomous=True)
         nodes = []
         for i, step in enumerate(fallback_steps):
@@ -191,6 +194,57 @@ YOUR DAG (JSON array only):"""
 
     safe_log(f"[STATUS:{agent_id}] Workmap generated: {len(workmap['nodes'])} nodes")
     return workmap
+
+
+async def update_workmap_logic(agent_id, instructions, api_key, provider):
+    """Reads current workmap, applies user instructions, and saves updated version."""
+    workmap_path = os.path.join(AGENTS_CODE_DIR, agent_id, "workmap.json")
+    
+    if not os.path.exists(workmap_path):
+        return "Error: No existing workmap found to update. Please generate a plan first."
+
+    with open(workmap_path, "r", encoding="utf-8") as f:
+        current_workmap = json.load(f)
+
+    current_nodes_json = json.dumps(current_workmap.get("nodes", []), indent=2)
+
+    prompt = f"""You are a master task planner updating an existing DAG workmap.
+The user has requested changes to the current plan. 
+
+USER INSTRUCTIONS: {instructions}
+
+CURRENT WORKMAP NODES:
+{current_nodes_json}
+
+RULES:
+1. Apply the user's changes to the existing nodes. 
+2. You may modify tasks, change assigned agents, add new nodes, or delete nodes.
+3. PRESERVE the "status" and "result_summary" of any nodes you do not change.
+4. Return ONLY a valid JSON array of the updated nodes. No markdown.
+
+YOUR UPDATED DAG (JSON array only):"""
+
+    text = await _call_llm(prompt, api_key, mode="fast")
+
+    if not text:
+        return "Error: LLM failed to generate updated nodes."
+
+    try:
+        raw = re.sub(r"^[\s\S]*?(\[[\s\S]*\])[\s\S]*$", r"\1", text, flags=re.DOTALL)
+        raw = re.sub(r"```(?:json)?|```", "", raw).strip()
+        updated_nodes = json.loads(raw)
+        
+        # Merge updated nodes back into workmap
+        current_workmap["nodes"] = updated_nodes
+        
+        with open(workmap_path, "w", encoding="utf-8") as f:
+            json.dump(current_workmap, f, indent=2)
+            
+        provision_workmap_agents(current_workmap, agent_id)
+        
+        return f"Workmap successfully updated with {len(updated_nodes)} nodes. Please review on the canvas."
+    except Exception as e:
+        return f"Error parsing updated workmap: {e}"
 
 
 def save_workmap_json(workmap, agent_id):
@@ -227,10 +281,13 @@ def provision_workmap_agents(workmap, master_agent_id):
         if agent and agent not in ("self", "", master_agent_id):
             referenced_agents.add(agent)
 
+    safe_log(f">>> [PROVISION] checking {len(referenced_agents)} referenced agents (existing={len(existing_ids)})")
+
     created = []
     offset = 0
     for agent_id in referenced_agents:
         if agent_id in existing_ids:
+            safe_log(f"    [PROVISION] {agent_id} already exists — skipping")
             continue
 
         parts = agent_id.replace("agent-", "").split("-")
@@ -273,14 +330,16 @@ def provision_workmap_agents(workmap, master_agent_id):
         agents.append(new_agent)
         generate_agent_structure(new_agent)
         created.append(agent_id)
-        safe_log(f"+++ [PROVISION] Auto-created agent '{display_name}' (ID: {agent_id})")
+        safe_log(f"+++ [PROVISION] created '{display_name}' @ x={new_x} y={new_y} workdir={agent_work_dir!r}")
 
     if created:
         if master:
             existing_conns = master.get("connections", [])
             master["connections"] = existing_conns + created
         save_data(agents)
-        safe_log(f"[PROVISION] {len(created)} agents provisioned and connected to {master_agent_id}")
+        safe_log(f"--- [PROVISION] {len(created)} new / {len(referenced_agents)-len(created)} already existed, connected to {master_agent_id}")
+    else:
+        safe_log(f"--- [PROVISION] No new agents needed")
 
     return created
 
@@ -351,6 +410,7 @@ async def execute_next_node(agent_id, api_key, provider):
 
     nodes = workmap.get("nodes", [])
     completed_ids = {n["id"] for n in nodes if n["status"] == "COMPLETED"}
+    safe_log(f">>> [TICK_NODE] agent={agent_id} nodes={len(nodes)} completed={len(completed_ids)}")
 
     # Find first PENDING node with all deps completed
     next_node = None
@@ -393,7 +453,7 @@ async def execute_next_node(agent_id, api_key, provider):
     is_pdf = any(w in next_node["task"].lower() for w in PDF_KEYWORDS)
     session_id = workmap.get("project_id", f"wm_{int(time.time())}")
 
-    safe_log(f"[TICK] {agent_id}: Executing node {next_node['id']} — {next_node['task'][:60]}")
+    safe_log(f"    [TICK_NODE] dispatching: id={next_node['id']} agent={target_agent} is_pdf={is_pdf} task={next_node['task'][:60]!r}")
 
     result = await _execute_step(
         step_num, total, next_node["task"], target_agent,
@@ -409,11 +469,13 @@ async def execute_next_node(agent_id, api_key, provider):
         if node["id"] == next_node["id"]:
             node["status"] = "ERROR" if str(result).startswith("Step failed") else "COMPLETED"
             node["result_summary"] = str(result)[:300]
+            safe_log(f"+++ [TICK_NODE] {next_node['id']} -> {node['status']} summary_len={len(node['result_summary'])}")
             break
 
     all_done = all(n["status"] in ("COMPLETED", "ERROR") for n in workmap.get("nodes", []))
     if all_done:
         workmap["status"] = "COMPLETED"
+        safe_log(f"--- [TICK_NODE] ALL nodes done — workmap COMPLETED")
 
     with open(workmap_path, "w", encoding="utf-8") as f:
         json.dump(workmap, f, indent=2)
@@ -425,7 +487,7 @@ async def _execute_step(step_num, total_steps, step_text, agent_id,
                         accumulated_context, api_key, provider,
                         is_pdf_step=False, session_id=None):
     """Execute a single plan step by calling /chat internally."""
-    safe_log(f"[STATUS:{agent_id}] Step {step_num}/{total_steps}: {step_text[:60]}")
+    safe_log(f">>> [STEP_EXEC] step={step_num}/{total_steps} agent={agent_id} is_pdf={is_pdf_step} task={step_text[:60]!r}")
 
     ctx = accumulated_context.strip()
     if len(ctx) > 12000:
@@ -464,9 +526,11 @@ async def _execute_step(step_num, total_steps, step_text, agent_id,
         }
 
         full_text = ""
+        safe_log(f"    [STEP_EXEC] POSTing to /chat agent={agent_id} msg_len={len(message)}")
         async with httpx.AsyncClient() as client:
             async with client.stream("POST", url, json=data, timeout=120) as r:
                 if r.status_code != 200:
+                    safe_log(f"!!! [STEP_EXEC] /chat HTTP {r.status_code} for agent={agent_id}")
                     return f"Step failed: HTTP {r.status_code}"
                 async for line in r.aiter_lines():
                     line = line.strip()
@@ -485,9 +549,9 @@ async def _execute_step(step_num, total_steps, step_text, agent_id,
                         except Exception:
                             pass
 
-        safe_log(f"[STATUS:{agent_id}] Step {step_num} complete")
+        safe_log(f"+++ [STEP_EXEC] step {step_num} complete — response_len={len(full_text)}")
         return full_text
 
     except Exception as e:
-        safe_log(f"!!! [ORCHESTRATION] Step {step_num} error: {e}")
+        safe_log(f"!!! [STEP_EXEC] step {step_num} exception: {e}")
         return f"Step failed: {str(e)}"

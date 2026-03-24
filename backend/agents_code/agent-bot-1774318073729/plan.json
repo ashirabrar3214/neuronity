@@ -1,5 +1,5 @@
 {
-  "objective": "Coordinate all agents",
+  "objective": "",
   "steps": [
     "Observe Workspace",
     "Execute requested task"

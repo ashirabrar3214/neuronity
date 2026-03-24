@@ -15,6 +15,12 @@ class AgentCanvas {
         this.pan = { x: 0, y: 0 };
         this.nodeIdCounter = 1;
 
+        // Selection Lasso
+        this.isSelecting = false;
+        this.selectionStart = { x: 0, y: 0 };
+        this.selectionBox = null;
+        this.selectedNodes = new Set();
+
         this.initContextMenu();
         this.initEventListeners();
         this.loadAgents();
@@ -51,6 +57,7 @@ class AgentCanvas {
         document.addEventListener('mousemove', (e) => this.onMouseMove(e));
         document.addEventListener('mouseup', (e) => this.onMouseUp(e));
         document.addEventListener('click', () => this.hideContextMenu());
+        document.addEventListener('keydown', (e) => this.onKeyDown(e));
         window.addEventListener('resize', () => this.onResize());
     }
 
@@ -322,23 +329,100 @@ class AgentCanvas {
     }
 
     onMouseDown(e) {
-        if (e.button !== 0) return; // Only pan on left click
-        if (e.target.closest('.agent-node')) return;
-        this.isPanning = true;
-        this.container.style.cursor = 'grabbing';
+        const node = e.target.closest('.agent-node');
+
+        // Right-click drag = Lasso Selection
+        if (e.button === 2) {
+            if (!node) {
+                if (!e.shiftKey) {
+                    this.selectedNodes.clear();
+                    document.querySelectorAll('.agent-node').forEach(n => n.classList.remove('selected'));
+                }
+                this.isSelecting = true;
+                this.selectionStart = { x: e.clientX, y: e.clientY };
+                this.selectionBox = document.createElement('div');
+                this.selectionBox.className = 'selection-box';
+                document.body.appendChild(this.selectionBox);
+                this.container.style.cursor = 'crosshair';
+                this.lassoDragStarted = false; // Reset lasso drag flag
+                return;
+            }
+        }
+
+        // Left-click (button 0)
+        if (e.button !== 0) return;
+
+        if (!node) {
+            // Clicked on empty canvas (Left Click)
+            this.isPanning = true;
+            this.container.style.cursor = 'grabbing';
+            return;
+        }
+
+        // Clicked on a node
+        const nodeId = node.id;
+        if (e.shiftKey) {
+            // Multi-toggle
+            if (this.selectedNodes.has(nodeId)) {
+                this.selectedNodes.delete(nodeId);
+                node.classList.remove('selected');
+            } else {
+                this.selectedNodes.add(nodeId);
+                node.classList.add('selected');
+            }
+        } else {
+            // Single select (if not already selected)
+            if (!this.selectedNodes.has(nodeId)) {
+                this.selectedNodes.clear();
+                document.querySelectorAll('.agent-node').forEach(n => n.classList.remove('selected'));
+                this.selectedNodes.add(nodeId);
+                node.classList.add('selected');
+            }
+        }
+
+        this.draggedNode = node;
+        this.offset.x = e.clientX - node.offsetLeft;
+        this.offset.y = e.clientY - node.offsetTop;
+
+        // Remember offsets for all selected nodes for multi-drag
+        this.selectedNodeOffsets = new Map();
+        this.selectedNodes.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                this.selectedNodeOffsets.set(id, {
+                    x: e.clientX - el.offsetLeft,
+                    y: e.clientY - el.offsetTop
+                });
+            }
+        });
     }
 
     onMouseMove(e) {
         if (this.draggedNode) {
-            const x = e.clientX - this.offset.x;
-            const y = e.clientY - this.offset.y;
-
-            this.draggedNode.style.left = `${x}px`;
-            this.draggedNode.style.top = `${y}px`;
-
+            this.selectedNodes.forEach(id => {
+                const nodeEl = document.getElementById(id);
+                const offset = this.selectedNodeOffsets.get(id);
+                if (nodeEl && offset) {
+                    nodeEl.style.left = `${e.clientX - offset.x}px`;
+                    nodeEl.style.top = `${e.clientY - offset.y}px`;
+                }
+            });
             this.updateConnections();
         } else if (this.draggedConnection) {
             this.updateTempConnection(e);
+        } else if (this.isSelecting) {
+            this.lassoDragStarted = true;
+            const currentX = e.clientX;
+            const currentY = e.clientY;
+            const x = Math.min(this.selectionStart.x, currentX);
+            const y = Math.min(this.selectionStart.y, currentY);
+            const width = Math.abs(this.selectionStart.x - currentX);
+            const height = Math.abs(this.selectionStart.y - currentY);
+
+            this.selectionBox.style.left = `${x}px`;
+            this.selectionBox.style.top = `${y}px`;
+            this.selectionBox.style.width = `${width}px`;
+            this.selectionBox.style.height = `${height}px`;
         } else if (this.isPanning) {
             this.pan.x += e.movementX;
             this.pan.y += e.movementY;
@@ -349,7 +433,6 @@ class AgentCanvas {
     onMouseUp(e) {
         if (this.draggedConnection) {
             const target = e.target;
-            // Check if dropped on an input port
             if (target.classList.contains('port-in')) {
                 const targetNode = target.closest('.agent-node');
                 if (targetNode && targetNode.id !== this.draggedConnection.sourceId) {
@@ -357,19 +440,56 @@ class AgentCanvas {
                     this.saveAgentData(this.draggedConnection.sourceId);
                 }
             }
-            // Cleanup temp path
             this.draggedConnection.path.remove();
             this.draggedConnection = null;
             return;
         }
 
+        if (this.isSelecting) {
+            const rect = this.selectionBox.getBoundingClientRect();
+            this.nodes.forEach(node => {
+                const nodeRect = node.el.getBoundingClientRect();
+                if (
+                    nodeRect.left >= rect.left &&
+                    nodeRect.right <= rect.right &&
+                    nodeRect.top >= rect.top &&
+                    nodeRect.bottom <= rect.bottom
+                ) {
+                    this.selectedNodes.add(node.id);
+                    node.el.classList.add('selected');
+                }
+            });
+            this.selectionBox.remove();
+            this.selectionBox = null;
+            this.isSelecting = false;
+        }
+
         if (this.draggedNode) {
-            this.saveAgentData(this.draggedNode.id);
+            this.selectedNodes.forEach(id => this.saveAgentData(id));
         }
 
         this.draggedNode = null;
+        this.selectedNodeOffsets = null;
         this.isPanning = false;
         this.container.style.cursor = 'grab';
+    }
+
+    async onKeyDown(e) {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            // Only if not typing in a field
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+
+            if (this.selectedNodes.size > 0) {
+                const confirmed = await window.customConfirm(`Delete ${this.selectedNodes.size} selected agents?`);
+                if (confirmed) {
+                    const toDelete = Array.from(this.selectedNodes);
+                    this.selectedNodes.clear();
+                    for (const id of toDelete) {
+                        await this.deleteAgent(id);
+                    }
+                }
+            }
+        }
     }
 
     updateTransform() {
@@ -392,6 +512,10 @@ class AgentCanvas {
 
     onContextMenu(e) {
         e.preventDefault();
+        if (this.lassoDragStarted) {
+            this.lassoDragStarted = false;
+            return;
+        }
         this.contextMenuMousePosition = { x: e.clientX, y: e.clientY };
         this.contextMenu.style.left = `${e.clientX}px`;
         this.contextMenu.style.top = `${e.clientY}px`;

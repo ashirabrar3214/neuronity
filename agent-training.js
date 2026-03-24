@@ -918,14 +918,46 @@ function initTrainingUI() {
             messageDiv.className = 'message agent-message';
             chatArea.appendChild(messageDiv);
 
-            let thoughtDetails = null;
-            let thoughtContent = null;
             let responseContent = "";
-            let fullThoughtText = "";
+            let reactContainer = null;   // holds all .react-iteration divs
+            let currentIterDiv = null;   // current iteration's container div
+
+            // Typewriter queue — renders text character-by-character regardless of chunk size
+            const twQueue = [];
+            let twRunning = false;
+            async function twDrain() {
+                if (twRunning) return;
+                twRunning = true;
+                while (twQueue.length > 0) {
+                    const item = twQueue.shift();
+                    if (item.onChar) {
+                        item.onChar(item.ch);
+                    } else {
+                        item.el.textContent += item.ch;
+                    }
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                    await new Promise(r => setTimeout(r, 14));
+                }
+                twRunning = false;
+            }
+            function typewrite(el, text) {
+                for (const ch of text) twQueue.push({ el, ch });
+                twDrain();
+            }
+            let responseVisible = "";
+            function typewriteMarkdown(textSpan, text) {
+                for (const ch of text) {
+                    twQueue.push({ ch, onChar: (c) => {
+                        responseVisible += c;
+                        textSpan.innerHTML = markdownToHtml(responseVisible);
+                    }});
+                }
+                twDrain();
+            }
 
             let initialStatus = document.createElement('div');
-            initialStatus.className = 'stream-status';
-            initialStatus.innerHTML = `<div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+            initialStatus.className = 'stream-status thinking-status';
+            initialStatus.innerHTML = `<span class="thinking-label">let me think</span><div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
             messageDiv.appendChild(initialStatus);
 
             let unprocessedText = "";
@@ -939,6 +971,7 @@ function initTrainingUI() {
                     unprocessedText = lines.pop();
 
                     for (let line of lines) {
+                        await new Promise(r => setTimeout(r, 0));
                         if (!line.trim() || !line.startsWith('data: ')) continue;
                         let dataText = line.trim();
                         // Robust stripping of all SSE data prefixes
@@ -949,21 +982,63 @@ function initTrainingUI() {
 
                         try {
                             const data = JSON.parse(dataText);
-                            if (initialStatus) { initialStatus.remove(); initialStatus = null; }
 
-                            if (data.type === 'thought') {
-                                if (!thoughtDetails) {
-                                    thoughtDetails = document.createElement('details');
-                                    thoughtDetails.className = 'thought-block';
-                                    thoughtDetails.setAttribute('open', '');
-                                    thoughtDetails.innerHTML = `<summary>Thinking <div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></summary><div class="thought-content"></div>`;
-                                    messageDiv.appendChild(thoughtDetails);
-                                    thoughtContent = thoughtDetails.querySelector('.thought-content');
+                            if (data.type === 'iteration_start') {
+                                // Ensure the react container exists
+                                if (!reactContainer) {
+                                    reactContainer = document.createElement('div');
+                                    reactContainer.className = 'react-container';
+                                    messageDiv.appendChild(reactContainer);
                                 }
-                                fullThoughtText += data.content;
-                                thoughtContent.textContent = fullThoughtText;
+                                // New iteration block
+                                currentIterDiv = document.createElement('div');
+                                currentIterDiv.className = 'react-iteration';
+                                reactContainer.appendChild(currentIterDiv);
                             }
-                            else if (data.type === 'text') {
+                            else if (data.type === 'thought') {
+                                if (initialStatus) { initialStatus.remove(); initialStatus = null; }
+                                const line = document.createElement('div');
+                                line.className = 'thought-line';
+                                const text = data.content.length > 80 ? data.content.slice(0, 80) + '…' : data.content;
+                                (currentIterDiv || messageDiv).appendChild(line);
+                                typewrite(line, text);
+                            }
+                            else if (data.type === 'thought_token') {
+                                if (initialStatus) { initialStatus.remove(); initialStatus = null; }
+                                const parent = currentIterDiv || messageDiv;
+                                let last = parent.querySelector('.thought-line:last-child');
+                                if (!last) {
+                                    last = document.createElement('div');
+                                    last.className = 'thought-line';
+                                    parent.appendChild(last);
+                                }
+                                typewrite(last, data.content);
+                            }
+                            else if (data.type === 'action') {
+                                if (initialStatus) { initialStatus.remove(); initialStatus = null; }
+                                const line = document.createElement('div');
+                                line.className = 'action-line';
+                                line.textContent = data.content;
+                                (currentIterDiv || messageDiv).appendChild(line);
+                            }
+                            else if (data.type === 'action_result') {
+                                if (initialStatus) { initialStatus.remove(); initialStatus = null; }
+                                const line = document.createElement('div');
+                                line.className = 'action-result-line';
+                                line.textContent = data.content;
+                                (currentIterDiv || messageDiv).appendChild(line);
+                            }
+                            else if (data.type === 'hitl_question') {
+                                if (initialStatus) { initialStatus.remove(); initialStatus = null; }
+                                const wrapper = document.createElement('div');
+                                wrapper.className = 'hitl-question';
+                                const text = document.createElement('span');
+                                wrapper.appendChild(text);
+                                (currentIterDiv || messageDiv).appendChild(wrapper);
+                                typewrite(text, data.content);
+                            }
+                            else if (data.type === 'response' || data.type === 'text') {
+                                if (initialStatus) { initialStatus.remove(); initialStatus = null; }
                                 responseContent += data.content;
                                 let textSpan = messageDiv.querySelector('.response-text');
                                 if (!textSpan) {
@@ -971,7 +1046,7 @@ function initTrainingUI() {
                                     textSpan.className = 'response-text';
                                     messageDiv.appendChild(textSpan);
                                 }
-                                textSpan.innerHTML = markdownToHtml(responseContent);
+                                typewriteMarkdown(textSpan, data.content);
                             }
                             else if (data.type === 'status' || data.type === 'tool_start') {
                                 let statusEl = messageDiv.querySelector('.stream-status');
@@ -980,10 +1055,10 @@ function initTrainingUI() {
                                     statusEl.className = 'stream-status';
                                     messageDiv.appendChild(statusEl);
                                 }
-                                statusEl.innerHTML = `<i>${data.content || 'Action...'}</i> <div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+                                statusEl.innerHTML = `<i>${data.content || 'Working...'}</i> <div class="typing-indicator-mini"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
                             }
                             else if (data.type === 'error') {
-                                messageDiv.innerHTML += `<div class="error-text">⚠️ ${data.content}</div>`;
+                                messageDiv.innerHTML += `<div class="error-text">Error: ${data.content}</div>`;
                             }
                         } catch (e) {
                             console.error("Error parsing stream chunk:", e, dataText);
@@ -995,12 +1070,6 @@ function initTrainingUI() {
                 if (initialStatus) initialStatus.remove();
                 const sEl = messageDiv.querySelector('.stream-status');
                 if (sEl) sEl.remove();
-                // Stop the brain/dot animation in the thought block
-                if (thoughtDetails) {
-                    const miniIndicator = thoughtDetails.querySelector('.typing-indicator-mini');
-                    if (miniIndicator) miniIndicator.remove();
-                    thoughtDetails.removeAttribute('open');
-                }
             }
 
             processPlanResponse(responseContent, originalText, true);

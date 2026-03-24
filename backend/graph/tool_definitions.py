@@ -34,6 +34,7 @@ async def web_search(
     import toolkit
     agent_id = _get(state, "agent_id")
     api_key = _get(state, "api_key")
+    print(f">>> [TOOL_DEF:web_search] agent={agent_id} query={query[:60]!r}", flush=True)
     return await toolkit.web_search(query, agent_id, api_key=api_key)
 
 
@@ -46,6 +47,7 @@ async def deep_search(
     import toolkit
     agent_id = _get(state, "agent_id")
     api_key = _get(state, "api_key")
+    print(f">>> [TOOL_DEF:deep_search] agent={agent_id} query={query[:60]!r}", flush=True)
     return await toolkit.deep_search(query, agent_id, api_key=api_key)
 
 
@@ -66,6 +68,7 @@ async def report_generation(
     api_key = _get(state, "api_key")
     agent_name = _get(state, "agent_name", "Agent")
     tool_input = f"{topic}|{context}"
+    print(f">>> [TOOL_DEF:report_generation] agent={agent_id} topic={topic[:60]!r} context_len={len(context)}", flush=True)
     return await toolkit.report_generation(agent_id, tool_input, working_dir, api_key, agent_name=agent_name)
 
 
@@ -80,6 +83,7 @@ async def generate_report(
     agent_id = _get(state, "agent_id")
     working_dir = _get(state, "working_dir")
     tool_input = f"{title}|{content}"
+    print(f">>> [TOOL_DEF:generate_report] agent={agent_id} title={title[:60]!r}", flush=True)
     return await toolkit.generate_report(agent_id, tool_input, working_dir)
 
 
@@ -104,6 +108,8 @@ async def message_agent(
     sender = next((a for a in agents if a["id"] == agent_id), None)
     target = next((a for a in agents if a["id"] == target_id), None)
 
+    print(f">>> [TOOL_DEF:message_agent] {agent_id} -> {target_id} msg={message[:60]!r}", flush=True)
+
     if not sender:
         return f"Error: Sender agent {agent_id} not found."
     if not target:
@@ -112,6 +118,7 @@ async def message_agent(
     # Bidirectional connection check
     sender_conns = sender.get("connections", [])
     target_conns = target.get("connections", [])
+    print(f"    [TOOL_DEF:message_agent] sender_conns={sender_conns} target_conns={target_conns}", flush=True)
     if target_id not in sender_conns and agent_id not in target_conns:
         return (
             f"Error: You are not connected to agent '{target_id}'. "
@@ -131,6 +138,8 @@ async def message_agent(
 
     sender_name = sender.get("name", "Unknown Agent")
     target_provider = target.get("brain", "gemini").lower()
+    target_api_key = target.get("apiKey", api_key)
+    print(f"    [TOOL_DEF:message_agent] target_provider={target_provider} target_perms={target.get('permissions',[])} api_key_resolved={bool(target_api_key)}", flush=True)
 
     # Build task context
     sender_plan_path = os.path.join(AGENTS_CODE_DIR, agent_id, "plan.json")
@@ -184,6 +193,7 @@ def list_workspace(
     """List all files and folders in the agent's working directory."""
     agent_id = _get(state, "agent_id")
     working_dir = _get(state, "working_dir")
+    print(f">>> [TOOL_DEF:list_workspace] agent={agent_id} dir={working_dir!r}", flush=True)
     print(f"[STATUS:{agent_id}] Listing Workspace Files (Real-time Scan)", flush=True)
     if not working_dir or not os.path.exists(working_dir):
         return "Error: Working directory is invalid or not set."
@@ -217,6 +227,7 @@ def scout_file(
     import toolkit
     agent_id = _get(state, "agent_id")
     working_dir = _get(state, "working_dir")
+    print(f">>> [TOOL_DEF:scout_file] agent={agent_id} path={file_path!r}", flush=True)
     return toolkit.scout_file(agent_id, file_path, working_dir)
 
 
@@ -229,6 +240,7 @@ def read_file(
     import toolkit
     agent_id = _get(state, "agent_id")
     working_dir = _get(state, "working_dir")
+    print(f">>> [TOOL_DEF:read_file] agent={agent_id} path={file_path!r}", flush=True)
     return toolkit.read_file(agent_id, file_path, working_dir)
 
 
@@ -243,6 +255,7 @@ def write_file(
     agent_id = _get(state, "agent_id")
     working_dir = _get(state, "working_dir")
     tool_input = f"{filename}|{content}"
+    print(f">>> [TOOL_DEF:write_file] agent={agent_id} file={filename!r} content_len={len(content)}", flush=True)
     return toolkit.write_file(agent_id, tool_input, working_dir)
 
 
@@ -258,6 +271,7 @@ async def update_plan(
     """Update your execution plan. Format: 'objective|step1, step2, step3' or just 'objective' with steps on separate lines."""
     import toolkit
     agent_id = _get(state, "agent_id")
+    print(f">>> [TOOL_DEF:update_plan] agent={agent_id} input={objective_and_steps[:60]!r}", flush=True)
     return await toolkit.update_plan(agent_id, objective_and_steps)
 
 
@@ -269,6 +283,7 @@ async def ask_user(
     """Halt execution and ask the user a question for guidance or clarification."""
     import toolkit
     agent_id = _get(state, "agent_id")
+    print(f">>> [TOOL_DEF:ask_user] agent={agent_id} question={question[:60]!r}", flush=True)
     return await toolkit.ask_user(agent_id, question)
 
 
@@ -359,6 +374,7 @@ async def create_project_workmap(
     agents_info = "\n".join(agents_info_lines)
 
     from graph.orchestration_graph import run_autonomous
+    print(f">>> [TOOL_DEF:create_project_workmap] agent={agent_id} task={finalized_task[:60]!r} connected={len(agents_info_lines)}", flush=True)
     await run_autonomous(agent_id, finalized_task, api_key, "gemini", agents_info, autonomous=True)
 
     return (
@@ -366,6 +382,35 @@ async def create_project_workmap(
         "INSTRUCTION: Tell the user the plan is ready. Tell them to review the DAG Workmap "
         "inside your agent card on the canvas, and click the PLAY button to start the background execution engine."
     )
+
+
+@tool
+async def update_project_workmap(
+    instructions: str,
+    state: Annotated[dict, InjectedState],
+) -> str:
+    """Update an existing project workmap with new instructions (add/remove nodes, change tasks)."""
+    agent_id = _get(state, "agent_id")
+    api_key = _get(state, "api_key")
+    provider = _get(state, "provider", "gemini")
+    print(f">>> [TOOL_DEF:update_project_workmap] agent={agent_id} instructions={instructions[:60]!r}", flush=True)
+
+    from graph.orchestration_graph import update_workmap_logic
+    return await update_workmap_logic(agent_id, instructions, api_key, provider)
+
+
+@tool
+async def start_project_execution(
+    state: Annotated[dict, InjectedState],
+) -> str:
+    """Activate the project workmap and start the background execution engine. Call this ONLY after the user has confirmed they are happy with the plan."""
+    agent_id = _get(state, "agent_id")
+    api_key = _get(state, "api_key")
+    provider = _get(state, "provider", "gemini")
+    print(f">>> [TOOL_DEF:start_project_execution] agent={agent_id}", flush=True)
+
+    from graph.orchestration_graph import run_execution_loop
+    return await run_execution_loop(agent_id, "", api_key, provider)
 
 
 # ---------------------------------------------------------------------------
@@ -376,7 +421,7 @@ async def create_project_workmap(
 SILENT_TOOLS = {"update_plan"}
 
 # Tools that terminate the agent turn after execution
-TERMINAL_TOOLS = {"report_generation", "ask_user"}
+TERMINAL_TOOLS = {"report_generation", "ask_user", "create_project_workmap", "update_project_workmap", "start_project_execution"}
 
 
 def get_tools_for_agent(permissions: list, has_connections: bool,
@@ -389,8 +434,7 @@ def get_tools_for_agent(permissions: list, has_connections: bool,
 
     if "web search" in permissions:
         tools.extend([web_search, deep_search])
-    # Master agents should never generate reports — only workers do
-    if "report generation" in permissions and not is_master:
+    if "report generation" in permissions:
         tools.extend([report_generation, generate_report])
     if "file access" in permissions:
         tools.extend([list_workspace, scout_file, read_file, write_file])
@@ -406,6 +450,7 @@ def get_tools_for_agent(permissions: list, has_connections: bool,
 
     # Master-only tool
     if is_master:
-        tools.append(create_project_workmap)
+        tools.extend([create_project_workmap, update_project_workmap, start_project_execution])
 
     return tools
+

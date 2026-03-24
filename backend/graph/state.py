@@ -4,7 +4,7 @@ from langchain_core.messages import BaseMessage
 
 
 class AgentState(TypedDict):
-    """State for the single-agent reasoning graph."""
+    """State for the ReAct-style iterative agent graph."""
 
     # Core conversation — add_messages appends and deduplicates automatically
     messages: Annotated[list[BaseMessage], add_messages]
@@ -18,8 +18,8 @@ class AgentState(TypedDict):
     working_dir: str
     system_prompt: str
 
-    # Deliberation result
-    decision: str  # "SOLVE", "CLARIFY", "RE-PLAN", or ""
+    # Legacy deliberation fields (kept for transition compatibility)
+    decision: str
     decision_reason: str
 
     # Execution control
@@ -34,6 +34,17 @@ class AgentState(TypedDict):
 
     # Training mode extras
     current_prompt_md: str  # Content of prompt.md for training mode
+
+    # ── ReAct loop fields ──────────────────────────────────────────────
+    goal: str                        # Original user prompt, captured once
+    plan_iterations: int             # Outer loop counter (incremented each plan call)
+    max_plan_iterations: int         # Hard cap (default 50)
+    current_steps: list              # [{id, description, type, tool_name, tool_args, result}]
+    iteration_summaries: list        # ~100-token compressed summary per iteration
+    planner_decision: str            # "CONTINUE" | "ASK_USER" | "DONE"
+    consecutive_clarifications: int  # ASK_USER counter — force terminate at 3
+    planner_response: str            # Final answer text (populated when DONE)
+    planner_question: str            # Question for user (populated when ASK_USER)
 
 
 class WorkmapState(TypedDict):

@@ -91,7 +91,6 @@ def execution_engine_tick():
     """Background tick: every 5 seconds, scan for RUNNING workmaps and dispatch nodes."""
     while _main_event_loop is None:
         time.sleep(0.1)
-
     while True:
         try:
             agents = load_data()
@@ -108,15 +107,17 @@ def execution_engine_tick():
                     if wm.get("status") != "RUNNING":
                         continue
                     if any(n.get("status") == "IN_PROGRESS" for n in wm.get("nodes", [])):
+                        safe_log(f"[TICK] {agent_id}: node IN_PROGRESS — skipping this tick")
                         continue
                     api_key = os.getenv("GEMINI_API_KEY", "")
                     provider = wm.get("provider", "gemini")
+                    safe_log(f"[TICK] {agent_id}: dispatching next node (provider={provider})")
                     from graph.orchestration_graph import execute_next_node
                     asyncio.run_coroutine_threadsafe(
                         execute_next_node(agent_id, api_key, provider),
                         _main_event_loop
                     )
-                    safe_log(f"[TICK] Dispatched node for {agent_id}")
+                    safe_log(f"+++ [TICK] {agent_id}: coroutine submitted to event loop")
                 except Exception as e:
                     safe_log(f"!!! [TICK] Error reading workmap for {agent_id}: {e}")
         except Exception as e:
@@ -509,12 +510,16 @@ async def chat_with_agent(request: ChatRequest):
     agents = load_data()
     agent_data = next((a for a in agents if a["id"] == request.agent_id), None)
     if not agent_data:
+        safe_log(f"!!! [CHAT] agent_id={request.agent_id!r} NOT FOUND in agents.json")
         raise HTTPException(status_code=404, detail="Agent not found")
 
     connected = get_connected_agents(request.agent_id, agents)
     api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
     mode = request.mode or "work"
     is_auto = "[AUTO_STEP" in request.message
+
+    safe_log(f">>> [CHAT] agent={request.agent_id} type={agent_data.get('agentType')} mode={mode} is_auto={is_auto} connected={len(connected)} api_key_present={bool(api_key)}")
+    safe_log(f"    [CHAT] msg={request.message[:80]!r}")
 
     graph = build_agent_graph()
 
@@ -536,6 +541,17 @@ async def chat_with_agent(request: ChatRequest):
         "api_key": api_key,
         "session_id": "",
         "current_prompt_md": "",
+        # ReAct loop fields — initialized here so LangGraph state has no missing keys
+        # build_context will overwrite these with proper values
+        "goal": request.message,
+        "plan_iterations": 0,
+        "max_plan_iterations": 50,
+        "current_steps": [],
+        "iteration_summaries": [],
+        "planner_decision": "",
+        "consecutive_clarifications": 0,
+        "planner_response": "",
+        "planner_question": "",
     }
 
     config = {
@@ -551,7 +567,7 @@ async def chat_with_agent(request: ChatRequest):
             if chunk.startswith("data: ") and chunk.strip() != "data: [DONE]":
                 try:
                     data = json.loads(chunk[6:])
-                    if data.get("type") == "text":
+                    if data.get("type") in ("text", "response"):
                         final_text += data.get("content", "")
                 except Exception:
                     pass
@@ -572,10 +588,24 @@ async def chat_with_agent(request: ChatRequest):
             history.append({"role": "user", "content": request.message})
             if final_text.strip():
                 history.append({"role": "assistant", "content": final_text.strip()})
-            with open(history_path, "w", encoding="utf-8") as f:
-                json.dump(history, f, indent=2)
+            try:
+                with open(history_path, "w", encoding="utf-8") as f:
+                    json.dump(history, f, indent=2)
+                safe_log(f"--- [CHAT] {request.agent_id}: done — response_len={len(final_text)} history_entries={len(history)}")
+            except Exception as e:
+                safe_log(f"!!! [CHAT] Failed to save history for {request.agent_id}: {e}")
+        else:
+            safe_log(f"--- [CHAT] {request.agent_id}: AUTO_STEP done — response_len={len(final_text)} (not saved)")
 
-    return StreamingResponse(stream_and_save(), media_type="text/event-stream")
+    return StreamingResponse(
+        stream_and_save(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -585,13 +615,16 @@ async def chat_with_agent(request: ChatRequest):
 @app.post("/run_autonomous")
 async def run_autonomous_agent(request: ChatRequest):
     """Generate intentions (plan + workmap) for a master agent."""
+    safe_log(f">>> [RUN_AUTONOMOUS] agent_id={request.agent_id} msg={request.message[:60]!r}")
     agents = load_data()
     agent_data = next((a for a in agents if a["id"] == request.agent_id), None)
 
     if not agent_data or agent_data.get("agentType", "worker") != "master":
+        safe_log(f"    [RUN_AUTONOMOUS] not a master — routing to /chat")
         return await chat_with_agent(request)
 
     if request.mode != "work":
+        safe_log(f"    [RUN_AUTONOMOUS] mode={request.mode!r} — routing to /chat")
         return await chat_with_agent(request)
 
     provider = request.provider or "gemini"
@@ -609,6 +642,7 @@ async def run_autonomous_agent(request: ChatRequest):
                 f"- {a['name']} (ID: {a['id']}): {a.get('responsibility', '')} | Tools: {perms}"
             )
     agents_info = "\n".join(agents_info_lines)
+    safe_log(f"    [RUN_AUTONOMOUS] connected_agents={len(agents_info_lines)} provider={provider} api_key_present={bool(api_key)}")
 
     from graph.orchestration_graph import run_autonomous
     try:
@@ -617,24 +651,25 @@ async def run_autonomous_agent(request: ChatRequest):
             agents_info, autonomous=True
         )
     except Exception as e:
-        safe_log(f"!!! [RUN_AUTONOMOUS] Error: {e}")
+        safe_log(f"!!! [RUN_AUTONOMOUS] Error on attempt 1: {e}")
         steps = None
 
     if not steps:
-        # Don't fall back to free-form chat — retry plan with just the fast model
-        safe_log(f"[RUN_AUTONOMOUS] Plan generation failed, retrying with fast model...")
+        safe_log(f"    [RUN_AUTONOMOUS] attempt 1 failed — retrying...")
         try:
             steps = await run_autonomous(
                 request.agent_id, request.message, api_key, provider,
                 agents_info, autonomous=True
             )
         except Exception as e:
-            safe_log(f"!!! [RUN_AUTONOMOUS] Retry also failed: {e}")
+            safe_log(f"!!! [RUN_AUTONOMOUS] Retry failed: {e}")
             steps = None
 
     if not steps:
+        safe_log(f"!!! [RUN_AUTONOMOUS] All attempts failed")
         return {"response": "Plan generation failed. Please check your API key and try again."}
 
+    safe_log(f"+++ [RUN_AUTONOMOUS] plan generated: {len(steps)} steps")
     steps_md = "\n".join([f"{i + 1}. {s}" for i, s in enumerate(steps)])
     final_response = (
         f"### Workmap Generated\n\n"
@@ -649,10 +684,12 @@ async def run_autonomous_agent(request: ChatRequest):
 @app.post("/execute_autonomous")
 async def execute_autonomous(request: ChatRequest):
     """Triggered by the 'Start' button. Activates the workmap for tick engine dispatch."""
+    safe_log(f">>> [EXECUTE_AUTONOMOUS] agent_id={request.agent_id}")
     provider = request.provider or "gemini"
     api_key = request.api_key or os.getenv("GEMINI_API_KEY", "")
     from graph.orchestration_graph import run_execution_loop
     result = await run_execution_loop(request.agent_id, request.message, api_key, provider)
+    safe_log(f"+++ [EXECUTE_AUTONOMOUS] result={str(result)[:80]!r}")
     return {"response": result}
 
 
@@ -664,34 +701,41 @@ async def execute_autonomous(request: ChatRequest):
 async def get_workmap(agent_id: str):
     wm_path = os.path.join(AGENTS_CODE_DIR, agent_id, "workmap.json")
     if not os.path.exists(wm_path):
-        raise HTTPException(status_code=404, detail="No workmap found for this agent")
+        return {"nodes": [], "edges": [], "status": "IDLE"}
     with open(wm_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 @app.post("/workmap/{agent_id}/play")
 async def play_workmap(agent_id: str):
+    safe_log(f">>> [WORKMAP:PLAY] agent_id={agent_id}")
     wm_path = os.path.join(AGENTS_CODE_DIR, agent_id, "workmap.json")
     if not os.path.exists(wm_path):
+        safe_log(f"!!! [WORKMAP:PLAY] No workmap found for {agent_id}")
         raise HTTPException(status_code=404, detail="No workmap found for this agent")
     with open(wm_path, "r", encoding="utf-8") as f:
         wm = json.load(f)
+    prev = wm.get("status", "UNKNOWN")
     wm["status"] = "RUNNING"
     with open(wm_path, "w", encoding="utf-8") as f:
         json.dump(wm, f, indent=2)
+    safe_log(f"+++ [WORKMAP:PLAY] {agent_id}: {prev} → RUNNING ({len(wm.get('nodes',[]))} nodes)")
     return {"status": "RUNNING", "agent_id": agent_id}
 
 
 @app.post("/workmap/{agent_id}/pause")
 async def pause_workmap(agent_id: str):
+    safe_log(f">>> [WORKMAP:PAUSE] agent_id={agent_id}")
     wm_path = os.path.join(AGENTS_CODE_DIR, agent_id, "workmap.json")
     if not os.path.exists(wm_path):
+        safe_log(f"!!! [WORKMAP:PAUSE] No workmap found for {agent_id}")
         raise HTTPException(status_code=404, detail="No workmap found for this agent")
     with open(wm_path, "r", encoding="utf-8") as f:
         wm = json.load(f)
     wm["status"] = "PAUSED"
     with open(wm_path, "w", encoding="utf-8") as f:
         json.dump(wm, f, indent=2)
+    safe_log(f"+++ [WORKMAP:PAUSE] {agent_id}: now PAUSED")
     return {"status": "PAUSED", "agent_id": agent_id}
 
 
@@ -820,4 +864,4 @@ async def get_available_agents(agent_id: str):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000, loop="asyncio")
+    uvicorn.run(app, host="127.0.0.1", port=8000, loop="asyncio", access_log=False)

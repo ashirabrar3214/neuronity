@@ -1,17 +1,23 @@
 [
   {
-    "id": "agent-MasterBot-001",
-    "name": "MasterBot",
-    "description": "Main orchestrator agent.",
-    "agentType": "master",
-    "x": 100,
-    "y": 150,
-    "brain": "Gemini",
-    "tools": "Gmail",
-    "responsibility": "Coordinate all agents",
+    "id": "agent-bot-1774318073729",
+    "name": "MasterAgent",
+    "description": "Agent description...",
+    "brain": "",
+    "channel": "Gmail",
+    "workingDir": "D:\\New folder",
     "permissions": [
       "web search",
-      "thinking"
-    ]
+      "thinking",
+      "report generation",
+      "scheduling",
+      "file access"
+    ],
+    "tools": "Custom",
+    "responsibility": "",
+    "agentType": "master",
+    "x": 61.0,
+    "y": 71.0,
+    "connections": []
   }
 ]

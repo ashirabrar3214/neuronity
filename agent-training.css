@@ -614,6 +614,13 @@ input:checked+.slider:before {
     gap: 4px;
 }
 
+.thinking-label {
+    font-size: 11px;
+    color: #555;
+    font-style: italic;
+    letter-spacing: 0.02em;
+}
+
 .loading-dots::after {
     content: '';
     display: inline-block;
@@ -907,6 +914,54 @@ input:checked+.slider:before {
     font-size: 12px;
     color: var(--text-secondary);
     margin-top: 5px;
+}
+
+/* ── HITL CONFIDENCE GATE ───────────────────────────────────────────── */
+.hitl-question {
+    margin: 6px 0 2px 0;
+    padding: 6px 10px;
+    border-left: 2px solid #444;
+    font-size: 12px;
+    color: #ccc;
+}
+
+/* ── ReAct LOOP DISPLAY ─────────────────────────────────────────────── */
+.react-container {
+    margin: 4px 0 8px 0;
+}
+
+.react-iteration {
+    border-left: 1px solid #3a3a3a;
+    padding-left: 10px;
+    margin-bottom: 6px;
+}
+
+.thought-line {
+    font-size: 11px;
+    font-style: italic;
+    color: #555;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    padding: 1px 0;
+}
+
+.action-line {
+    font-size: 11px;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    color: #777;
+    line-height: 1.4;
+    padding: 1px 0;
+}
+
+.action-result-line {
+    font-size: 11px;
+    color: #666;
+    line-height: 1.4;
+    padding: 1px 0;
+    margin-left: 8px;
 }
 
 @keyframes pulse-s {

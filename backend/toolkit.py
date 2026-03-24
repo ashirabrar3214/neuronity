@@ -10,6 +10,7 @@ from pdf_generator import ReportPDFGenerator
 # -- LLM Models (Abstracting for easy upgrades) --
 FAST_MODEL = os.getenv("FAST_MODEL", "gemini-2.0-flash")
 REASONING_MODEL = os.getenv("REASONING_MODEL", "gemini-3-flash-preview")
+PLANNER_MODEL = os.getenv("PLANNER_MODEL", "gemini-3.1-pro-preview")
 
 def get_training_context():
     """
@@ -56,20 +57,23 @@ async def _ddgs_search_raw(query, agent_id):
         from ddgs import DDGS
         def do_search():
             results = []
-            for result in DDGS().text(query, max_results=15):
+            search_results = DDGS().text(query, max_results=15)
+            for result in search_results:
                 results.append({
                     "title": result.get("title", ""),
                     "href": result.get("href", ""),
                     "body": result.get("body", "")
                 })
             return results
-        
+
         results = await asyncio.to_thread(do_search)
         safe_log(f"+++ [INTERNAL:search] Got {len(results)} results")
         return results
     except Exception as e:
         safe_log(f"!!! [INTERNAL:search] Error: {e}")
-        return []
+        # Surface the actual error so the planner knows search is broken, not just empty
+        return f"__SEARCH_ERROR__: {str(e)}"
+
 
 
 def filter_sources(query, search_results, api_key):
@@ -149,14 +153,16 @@ async def web_search(query, agent_id, api_key):
     query = query.strip("'").strip('"').strip("`")
 
     results = await _ddgs_search_raw(query, agent_id)
+    if isinstance(results, str):
+        return f"Search failed: {results}"
     if not results:
-        return "No results found for the query."
-    
+        return "No results found for the query. Try a different or more specific search term."
+
     # Return raw JSON-like format so Researcher can see URLs
     formatted_results = []
     for r in results:
         formatted_results.append(f"Title: {r['title']}\nURL: {r['href']}\nSnippet: {r['body']}")
-    
+
     return "\n\n---\n\n".join(formatted_results)
 
 async def deep_search(query, agent_id, api_key):
@@ -170,9 +176,11 @@ async def deep_search(query, agent_id, api_key):
     query = query.strip("'").strip('"').strip("`")
 
     results = await _ddgs_search_raw(query, agent_id)
+    if isinstance(results, str):
+        return f"Search failed: {results}"
     if not results:
-        return "No results found for the query."
-    
+        return "No results found for the query. Try a different or more specific search term."
+
     # Still filter but return the raw data of the filtered sources
     filtered = filter_sources(query, results, api_key)
     

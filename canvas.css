@@ -862,3 +862,11 @@ body.training-panel-active #agent-canvas {
 .dropdown-item-danger:hover {
     background: rgba(255, 77, 77, 0.08);
 }
+
+.selection-box {
+    position: absolute;
+    border: 1px solid #6c5ce7;
+    background: rgba(108, 92, 231, 0.15);
+    pointer-events: none;
+    z-index: 2000;
+}
