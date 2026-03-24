@@ -14,6 +14,10 @@ from graph.tool_definitions import get_tools_for_agent
 
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "agents_code")
 
+# Per-agent raw step results — used to pass full research data (with URLs)
+# to report_generation instead of compressed summaries that lose citations
+_completed_steps_ref: dict = {}
+
 
 # ---------------------------------------------------------------------------
 # Public entry point (called from interpreter.py — graph param ignored)
@@ -100,6 +104,9 @@ async def _react_loop(state: dict):
     connected_agents = state["connected_agents"]
     is_training      = False
     system_prompt    = state.get("system_prompt", "")
+
+    # Reset raw step storage for this agent session
+    _completed_steps_ref[agent_id] = []
 
     # Load recent conversation history so planner has context
     history_context = ""
@@ -236,6 +243,7 @@ async def _react_loop(state: dict):
         summary = await _compress(goal, [step], api_key, step_num)
         summaries.append(summary)
         completed_steps.append(step)
+        _completed_steps_ref[agent_id].append(step)
 
     # Cap hit — surface what was gathered
     print(f"--- [REACT] CAP HIT at step {max_steps} — summaries={len(summaries)}", flush=True)
@@ -369,6 +377,7 @@ RULES:
 - decision="DONE" for simple replies (greetings, quick answers, conversational).
 - decision="ASK_USER" ONLY if you genuinely cannot proceed without more information.
 - decision="CONTINUE" to execute planned steps.
+- For report_generation: set tool_args to {{"topic":"exact topic name"}}. Research context is auto-injected — do NOT put placeholder text in context.
 
 For EACH step include:
 - "confidence": 0-100
@@ -438,6 +447,7 @@ RULES:
 - decision="DONE" when the goal is complete. Put the final answer in "response".
 - decision="ASK_USER" ONLY if genuinely blocked and you cannot proceed.
 - decision="CONTINUE" to execute more steps.
+- For report_generation: set tool_args to {{"topic":"exact topic name"}}. Research context is auto-injected from prior steps — do NOT put placeholder text in context.
 
 For EACH step include:
 - "confidence": 0-100
@@ -528,6 +538,22 @@ async def _run_tool(tool_name: str, tool_args: dict, state: dict, summaries: lis
         elif tool_name == "report_generation":
             topic   = tool_args.get("topic", "")
             context = tool_args.get("context", "")
+            # If the planner used a placeholder or empty context, inject
+            # real research data so the report has actual content and citations
+            placeholder_hints = ["paste", "gathered", "all results", "search results", "insert", "context here"]
+            if not context or len(context) < 50 or any(h in context.lower() for h in placeholder_hints):
+                # Build context from raw step results (full data with URLs),
+                # NOT from compressed summaries which lose citations
+                raw_parts = []
+                for s in _completed_steps_ref.get(agent_id, []):
+                    raw = str(s.get("result", ""))
+                    if raw and len(raw) > 30:
+                        raw_parts.append(raw)
+                # Fallback to summaries if no raw data available
+                if not raw_parts:
+                    raw_parts = summaries if summaries else []
+                if raw_parts:
+                    context = "RESEARCH DATA (use URLs for citations):\n\n" + "\n\n---\n\n".join(raw_parts)
             return await tk.report_generation(agent_id, f"{topic}|{context}", working_dir, api_key, agent_name)
 
         elif tool_name == "message_agent":

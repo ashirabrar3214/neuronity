@@ -27,16 +27,10 @@ load_dotenv()
 
 # -- Config -------------------------------------------------------------------
 BASE_URL = "http://localhost:8000"
-AGENT_ID = "agent-bot-1774318073729"   # MasterAgent
+AGENT_ID = "agent-bot-1774326906234"   # MasterAgent
 API_KEY  = os.getenv("GEMINI_API_KEY", "")
 
-INITIAL_PROMPT = (
-    "Make a report on the Iran war. "
-    "Scope: Cover the Iran-Iraq war (1980-1988), recent Iran-Israel tensions (2024-2025), and proxy conflicts. "
-    "Format: Detailed text report, approximately 1500 words. "
-    "Focus: Key events, casualties, geopolitical impact, and current situation. "
-    "Do NOT ask me any clarifying questions - all details are provided above. Proceed directly with research."
-)
+INITIAL_PROMPT = "make a report on iran war"
 
 # Fallback answers for clarification / search failure
 CLARIFICATION_ANSWER = (

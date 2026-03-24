@@ -1,7 +1,7 @@
 
-class agent_bot_1774318073729:
+class agent_bot_1774326906234:
     def __init__(self):
-        self.id = "agent-bot-1774318073729"
+        self.id = "agent-bot-1774326906234"
         self.name = "MasterAgent"
         self.working_dir = r"D:\New folder"
         self.permissions = ['web search', 'thinking', 'report generation', 'scheduling', 'file access']
@@ -17,5 +17,5 @@ class agent_bot_1774318073729:
             return {}
 
 if __name__ == "__main__":
-    agent = agent_bot_1774318073729()
+    agent = agent_bot_1774326906234()
     print(f"Agent {agent.name} initialized.")
