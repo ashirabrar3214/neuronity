@@ -311,6 +311,9 @@ def provision_workmap_agents(workmap, master_agent_id):
         else:
             agent_work_dir = ""
 
+        # Inherit permissions from master so spawned workers can use the same tools
+        master_perms = (master.get("permissions", []) if master else [])
+
         new_agent = {
             "id": agent_id,
             "name": display_name,
@@ -318,7 +321,7 @@ def provision_workmap_agents(workmap, master_agent_id):
             "brain": master.get("brain", "") if master else "",
             "channel": "Gmail",
             "workingDir": agent_work_dir,
-            "permissions": [],
+            "permissions": list(master_perms),
             "tools": "Custom",
             "responsibility": task_hint or f"{display_name} research and analysis",
             "agentType": "worker",
@@ -488,7 +491,6 @@ async def execute_next_node(agent_id, api_key, provider):
             "result_summary": ""
         }
         nodes = workmap.get("nodes", [])
-        # Insert before the final report node (if any), otherwise append
         report_idx = next(
             (i for i, n in enumerate(nodes) if "report" in n.get("label", "").lower()),
             len(nodes)
@@ -496,6 +498,49 @@ async def execute_next_node(agent_id, api_key, provider):
         nodes.insert(report_idx, new_node)
         workmap["nodes"] = nodes
         safe_log(f"+++ [RECURSION] Injected node {new_node['id']} at position {report_idx}")
+
+    # Forced verification for researcher agents: if a research step completed
+    # and the next step is a report, inject a cross-check step to slow down
+    # and ensure the agent doesn't skip verification
+    from interpreter import load_data
+    agent_data_list = load_data()
+    current_agent = next((a for a in agent_data_list if a["id"] == agent_id), None)
+    is_researcher = current_agent and current_agent.get("specialRole") == "deep-web-researcher"
+
+    if is_researcher and "RE-EVALUATE" not in result_str:
+        nodes = workmap.get("nodes", [])
+        completed_research = sum(
+            1 for n in nodes
+            if n["status"] == "COMPLETED" and "report" not in n.get("label", "").lower()
+        )
+        pending_nodes = [n for n in nodes if n["status"] == "PENDING"]
+        next_is_report = (
+            pending_nodes and "report" in pending_nodes[0].get("label", "").lower()
+        )
+
+        # If we've done research steps and the very next step is the report,
+        # inject a mandatory cross-check step
+        if next_is_report and completed_research >= 1:
+            verify_node = {
+                "id": f"crosscheck_{int(time.time())}",
+                "label": "Cross-Reference Verification",
+                "agent": agent_id,
+                "task": (
+                    "Review all findings gathered so far. Identify the 3 most critical claims. "
+                    "For each claim, use scrape_website on a DIFFERENT source to verify it. "
+                    "Flag any discrepancies or unverified claims."
+                ),
+                "dependencies": [next_node["id"]],
+                "status": "PENDING",
+                "result_summary": ""
+            }
+            report_idx = next(
+                (i for i, n in enumerate(nodes) if n["id"] == pending_nodes[0]["id"]),
+                len(nodes)
+            )
+            nodes.insert(report_idx, verify_node)
+            workmap["nodes"] = nodes
+            safe_log(f"+++ [RESEARCHER] Injected cross-check before report at position {report_idx}")
 
     all_done = all(n["status"] in ("COMPLETED", "ERROR") for n in workmap.get("nodes", []))
     if all_done:

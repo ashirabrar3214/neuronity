@@ -1,9 +1,9 @@
 [
   {
-    "id": "agent-bot-1774378972069",
+    "id": "agent-bot-1774392266237",
     "name": "Deep Web Researcher",
-    "description": "Iterative researcher that scrapes full articles and resolves contradictions using an investigative detective model",
-    "brain": "",
+    "description": "Elite investigator that scrapes full articles and resolves contradictions using recursive verification",
+    "brain": "gemini-3.1-pro-preview",
     "channel": "Gmail",
     "workingDir": "D:\\New folder",
     "permissions": [
@@ -14,8 +14,8 @@
     "responsibility": "Perform deep, multi-source investigative research and verify facts.",
     "agentType": "master",
     "specialRole": "deep-web-researcher",
-    "x": 230.0,
-    "y": 223.0,
+    "x": 249.0,
+    "y": 266.0,
     "connections": []
   }
 ]

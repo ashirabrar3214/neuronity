@@ -490,7 +490,10 @@ async def _run_tool(tool_name: str, tool_args: dict, state: dict, summaries: lis
 
     print(f">>> [TOOL] {tool_name} agent={agent_id} args={str(tool_args)[:80]}", flush=True)
     try:
-        if tool_name == "web_search":
+        if tool_name == "find_sources":
+            return await tk.find_sources(tool_args.get("query", ""), agent_id, api_key)
+
+        elif tool_name == "web_search":
             return await tk.web_search(tool_args.get("query", ""), agent_id, api_key)
 
         elif tool_name == "deep_search":

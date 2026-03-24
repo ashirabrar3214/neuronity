@@ -616,7 +616,7 @@ class AgentCanvas {
             name: template && template.id !== 'custom' ? template.name : '',
             description: template && template.id !== 'custom' ? template.description : 'Agent description...',
             x: cx, y: cy,
-            brain: '', channel: 'Gmail', role: 'Assistant',
+            brain: (template && template.brain) || '', channel: 'Gmail', role: 'Assistant',
             workingDir: '',
             permissions: template ? [...template.permissions] : [],
             specialRole: template ? template.id : 'custom'

@@ -170,6 +170,29 @@ INSTRUCTIONS:
         safe_log(f"!!! [FACT_EXTRACT] Exception: {e}")
         return f"Fact extraction failed: {e}. Raw excerpt:\n{raw_context[:3000]}"
 
+async def find_sources(query, agent_id, api_key):
+    """
+    Search-for-URLs-only tool. Returns titles and URLs without snippet content.
+    Forces the agent to use scrape_website to get actual information.
+    """
+    query = query.strip()
+    if "=" in query and (query.lower().startswith("query=") or query.lower().startswith("search=")):
+        query = query.split("=", 1)[-1].strip()
+    query = query.strip("'").strip('"').strip("`")
+
+    results = await _ddgs_search_raw(query, agent_id)
+    if isinstance(results, str):
+        return f"Search failed: {results}"
+    if not results:
+        return "No sources found. Try different search terms."
+
+    formatted = []
+    for i, r in enumerate(results, 1):
+        formatted.append(f"{i}. {r['title']}\n   URL: {r['href']}")
+
+    return "SOURCES FOUND (use scrape_website to read each one):\n\n" + "\n\n".join(formatted)
+
+
 async def web_search(query, agent_id, api_key):
     """
     The new QUICK SEARCH tool. Just the facts.
@@ -773,8 +796,9 @@ async def ask_user(agent_id, tool_input):
 
 _SCRAPE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Referer": "https://www.google.com/",
 }
 
 async def scrape_website(url, objective, agent_id, api_key):

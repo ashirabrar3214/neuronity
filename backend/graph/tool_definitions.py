@@ -26,6 +26,19 @@ def _get(state: dict, key: str, default=""):
 # ---------------------------------------------------------------------------
 
 @tool
+async def find_sources(
+    query: str,
+    state: Annotated[dict, InjectedState],
+) -> str:
+    """Search the web and return a list of source URLs. Does NOT return page content — you MUST use scrape_website on each URL to read the actual article."""
+    import toolkit
+    agent_id = _get(state, "agent_id")
+    api_key = _get(state, "api_key")
+    print(f">>> [TOOL_DEF:find_sources] agent={agent_id} query={query[:60]!r}", flush=True)
+    return await toolkit.find_sources(query, agent_id, api_key=api_key)
+
+
+@tool
 async def web_search(
     query: str,
     state: Annotated[dict, InjectedState],
@@ -460,10 +473,12 @@ def get_tools_for_agent(permissions: list, has_connections: bool,
     """Build the tool list based on agent permissions."""
     tools = []
 
-    # Web search is always available
-    tools.extend([web_search, deep_search])
+    # Researcher agents get find_sources (URL-only) instead of web_search/deep_search
+    # This forces them to scrape pages for actual content
     if "scrape website" in permissions:
-        tools.extend([scrape_website, reflect_and_plan])
+        tools.extend([find_sources, scrape_website, reflect_and_plan])
+    else:
+        tools.extend([web_search, deep_search])
     if "report generation" in permissions:
         tools.extend([report_generation, generate_report])
     if has_working_dir:

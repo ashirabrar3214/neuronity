@@ -21,9 +21,10 @@ const AGENT_GALLERY = [
         id: 'deep-web-researcher',
         name: 'Deep Web Researcher',
         icon: '🔍',
-        description: 'Iterative researcher that scrapes full articles and resolves contradictions using an investigative detective model',
+        description: 'Elite investigator that scrapes full articles and resolves contradictions using recursive verification',
         permissions: ['scrape website', 'report generation'],
         responsibility: 'Perform deep, multi-source investigative research and verify facts.',
+        brain: 'gemini-3.1-pro-preview',
     },
 ];
 

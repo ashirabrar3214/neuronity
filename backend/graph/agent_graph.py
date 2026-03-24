@@ -425,7 +425,12 @@ async def execute(state: AgentState) -> dict:
                 continue
 
             try:
-                if tool_name == "web_search":
+                if tool_name == "find_sources":
+                    step["result"] = await tk.find_sources(
+                        tool_args.get("query", ""), agent_id, api_key
+                    )
+
+                elif tool_name == "web_search":
                     step["result"] = await tk.web_search(
                         tool_args.get("query", ""), agent_id, api_key
                     )
