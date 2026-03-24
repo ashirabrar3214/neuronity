@@ -57,12 +57,13 @@ async def _ddgs_search_raw(query, agent_id):
         from ddgs import DDGS
         def do_search():
             results = []
-            search_results = DDGS().text(query, max_results=15)
+            search_results = DDGS().text(query, max_results=7)
             for result in search_results:
+                body = result.get("body", "")
                 results.append({
                     "title": result.get("title", ""),
                     "href": result.get("href", ""),
-                    "body": result.get("body", "")
+                    "body": body[:250]
                 })
             return results
 

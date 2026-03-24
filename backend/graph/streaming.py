@@ -116,7 +116,7 @@ async def _react_loop(state: dict):
             with open(history_path, "r", encoding="utf-8") as f:
                 history = json.load(f)
             parts = []
-            for entry in history[-8:]:
+            for entry in history[-4:]:
                 role = "User" if entry.get("role") == "user" else "Assistant"
                 parts.append(f"{role}: {entry.get('content', '')[:300]}")
             history_context = "\n".join(parts)
@@ -360,8 +360,8 @@ async def _stream_planner(
 
 
 def _initial_prompt(goal: str, tool_names: list, system_prompt: str = "", history_context: str = "", steps_done: int = 0) -> str:
-    agent_ctx = f"AGENT CONTEXT (follow these instructions closely):\n{system_prompt}\n\n" if system_prompt else ""
-    history_block = f"RECENT CONVERSATION:\n{history_context}\n\n" if history_context else ""
+    agent_ctx = f"AGENT CONTEXT (follow these instructions closely):\n{system_prompt[:800]}\n\n" if system_prompt else ""
+    history_block = f"RECENT CONVERSATION:\n{history_context[:600]}\n\n" if history_context else ""
 
     return f"""{agent_ctx}{history_block}You are a planning module for an AI agent.
 CURRENT EXECUTION STEP: {steps_done + 1}
@@ -394,7 +394,7 @@ def _refeed_prompt(
     system_prompt: str = "", force_knowledge: bool = False, history_context: str = "",
     steps_done: int = 0,
 ) -> str:
-    agent_ctx = f"AGENT CONTEXT: {system_prompt[:500]}\n\n" if system_prompt else ""
+    agent_ctx = f"AGENT CONTEXT: {system_prompt[:800]}\n\n" if system_prompt else ""
     history_block = f"RECENT CONVERSATION:\n{history_context}\n\n" if history_context else ""
     summaries_str = "\n".join(summaries[-3:]) if summaries else "None yet."
     steps_str = "\n".join([
@@ -548,12 +548,17 @@ async def _run_tool(tool_name: str, tool_args: dict, state: dict, summaries: lis
                 for s in _completed_steps_ref.get(agent_id, []):
                     raw = str(s.get("result", ""))
                     if raw and len(raw) > 30:
-                        raw_parts.append(raw)
+                        # Cap each step's result to ~1500 chars to control token usage
+                        raw_parts.append(raw[:1500])
                 # Fallback to summaries if no raw data available
                 if not raw_parts:
                     raw_parts = summaries if summaries else []
                 if raw_parts:
-                    context = "RESEARCH DATA (use URLs for citations):\n\n" + "\n\n---\n\n".join(raw_parts)
+                    # Cap total context to ~6000 chars (~1500 tokens)
+                    joined = "\n\n---\n\n".join(raw_parts)
+                    if len(joined) > 6000:
+                        joined = joined[:6000]
+                    context = "RESEARCH DATA (use URLs for citations):\n\n" + joined
             return await tk.report_generation(agent_id, f"{topic}|{context}", working_dir, api_key, agent_name)
 
         elif tool_name == "message_agent":

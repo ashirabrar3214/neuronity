@@ -1,7 +1,7 @@
 [
   {
-    "id": "agent-bot-1774326906234",
-    "name": "MasterAgent",
+    "id": "agent-bot-1774331253280",
+    "name": "Master",
     "description": "Agent description...",
     "brain": "",
     "channel": "Gmail",
@@ -16,8 +16,8 @@
     "tools": "Custom",
     "responsibility": "",
     "agentType": "master",
-    "x": 528.0,
-    "y": 162.0,
+    "x": 621.0,
+    "y": 172.0,
     "connections": []
   }
 ]

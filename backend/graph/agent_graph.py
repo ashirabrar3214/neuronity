@@ -302,10 +302,47 @@ async def plan(state: AgentState) -> dict:
     )
 
     try:
-        llm = get_llm("planner", state["api_key"])
-        result = await llm.ainvoke([HumanMessage(content=prompt)])
-        text = result.content.strip()
+        # --- THE BEST SOLUTION: CONCURRENT STATUS STREAMING ---
+        async def generate_plan_with_loading():
+            agent_id = state["agent_id"]
 
+            # Task 1: The "Claude-like" changing loading messages
+            async def loading_sequence():
+                messages = [
+                    "Thinking...",
+                    "Hold on...",
+                    "Lemme think...",
+                    "Interesting...",
+                    "Almost there...",
+                    "Cooking...",
+                    "Rizzing...",
+                    "This is a good one...",
+                ]
+                try:
+                    for msg in messages:
+                        print(f"[STATUS:{agent_id}] {msg}", flush=True)
+                        await asyncio.sleep(2.5)
+                except asyncio.CancelledError:
+                    pass
+
+            # Task 2: The actual heavy LLM call
+            llm = get_llm("planner", state["api_key"])
+
+            # Run both concurrently
+            loading_task = asyncio.create_task(loading_sequence())
+            result = await llm.ainvoke([HumanMessage(content=prompt)])
+
+            # Kill the loading sequence the exact millisecond the LLM finishes
+            loading_task.cancel()
+            print(f"[STATUS:{agent_id}] Strategy finalized.", flush=True)
+
+            return result.content.strip()
+
+        # Execute the concurrent wrapper
+        text = await generate_plan_with_loading()
+        # ------------------------------------------------------
+
+        # Continue with existing parsing logic...
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
