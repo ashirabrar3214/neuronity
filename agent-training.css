@@ -322,38 +322,6 @@ input:checked+.slider:before {
     color: var(--text-primary);
 }
 
-/* ── CAPABILITIES ───────────────────────────────────────────────────── */
-.capabilities-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-top: 4px;
-}
-
-.cap-btn {
-    font-size: 11px;
-    background: #262626;
-    color: var(--text-secondary);
-    padding: 8px 12px;
-    border-radius: 20px;
-    border: 1px solid var(--border-subtle);
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    font-weight: 500;
-    text-align: center;
-}
-
-.cap-btn:hover {
-    border-color: var(--accent-color);
-    color: var(--text-primary);
-}
-
-.cap-btn.active {
-    background: rgba(108, 92, 231, 0.15);
-    color: var(--accent-color);
-    border-color: rgba(108, 92, 231, 0.4);
-    box-shadow: 0 2px 8px rgba(108, 92, 231, 0.1);
-}
 
 .chat-main,
 .chat-main-column {

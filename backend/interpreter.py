@@ -169,6 +169,7 @@ class AgentModel(BaseModel):
     tools: str = "Custom"
     responsibility: str = ""
     agentType: str = "worker"
+    specialRole: str = "custom"
     x: float = 0
     y: float = 0
     connections: List[str] = []
@@ -312,9 +313,18 @@ if __name__ == "__main__":
     with open(personality_path, "w", encoding="utf-8") as f:
         json.dump(personality_data, f, indent=2)
 
-    # 3. prompt.md
+    # 3. prompt.md — use template if available, otherwise generic
     prompt_path = os.path.join(agent_dir, "prompt.md")
-    prompt_content = f"""# Agent Instructions: {agent_data['name']}
+    special_role = agent_data.get('specialRole', 'custom')
+    template_prompt_path = os.path.join(
+        os.path.dirname(__file__), "agent_templates", special_role, "prompt.md"
+    )
+
+    if special_role != 'custom' and os.path.exists(template_prompt_path):
+        with open(template_prompt_path, "r", encoding="utf-8") as f:
+            prompt_content = f.read()
+    else:
+        prompt_content = f"""# Agent Instructions: {agent_data['name']}
 Identity: You are an agent sitting in a desktop PC working for the User.
 Description: {agent_data['description']}
 Responsibility: {agent_data.get('responsibility', 'General purpose assistance')}
@@ -408,7 +418,7 @@ def get_agents():
             "brain": "Gemini",
             "tools": "Gmail",
             "responsibility": "Coordinate all agents",
-            "permissions": ["web search", "thinking"]
+            "permissions": []
         }
         agents.append(master)
         save_data(agents)

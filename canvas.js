@@ -22,6 +22,7 @@ class AgentCanvas {
         this.selectedNodes = new Set();
 
         this.initContextMenu();
+        this.initGalleryButton();
         this.initEventListeners();
         this.loadAgents();
 
@@ -551,6 +552,86 @@ class AgentCanvas {
         }, 100);
 
         // Save to Python Backend
+        fetch('http://localhost:8000/agents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newAgent)
+        }).catch(err => console.error("Error creating agent:", err));
+    }
+
+    initGalleryButton() {
+        const addBtn = document.getElementById('add-agent-btn');
+        const overlay = document.getElementById('gallery-overlay');
+        const closeBtn = document.getElementById('gallery-modal-close');
+        const grid = document.getElementById('gallery-modal-grid');
+        if (!addBtn || !overlay || !grid) return;
+
+        // Render gallery cards from AGENT_GALLERY (defined in agent-training.js)
+        const renderGalleryCards = () => {
+            const templates = (typeof AGENT_GALLERY !== 'undefined') ? AGENT_GALLERY : [];
+            grid.innerHTML = templates.map(tpl => `
+                <div class="gallery-modal-card" data-template="${tpl.id}">
+                    <span class="gallery-modal-icon">${tpl.icon}</span>
+                    <div class="gallery-modal-info">
+                        <span class="gallery-modal-name">${tpl.name}</span>
+                        <span class="gallery-modal-desc">${tpl.description}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            grid.querySelectorAll('.gallery-modal-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const templateId = card.dataset.template;
+                    const tpl = templates.find(t => t.id === templateId);
+                    overlay.classList.remove('open');
+                    this.addAgentFromTemplate(tpl);
+                });
+            });
+        };
+
+        addBtn.addEventListener('click', () => {
+            renderGalleryCards();
+            overlay.classList.add('open');
+        });
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => overlay.classList.remove('open'));
+        }
+
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.classList.remove('open');
+        });
+    }
+
+    addAgentFromTemplate(template) {
+        this.nodeIdCounter++;
+        const id = `agent-bot-${Date.now()}`;
+
+        // Place at center of viewport
+        const cx = (window.innerWidth / 2) - this.pan.x;
+        const cy = (window.innerHeight / 2) - this.pan.y;
+
+        const newAgent = {
+            id,
+            name: template && template.id !== 'custom' ? template.name : '',
+            description: template && template.id !== 'custom' ? template.description : 'Agent description...',
+            x: cx, y: cy,
+            brain: '', channel: 'Gmail', role: 'Assistant',
+            workingDir: '',
+            permissions: template ? [...template.permissions] : [],
+            specialRole: template ? template.id : 'custom'
+        };
+
+        if (template && template.responsibility) {
+            newAgent.responsibility = template.responsibility;
+        }
+
+        const nodeEl = this.createNode(id, newAgent.name, newAgent.description, cx, cy, newAgent);
+
+        // Focus name field if custom, otherwise just select it
+        const titleEl = nodeEl.querySelector('.node-title');
+        setTimeout(() => titleEl.focus(), 100);
+
         fetch('http://localhost:8000/agents', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

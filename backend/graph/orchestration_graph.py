@@ -318,7 +318,7 @@ def provision_workmap_agents(workmap, master_agent_id):
             "brain": master.get("brain", "") if master else "",
             "channel": "Gmail",
             "workingDir": agent_work_dir,
-            "permissions": ["web search", "file access"],
+            "permissions": [],
             "tools": "Custom",
             "responsibility": task_hint or f"{display_name} research and analysis",
             "agentType": "worker",

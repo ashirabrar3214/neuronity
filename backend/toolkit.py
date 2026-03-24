@@ -271,8 +271,6 @@ STRICT RULES:
     return f"{gemini_text.strip()}\n\n{sources_section}"
 
 
-# Thinking tool removed - Gemini 3 native thinkingConfig is used instead.
-
 
 # ─────────────────────────────────────────────────
 # REPORT GENERATION CAPABILITY

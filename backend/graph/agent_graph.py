@@ -54,8 +54,9 @@ async def build_context(state: AgentState) -> dict:
     connected_agents = state["connected_agents"]
     is_master = state["agent_type"] == "master"
     is_training = state["mode"] == "training"
+    has_working_dir = bool(state.get("working_dir", ""))
 
-    tools = get_tools_for_agent(permissions, len(connected_agents) > 0, is_training, is_master)
+    tools = get_tools_for_agent(permissions, len(connected_agents) > 0, is_training, is_master, has_working_dir)
     tool_manifest = "\n".join([f"- {t.name}: {t.description}" for t in tools])
     print(f"+++ [BUILD_CTX] agent={state['agent_id']} tools={len(tools)} connected={len(connected_agents)} prompt_will_be_len~{len(tool_manifest)+200}", flush=True)
 
@@ -291,8 +292,9 @@ async def plan(state: AgentState) -> dict:
     connected_agents = state["connected_agents"]
     is_master = state["agent_type"] == "master"
     is_training = state["mode"] == "training"
+    has_working_dir = bool(state.get("working_dir", ""))
 
-    tools = get_tools_for_agent(permissions, len(connected_agents) > 0, is_training, is_master)
+    tools = get_tools_for_agent(permissions, len(connected_agents) > 0, is_training, is_master, has_working_dir)
     tool_names = [t.name for t in tools]
 
     prompt = (
@@ -401,7 +403,8 @@ async def execute(state: AgentState) -> dict:
     permissions = state["permissions"]
     is_master = state["agent_type"] == "master"
     is_training = state["mode"] == "training"
-    tools_list = get_tools_for_agent(permissions, len(connected_agents) > 0, is_training, is_master)
+    has_working_dir = bool(working_dir)
+    tools_list = get_tools_for_agent(permissions, len(connected_agents) > 0, is_training, is_master, has_working_dir)
     allowed_tool_names = {t.name for t in tools_list}
 
     executor_llm = get_llm("fast", api_key, streaming=False)

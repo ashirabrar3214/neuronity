@@ -1,6 +1,0 @@
-{
-  "name": "graph_maker",
-  "description": "This tool takes a CSV file and generates a graph based on the data. It uses the 'x' column as the x-axis and the 'y' column as the y-axis. The tool saves the graph as graph.png.",
-  "creator": "agent-NewAgent-1773348304125",
-  "created_at": 1773364858.1356385
-}

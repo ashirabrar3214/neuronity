@@ -425,18 +425,16 @@ TERMINAL_TOOLS = {"report_generation", "ask_user", "create_project_workmap", "up
 
 
 def get_tools_for_agent(permissions: list, has_connections: bool,
-                        is_training: bool = False, is_master: bool = False) -> list:
-    """Build the tool list based on agent permissions.
-
-    Replaces get_gemini_tools_from_permissions() entirely.
-    """
+                        is_training: bool = False, is_master: bool = False,
+                        has_working_dir: bool = False) -> list:
+    """Build the tool list based on agent permissions."""
     tools = []
 
-    if "web search" in permissions:
-        tools.extend([web_search, deep_search])
+    # Web search is always available
+    tools.extend([web_search, deep_search])
     if "report generation" in permissions:
         tools.extend([report_generation, generate_report])
-    if "file access" in permissions:
+    if has_working_dir:
         tools.extend([list_workspace, scout_file, read_file, write_file])
     if has_connections:
         tools.append(message_agent)

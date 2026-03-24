@@ -7,6 +7,26 @@ let saveTimeout = null;
 let autoSaveStatus = null;
 let connectedToolsSet = new Set(); // Tracks connected MCP tool IDs for the active agent
 
+// ─── AGENT GALLERY TEMPLATES ───────────────────────────────────────────────
+const AGENT_GALLERY = [
+    {
+        id: 'custom',
+        name: 'Custom Agent',
+        icon: '⚙️',
+        description: 'A blank agent you configure yourself',
+        permissions: [],
+        responsibility: '',
+    },
+    {
+        id: 'deep-web-researcher',
+        name: 'Deep Web Researcher',
+        icon: '🔍',
+        description: 'Expert at finding hard-to-reach information across the web with deep search and report generation',
+        permissions: ['report generation'],
+        responsibility: 'Deep web research and comprehensive analysis',
+    },
+];
+
 // ─── MCP TOOLS REGISTRY ────────────────────────────────────────────────────
 const MCP_TOOLS_REGISTRY = [
     // Search & Research
@@ -361,17 +381,6 @@ window.openTrainingPanel = async (agentId, agentName) => {
         planBtn.style.display = (agentData.agentType === 'master') ? 'block' : 'none';
     }
 
-    // Sync capability buttons
-    const capBtns = document.querySelectorAll('.cap-btn');
-    const agentPerms = agentData.permissions || [];
-    capBtns.forEach(btn => {
-        const cap = btn.getAttribute('data-cap');
-        if (agentPerms.includes(cap)) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
 
     // Clear old chat area except for the first greeting
     const chatArea = document.getElementById('chat-area');
@@ -512,10 +521,6 @@ async function triggerSave() {
         autoSaveStatus.style.opacity = '1';
     }
 
-    // Collect active permissions/capabilities
-    const permissions = Array.from(document.querySelectorAll('.cap-btn.active'))
-        .map(btn => btn.getAttribute('data-cap'));
-
     const updatedData = {
         ...activeAgentData,
         id: activeAgentId, // CRITICAL: Enforce ID match to prevent accidental renames/duplications
@@ -526,7 +531,8 @@ async function triggerSave() {
         workingDir: document.getElementById('detail-workdir').value,
         connectedTools: Array.from(connectedToolsSet),
         agentType: document.getElementById('detail-agent-type')?.value || activeAgentData.agentType || 'worker',
-        permissions: permissions
+        permissions: activeAgentData.permissions || [],
+        specialRole: activeAgentData.specialRole || 'custom'
     };
 
     try {
@@ -630,15 +636,6 @@ function initTrainingUI() {
             }
         });
     }
-
-    // Capability button toggles
-    const capBtns = document.querySelectorAll('.cap-btn');
-    capBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            btn.classList.toggle('active');
-            queueAutoSave();
-        });
-    });
 
     // ── MCP Tools Modal Wiring ──────────────────────────────────────────────
     const manageToolsBtn = document.getElementById('manage-tools-btn');

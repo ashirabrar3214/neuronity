@@ -1,6 +1,0 @@
-{
-  "name": "csv_to_json_head",
-  "description": "Converts a CSV file to JSON format and prints the first 10 rows",
-  "creator": "agent-NewAgent-1773372348992",
-  "created_at": 1773377043.468105
-}
