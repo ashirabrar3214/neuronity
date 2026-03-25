@@ -362,6 +362,18 @@ window.openTrainingPanel = async (agentId, agentName) => {
     document.getElementById('detail-responsibility').value = agentData.responsibility || '';
     document.getElementById('detail-channel').value = agentData.channel || 'Gmail';
     document.getElementById('detail-workdir').value = agentData.workingDir || '';
+    const effortSlider = document.getElementById('detail-user-effort');
+    if (effortSlider) {
+        effortSlider.value = agentData.userEffort || 1;
+        const effortDisplay = document.getElementById('effort-value-display');
+        if (effortDisplay) effortDisplay.textContent = effortSlider.value;
+    }
+    // Project Size toggle
+    const savedSize = agentData.projectSize || 'small';
+    document.getElementById('detail-project-size').value = savedSize;
+    document.querySelectorAll('.size-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.size === savedSize);
+    });
     // Load connected MCP tools
     if (agentData.connectedTools && Array.isArray(agentData.connectedTools)) {
         connectedToolsSet = new Set(agentData.connectedTools);
@@ -530,6 +542,8 @@ async function triggerSave() {
         responsibility: document.getElementById('detail-responsibility').value,
         channel: document.getElementById('detail-channel').value,
         workingDir: document.getElementById('detail-workdir').value,
+        userEffort: parseInt(document.getElementById('detail-user-effort')?.value || '1', 10),
+        projectSize: document.getElementById('detail-project-size')?.value || 'small',
         connectedTools: Array.from(connectedToolsSet),
         agentType: document.getElementById('detail-agent-type')?.value || activeAgentData.agentType || 'worker',
         permissions: activeAgentData.permissions || [],
@@ -696,7 +710,7 @@ function initTrainingUI() {
     // Attach listeners to all inputs/selects for auto-save
     const autoSaveInputs = [
         'detail-name', 'detail-description', 'detail-responsibility',
-        'detail-channel', 'detail-workdir'
+        'detail-channel', 'detail-workdir', 'detail-user-effort'
     ];
 
     autoSaveInputs.forEach(id => {
@@ -705,6 +719,25 @@ function initTrainingUI() {
             el.addEventListener('input', queueAutoSave);
             el.addEventListener('change', queueAutoSave);
         }
+    });
+
+    // Human Effort slider — live value display
+    const effortSliderEl = document.getElementById('detail-user-effort');
+    if (effortSliderEl) {
+        effortSliderEl.addEventListener('input', () => {
+            const display = document.getElementById('effort-value-display');
+            if (display) display.textContent = effortSliderEl.value;
+        });
+    }
+
+    // Project Size toggle buttons
+    document.querySelectorAll('.size-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('detail-project-size').value = btn.dataset.size;
+            queueAutoSave();
+        });
     });
 
     // Clear Chat button

@@ -1,0 +1,19 @@
+{
+  "session_id": "hitl_1774482901",
+  "goal": "hello",
+  "current_phase": "DONE",
+  "understanding": {},
+  "phase_history": [
+    {
+      "phase": "DONE",
+      "timestamp": "2026-03-25T18:55:07Z",
+      "summary": "Trivial: trivial"
+    }
+  ],
+  "user_steers": [],
+  "options_presented": [],
+  "outputs_written": [],
+  "gaps": [],
+  "gather_cycles_completed": 0,
+  "max_gather_cycles": 10
+}

@@ -26,19 +26,6 @@ def _get(state: dict, key: str, default=""):
 # ---------------------------------------------------------------------------
 
 @tool
-async def find_sources(
-    query: str,
-    state: Annotated[dict, InjectedState],
-) -> str:
-    """Search the web and return a list of source URLs. Does NOT return page content — you MUST use scrape_website on each URL to read the actual article."""
-    import toolkit
-    agent_id = _get(state, "agent_id")
-    api_key = _get(state, "api_key")
-    print(f">>> [TOOL_DEF:find_sources] agent={agent_id} query={query[:60]!r}", flush=True)
-    return await toolkit.find_sources(query, agent_id, api_key=api_key)
-
-
-@tool
 async def web_search(
     query: str,
     state: Annotated[dict, InjectedState],
@@ -51,17 +38,20 @@ async def web_search(
     return await toolkit.web_search(query, agent_id, api_key=api_key)
 
 
+# ---------------------------------------------------------------------------
+# DEEP WEB RESEARCH TOOLS
+# ---------------------------------------------------------------------------
+
 @tool
-async def deep_search(
-    query: str,
+async def scrape_website(
+    url: str,
     state: Annotated[dict, InjectedState],
 ) -> str:
-    """Perform an in-depth research exploration with multiple filtered sources. Use for comprehensive research."""
+    """Scrape a URL and extract its text content. Use this to read full articles, reports, or pages found via web_search."""
     import toolkit
     agent_id = _get(state, "agent_id")
-    api_key = _get(state, "api_key")
-    print(f">>> [TOOL_DEF:deep_search] agent={agent_id} query={query[:60]!r}", flush=True)
-    return await toolkit.deep_search(query, agent_id, api_key=api_key)
+    print(f">>> [TOOL_DEF:scrape_website] agent={agent_id} url={url[:60]!r}", flush=True)
+    return await toolkit.scrape_website(url, agent_id)
 
 
 # ---------------------------------------------------------------------------
@@ -98,36 +88,6 @@ async def generate_report(
     tool_input = f"{title}|{content}"
     print(f">>> [TOOL_DEF:generate_report] agent={agent_id} title={title[:60]!r}", flush=True)
     return await toolkit.generate_report(agent_id, tool_input, working_dir)
-
-
-# ---------------------------------------------------------------------------
-# SCRAPE & REFLECT TOOLS
-# ---------------------------------------------------------------------------
-
-@tool
-async def scrape_website(
-    url: str,
-    objective: str,
-    state: Annotated[dict, InjectedState],
-) -> str:
-    """Fetch and extract the full content of a webpage. Use this to read articles, docs, or any URL found during research. Provide the objective so irrelevant content can be filtered out."""
-    import toolkit
-    agent_id = _get(state, "agent_id")
-    api_key = _get(state, "api_key")
-    print(f">>> [TOOL_DEF:scrape_website] agent={agent_id} url={url[:60]!r}", flush=True)
-    return await toolkit.scrape_website(url, objective, agent_id, api_key)
-
-
-@tool
-async def reflect_and_plan(
-    current_findings: str,
-    state: Annotated[dict, InjectedState],
-) -> str:
-    """Pause and evaluate your research progress. Use when you notice gaps, contradictions, or need to re-plan your investigation strategy. Summarize what you have found so far."""
-    import toolkit
-    agent_id = _get(state, "agent_id")
-    print(f">>> [TOOL_DEF:reflect_and_plan] agent={agent_id} findings_len={len(current_findings)}", flush=True)
-    return await toolkit.reflect_and_plan(agent_id, current_findings)
 
 
 # ---------------------------------------------------------------------------
@@ -473,12 +433,8 @@ def get_tools_for_agent(permissions: list, has_connections: bool,
     """Build the tool list based on agent permissions."""
     tools = []
 
-    # Researcher agents get find_sources (URL-only) instead of web_search/deep_search
-    # This forces them to scrape pages for actual content
-    if "scrape website" in permissions:
-        tools.extend([find_sources, scrape_website, reflect_and_plan])
-    else:
-        tools.extend([web_search, deep_search])
+    tools.append(web_search)
+    tools.append(scrape_website)
     if "report generation" in permissions:
         tools.extend([report_generation, generate_report])
     if has_working_dir:

@@ -5,7 +5,6 @@ import json
 import httpx
 import asyncio
 import re
-from bs4 import BeautifulSoup
 from pdf_generator import ReportPDFGenerator
 
 # -- LLM Models (Abstracting for easy upgrades) --
@@ -78,124 +77,6 @@ async def _ddgs_search_raw(query, agent_id):
 
 
 
-def filter_sources(query, search_results, api_key):
-    """
-    Asks Gemini to pick only the most relevant sources from the full result set.
-    Returns a filtered list[dict] (subset of search_results).
-    """
-    # Logic for source filtering
-    
-    if not search_results or not api_key:
-        return search_results
-        
-    # Safety: If search_results is a string (e.g. from a failed or already synthesized step), return it.
-    if isinstance(search_results, str):
-        return search_results
-    
-    # Build a numbered index for Gemini to reference
-    index_lines = []
-    for i, r in enumerate(search_results):
-        index_lines.append(f"{i}: [{r['title']}] — {r['body'][:200]}")
-    index_text = "\n".join(index_lines)
-    
-    filter_prompt = f"""You are a research librarian. Given the query and a list of search results, select only the most relevant and authoritative sources.
-
-QUERY: {query}
-
-SEARCH RESULTS:
-{index_text}
-
-Respond with ONLY a JSON array of the index numbers to keep. Example: [0, 2, 5, 8]
-Select between 3 and 8 sources. Prioritize: relevance, authority (Wikipedia, major news, official sites), and recency.
-"""
-    
-    return search_results
-
-
-
-async def synthesize_fact_with_gemini(query, search_results, api_key):
-    """
-    Specialized synthesis for quick facts, targeted data, or small snippets.
-    Accepts either a list of search result dicts OR a raw text string.
-    Uses Gemini-Flash to extract relevant facts.
-    """
-    safe_log(f"[STATUS] Extracting specific facts with semantic attribution")
-
-    # Handle both raw text (from scrape_website) and search result dicts
-    if isinstance(search_results, str):
-        raw_context = search_results
-    else:
-        raw_context = "\n\n".join([
-            f"Source: {r['title']}\nURL: {r['href']}\nContent: {r['body']}"
-            for r in search_results
-        ])
-
-    fact_prompt = f"""You are an intelligence analyst extracting high-resolution facts from source material.
-
-RESEARCH OBJECTIVE: {query}
-
-SOURCE MATERIAL:
-{raw_context[:25000]}
-
-INSTRUCTIONS:
-- Extract every specific, surgical fact relevant to the objective: exact numbers, names, dates, locations, quotes, statistics.
-- Do NOT summarize generically. Pull the precise data points a researcher would need.
-- Organize facts as a bulleted list grouped by sub-topic.
-- If there are conflicting claims, note both with their sources.
-- Omit filler, opinions, and boilerplate content.
-"""
-
-    model = FAST_MODEL
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    headers = {"Content-Type": "application/json"}
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": fact_prompt}]}],
-    }
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=payload, timeout=60)
-            if response.status_code == 200:
-                res_json = response.json()
-                candidates = res_json.get("candidates", [])
-                if candidates and len(candidates) > 0:
-                    parts = candidates[0].get("content", {}).get("parts", [])
-                    if parts and len(parts) > 0:
-                        return parts[0].get("text", "Fact extraction failed: empty response.")
-                return "Fact extraction failed: no candidates."
-            else:
-                safe_log(f"!!! [FACT_EXTRACT] Gemini error {response.status_code}: {response.text[:200]}")
-                return f"Fact extraction failed (HTTP {response.status_code}). Raw excerpt:\n{raw_context[:3000]}"
-    except Exception as e:
-        safe_log(f"!!! [FACT_EXTRACT] Exception: {e}")
-        return f"Fact extraction failed: {e}. Raw excerpt:\n{raw_context[:3000]}"
-
-async def find_sources(query, agent_id, api_key):
-    """
-    Search-for-URLs-only tool. Returns titles and URLs without snippet content.
-    Forces the agent to use scrape_website to get actual information.
-    """
-    query = query.strip()
-    if "=" in query and (query.lower().startswith("query=") or query.lower().startswith("search=")):
-        query = query.split("=", 1)[-1].strip()
-    query = query.strip("'").strip('"').strip("`")
-
-    results = await _ddgs_search_raw(query, agent_id)
-    if isinstance(results, str):
-        return f"Search failed: {results}"
-    if not results:
-        return "No sources found. Try different search terms."
-
-    # Include all results including Wikipedia
-    filtered = results
-
-    formatted = []
-    for i, r in enumerate(filtered, 1):
-        formatted.append(f"{i}. {r['title']}\n   URL: {r['href']}")
-
-    return "SOURCES FOUND (use scrape_website on MULTIPLE URLs, not just the first one):\n\n" + "\n\n".join(formatted)
-
-
 async def web_search(query, agent_id, api_key):
     """
     The new QUICK SEARCH tool. Just the facts.
@@ -218,112 +99,6 @@ async def web_search(query, agent_id, api_key):
         formatted_results.append(f"Title: {r['title']}\nURL: {r['href']}\nSnippet: {r['body']}")
 
     return "\n\n---\n\n".join(formatted_results)
-
-async def deep_search(query, agent_id, api_key):
-    """
-    The existing COMPREHENSIVE search tool. Full reports.
-    """
-    # Robust parsing
-    query = query.strip()
-    if "=" in query and (query.lower().startswith("query=") or query.lower().startswith("search=")):
-        query = query.split("=", 1)[-1].strip()
-    query = query.strip("'").strip('"').strip("`")
-
-    results = await _ddgs_search_raw(query, agent_id)
-    if isinstance(results, str):
-        return f"Search failed: {results}"
-    if not results:
-        return "No results found for the query. Try a different or more specific search term."
-
-    # Still filter but return the raw data of the filtered sources
-    filtered = filter_sources(query, results, api_key)
-    
-    formatted_results = []
-    for r in filtered:
-        formatted_results.append(f"Title: {r['title']}\nURL: {r['href']}\nSnippet: {r['body']}")
-    
-    return "\n\n---\n\n".join(formatted_results)
-
-
-async def synthesize_with_gemini(query, search_results, api_key):
-    """
-    Function 2: Feed raw search results JSON to Gemini, get a clean synthesis.
-    Always appends a ### Sources section built directly from the raw results.
-    """
-    safe_log(f"[STATUS] Synthesizing results with Gemini")
-    
-    if isinstance(search_results, str):
-        return search_results
-    
-    raw_context = "\n\n".join([
-        f"Source: {r['title']}\nURL: {r['href']}\nContent: {r['body']}"
-        for r in search_results
-    ])
-    
-    synthesis_prompt = f"""You are an expert research assistant. Analyze the search results below to fulfill the USER'S REQUEST.
-
-USER'S ORIGINAL REQUEST: {query}
-
-SEARCH RESULTS FOUND:
-{raw_context}
-
-STRICT RULES:
-1. Provide a detailed and informative response based ONLY on the data found.
-2. Cite your sources in the text and include their URLs.
-3. If the user explicitly asked for a 'report', format it with a title, summary, and sections. 
-4. If no specific format is requested, provide a **Comprehensive Research Report**:
-   - Start with a clear, descriptive title.
-   - Provide a 1-2 paragraph executive summary.
-   - Use 'Key Findings' sections with descriptive subheadings.
-   - **MANDATORY**: For every major claim or piece of news, cite the source and INCLUDE its URL in the text.
-   - Ensure the report is detailed and informative, covering multiple perspectives if present in the data.
-5. Use the CURRENT_DATE provided in the system prompt for context.
-6. Do NOT include 'Thoughts', 'Thinking', or any conversational preamble. Just the report content.
-7. Return ONLY the content.
-"""
-    
-    model = FAST_MODEL
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    headers = {"Content-Type": "application/json"}
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": synthesis_prompt}]}],
-    }
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=payload, timeout=60)
-            if response.status_code == 200:
-                res_json = response.json()
-                candidates = res_json.get("candidates", [])
-                if candidates and isinstance(candidates, list) and len(candidates) > 0:
-                    cand = candidates[0]
-                    content = cand.get("content", {})
-                    parts = content.get("parts", [])
-                    if parts and isinstance(parts, list) and len(parts) > 0:
-                        gemini_text = parts[0].get("text", "")
-                    else:
-                        gemini_text = "Synthesis failed: No parts found."
-                else:
-                    gemini_text = "Synthesis failed: No candidates found."
-            else:
-                print(f"!!! [CAPABILITY:synthesize] Gemini error {response.status_code}: {response.text}", flush=True)
-                gemini_text = f"Search found results but synthesis failed.\n\n{raw_context}"
-    except Exception as e:
-        safe_log(f"!!! [CAPABILITY:synthesize] Exception: {e}")
-        gemini_text = f"Search found results but could not synthesize: {str(e)}"
-
-    # --- Always append Sources section directly from raw results (never trust LLM for URLs) ---
-    sources_lines = ["### Sources\n"]
-    for r in search_results:
-        title = r.get("title", "Untitled")
-        url_link = r.get("href", "")
-        if url_link:
-            sources_lines.append(f"- [{title}]({url_link})")
-    
-    sources_section = "\n".join(sources_lines)
-    return f"{gemini_text.strip()}\n\n{sources_section}"
-
-
 
 # ─────────────────────────────────────────────────
 # REPORT GENERATION CAPABILITY
@@ -794,110 +569,177 @@ async def ask_user(agent_id, tool_input):
 
 
 # ─────────────────────────────────────────────────
-# SCRAPE WEBSITE CAPABILITY
+# DEEP WEB RESEARCH CAPABILITIES
 # ─────────────────────────────────────────────────
 
+# --- Research Config ---
+RESEARCH_PROFILES = {
+    "small":  {"total_sources": 10,  "thinking_steps": 5},
+    "medium": {"total_sources": 40,  "thinking_steps": 15},
+    "large":  {"total_sources": 100, "thinking_steps": 30},
+}
 
-async def scrape_website(url, objective, agent_id, api_key):
+def get_research_config(project_size: str, human_effort: int) -> dict:
     """
-    Fetches full content of a website using a 3-layer strategy:
-    1. Crawl4AI (stealth headless browser — handles 403s, JS rendering, CAPTCHAs)
-    2. Jina Reader proxy fallback (https://r.jina.ai/) — works even if local IP is flagged
-    3. Error — only if both layers fail
-    Returns LLM-ready Markdown. Large pages are distilled via Gemini.
+    Calculate burst parameters from project size and human effort slider.
+    Returns: {total_sources, thinking_steps, burst_size}
+
+    burst_size = ceil(total_sources / human_effort)
+    """
+    import math
+    profile = RESEARCH_PROFILES.get(project_size, RESEARCH_PROFILES["small"])
+    h = max(1, min(10, human_effort))  # clamp 1-10
+    burst_size = math.ceil(profile["total_sources"] / h)
+    return {
+        "total_sources": profile["total_sources"],
+        "thinking_steps": profile["thinking_steps"],
+        "burst_size": burst_size,
+        "human_effort": h,
+    }
+
+
+# --- Website Scraping ---
+
+async def scrape_website(url, agent_id):
+    """
+    Scrapes a URL and returns its text content (truncated to fit context).
+    Uses httpx with a browser-like User-Agent for best compatibility.
     """
     safe_log(f"[STATUS:{agent_id}] Scraping: {url[:60]}...", agent_id=agent_id)
 
-    content = None
+    # Sanitize URL
+    url = url.strip().strip("'\"`")
+    if not url.startswith("http"):
+        url = "https://" + url
 
-    # ── Layer 1: Crawl4AI stealth browser ────────────────────────────────────
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+
     try:
-        from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+        async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
+            response = await client.get(url, headers=headers)
+            if response.status_code != 200:
+                return f"Error: HTTP {response.status_code} from {url}"
 
-        browser_config = BrowserConfig(
-            headless=True,
-            verbose=False,
-            use_managed_browser=True,   # Undetected browser mode
-        )
-        run_config = CrawlerRunConfig(
-            cache_mode="bypass",
-        )
+            content_type = response.headers.get("content-type", "")
+            if "text/html" not in content_type and "text/plain" not in content_type:
+                return f"Skipped: Non-text content ({content_type}) at {url}"
 
-        async with AsyncWebCrawler(config=browser_config) as crawler:
-            result = await crawler.arun(url=url, config=run_config)
+            html = response.text
 
-        if result.success and result.markdown and len(result.markdown.strip()) > 100:
-            safe_log(f"+++ [Crawl4AI] Success: {url[:60]}", agent_id=agent_id)
-            content = result.markdown
-        else:
-            reason = getattr(result, 'error_message', 'empty content')
-            safe_log(f"!!! [Crawl4AI] Failed ({reason}) — trying Jina Reader...", agent_id=agent_id)
+        # Extract text from HTML
+        text = _extract_text_from_html(html)
+
+        if not text or len(text) < 50:
+            return f"Scraped {url} but found no meaningful text content."
+
+        # Truncate to ~3000 chars to fit context
+        if len(text) > 3000:
+            text = text[:3000] + "\n\n[... content truncated ...]"
+
+        safe_log(f"+++ [SCRAPE] {url[:40]} -> {len(text)} chars", agent_id=agent_id)
+        return f"SOURCE: {url}\n\n{text}"
+
+    except httpx.TimeoutException:
+        return f"Error: Timeout scraping {url}"
+    except Exception as e:
+        safe_log(f"!!! [SCRAPE] Error: {e}", agent_id=agent_id)
+        return f"Error scraping {url}: {str(e)[:150]}"
+
+
+def _extract_text_from_html(html: str) -> str:
+    """
+    Lightweight HTML-to-text extraction without BeautifulSoup dependency.
+    Strips tags, scripts, styles, and normalizes whitespace.
+    """
+    # Remove script and style blocks
+    html = re.sub(r'<script[^>]*>[\s\S]*?</script>', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'<style[^>]*>[\s\S]*?</style>', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'<nav[^>]*>[\s\S]*?</nav>', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'<footer[^>]*>[\s\S]*?</footer>', '', html, flags=re.IGNORECASE)
+    html = re.sub(r'<header[^>]*>[\s\S]*?</header>', '', html, flags=re.IGNORECASE)
+
+    # Convert common block elements to newlines
+    html = re.sub(r'<(br|hr|/p|/div|/h[1-6]|/li|/tr)[^>]*>', '\n', html, flags=re.IGNORECASE)
+
+    # Strip remaining tags
+    text = re.sub(r'<[^>]+>', ' ', html)
+
+    # Decode HTML entities
+    text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+    text = text.replace('&quot;', '"').replace('&#39;', "'").replace('&nbsp;', ' ')
+
+    # Normalize whitespace
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n\s*\n+', '\n\n', text)
+
+    return text.strip()
+
+
+# --- Human Steering Check ---
+
+async def generate_human_steering_check(ledger_json, user_steer_history, agent_id, api_key):
+    """
+    Uses a fast model to analyze current research findings, identify gaps,
+    and generate a focused steering question for the human operator.
+
+    This saves high-reasoning tokens for the final report by using
+    Gemini 2 Flash for the meta-analysis.
+    """
+    safe_log(f"[STATUS:{agent_id}] Generating steering checkpoint...", agent_id=agent_id)
+
+    steer_context = ""
+    if user_steer_history:
+        steer_context = f"\n\nPREVIOUS USER STEERS:\n{user_steer_history}"
+
+    prompt = f"""You are an editorial assistant reviewing an AI researcher's progress.
+
+RESEARCH FINDINGS SO FAR:
+{ledger_json[:4000]}
+{steer_context}
+
+YOUR JOB:
+1. Identify the ONE most critical gap or ambiguity in the current research.
+2. Suggest 2-3 specific directions the research could go next.
+3. Ask a single, precise question that will maximally steer the next research burst.
+
+FORMAT YOUR RESPONSE AS:
+**Knowledge Map**: [2-3 sentence summary of what has been found so far]
+**Gap Identified**: [The one thing that is missing or unclear]
+**Suggested Directions**:
+- [Direction A]
+- [Direction B]
+- [Direction C]
+**Steering Question**: [Your single precise question to the human]
+
+Be concise. No fluff."""
+
+    model = FAST_MODEL
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 500}
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=data, timeout=30)
+            if response.status_code != 200:
+                return f"Steering check failed: {response.text[:200]}"
+
+            res_json = response.json()
+            candidates = res_json.get("candidates", [])
+            if not candidates:
+                return "Steering check failed: no response from model."
+
+            result = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+            safe_log(f"+++ [STEERING] Generated check ({len(result)} chars)", agent_id=agent_id)
+            return result
 
     except Exception as e:
-        safe_log(f"!!! [Crawl4AI] Exception ({e}) — trying Jina Reader...", agent_id=agent_id)
-
-    # ── Layer 2: Jina Reader proxy fallback ──────────────────────────────────
-    if not content:
-        try:
-            jina_url = f"https://r.jina.ai/{url}"
-            safe_log(f"    [Jina] Fetching via proxy: {jina_url[:70]}", agent_id=agent_id)
-            async with httpx.AsyncClient(timeout=30) as client:
-                response = await client.get(
-                    jina_url,
-                    headers={"Accept": "text/markdown", "X-Return-Format": "markdown"},
-                    follow_redirects=True
-                )
-                if response.status_code == 200 and len(response.text.strip()) > 100:
-                    safe_log(f"+++ [Jina] Success: {url[:60]}", agent_id=agent_id)
-                    content = response.text
-                else:
-                    safe_log(f"!!! [Jina] Failed (HTTP {response.status_code})", agent_id=agent_id)
-        except Exception as e:
-            safe_log(f"!!! [Jina] Exception: {e}", agent_id=agent_id)
-
-    # ── Layer 3: Old httpx + BeautifulSoup fallback ──────────────────────────
-    if not content:
-        safe_log(f"    [HTTPX] Trying native fallback for: {url[:70]}", agent_id=agent_id)
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                response = await client.get(url, headers={"User-Agent": "Mozilla/5.0"}, follow_redirects=True)
-                if response.status_code == 200:
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    for element in soup(["script", "style", "nav", "footer", "header"]):
-                        element.decompose()
-                    text = soup.get_text(separator='\n', strip=True)
-                    if len(text) > 100:
-                        safe_log(f"+++ [HTTPX] Success: {url[:60]}", agent_id=agent_id)
-                        content = text
-        except Exception as e:
-            safe_log(f"!!! [HTTPX] Exception: {e}", agent_id=agent_id)
-
-    # ── Layer 4: Error ───────────────────────────────────────────────────────
-    if not content:
-        return (
-            f"Error scraping {url}: Crawl4AI, Jina Proxy, and HTTPX all failed. "
-            f"The site is inaccessible. Use find_sources to search for a DIFFERENT source covering the same topic."
-        )
-
-    # Token protection: if too large, distill relevant facts via LLM
-    if len(content) > 12000:
-        safe_log(f"[STATUS:{agent_id}] Page large ({len(content)} chars). Distilling facts...", agent_id=agent_id)
-        distilled = await synthesize_fact_with_gemini(objective, content[:25000], api_key)
-        return f"SOURCE: {url}\nDISTILLED FACTS:\n{distilled}"
-
-    return f"SOURCE: {url}\nFULL CONTENT:\n{content}"
-
-
-# ─────────────────────────────────────────────────
-# REFLECT AND PLAN CAPABILITY
-# ─────────────────────────────────────────────────
-
-async def reflect_and_plan(agent_id, current_findings):
-    """
-    Forces the agent to stop and evaluate its research progress.
-    Returns a RE-EVALUATE signal that the orchestrator can detect
-    to inject additional verification steps.
-    """
-    safe_log(f"[STATUS:{agent_id}] Reflecting on findings...", agent_id=agent_id)
-    return f"RE-EVALUATE|{current_findings}"
+        safe_log(f"!!! [STEERING] Error: {e}", agent_id=agent_id)
+        return f"Steering check error: {str(e)[:150]}"

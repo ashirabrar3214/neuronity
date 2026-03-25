@@ -322,6 +322,108 @@ input:checked+.slider:before {
     color: var(--text-primary);
 }
 
+/* ─── Project Size Toggle ────────────────────────────────────────────── */
+.project-size-toggle {
+    display: flex;
+    gap: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+}
+
+.size-btn {
+    flex: 1;
+    padding: 8px 0;
+    background: #262626;
+    color: var(--text-secondary);
+    border: none;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    font-family: inherit;
+}
+
+.size-btn:not(:last-child) {
+    border-right: 1px solid var(--border-subtle);
+}
+
+.size-btn:hover {
+    background: #2e2e2e;
+    color: var(--text-primary);
+}
+
+.size-btn.active {
+    background: var(--accent-color);
+    color: #fff;
+}
+
+/* ─── Human Effort Slider ────────────────────────────────────────────── */
+.effort-slider-container {
+    width: 100%;
+}
+
+.effort-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(to right, var(--accent-color), #6b5ce7);
+    outline: none;
+    cursor: pointer;
+}
+
+.effort-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid var(--accent-color);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.effort-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.effort-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid var(--accent-color);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.effort-labels {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.effort-label-left,
+.effort-label-right {
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.effort-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-color);
+    min-width: 20px;
+    text-align: center;
+}
+
 
 .chat-main,
 .chat-main-column {

@@ -46,6 +46,10 @@ class AgentState(TypedDict):
     planner_response: str            # Final answer text (populated when DONE)
     planner_question: str            # Question for user (populated when ASK_USER)
 
+    # ── HITL engine fields ────────────────────────────────────────────
+    hitl_phase: str                  # Current HITL phase (or empty)
+    hitl_session_id: str             # Active HITL session ID
+
 
 class WorkmapState(TypedDict):
     """State for the multi-agent workmap orchestration graph."""

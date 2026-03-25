@@ -312,7 +312,7 @@ def provision_workmap_agents(workmap, master_agent_id):
             agent_work_dir = ""
 
         # Inherit permissions from master so spawned workers can use the same tools
-        master_perms = (master.get("permissions", []) if master else []) or ["web_search", "scrape_website", "report_generation"]
+        master_perms = (master.get("permissions", []) if master else []) or ["web_search", "report_generation"]
 
         new_agent = {
             "id": agent_id,
@@ -468,130 +468,14 @@ async def execute_next_node(agent_id, api_key, provider):
     with open(workmap_path, "r", encoding="utf-8") as f:
         workmap = json.load(f)
 
-    # 1. New Deadlock Fix: If report is blocked, reset predecessors
-    if "BLOCKED" in str(result) and "scrapes" in str(result).lower():
-        safe_log(f">>> [DEADLOCK] {agent_id} needs more data. Resetting research nodes.")
-        
-        # Reset current node so it doesn't stay IN_PROGRESS
-        for node in workmap["nodes"]:
-            if node["id"] == next_node["id"]:
-                node["status"] = "PENDING"
-                break
-        
-        # Reset previous search/scrape nodes so agent can find new leads
-        for node in workmap["nodes"]:
-            label = node.get("label", "").lower()
-            if "search" in label or "scrape" in label:
-                node["status"] = "PENDING"
-                node["result_summary"] = "Additional research required to satisfy triangulation."
-                
-        save_workmap_json(workmap, agent_id)
-        return "in_progress"
-
-    # Reload and update workmap (original logic continues)
-
     result_str = str(result)
-
-    # Detect scrape failures and inject a retry node with alternative-source instructions
-    scrape_failed = "Error scraping" in result_str or "CRITICAL: Could not read" in result_str
-    if scrape_failed:
-        safe_log(f">>> [RETRY] {agent_id} scrape failed. Injecting alternative-source task.")
-        retry_node = {
-            "id": f"retry_{int(time.time())}",
-            "label": "Alternative Source Lookup",
-            "agent": next_node.get("agent", agent_id),
-            "task": (
-                f"Previous scrape failed: {result_str[:120]}. "
-                f"Use find_sources to search for a DIFFERENT source covering the same topic. "
-                f"Then use scrape_website on the new URL. Do NOT retry the same URL."
-            ),
-            "dependencies": [next_node["id"]],
-            "status": "PENDING",
-            "result_summary": ""
-        }
-        nodes = workmap.get("nodes", [])
-        # Insert right after the current node
-        current_idx = next((i for i, n in enumerate(nodes) if n["id"] == next_node["id"]), len(nodes))
-        nodes.insert(current_idx + 1, retry_node)
-        workmap["nodes"] = nodes
-        safe_log(f"+++ [RETRY] Injected retry node {retry_node['id']} at position {current_idx + 1}")
 
     for node in workmap.get("nodes", []):
         if node["id"] == next_node["id"]:
-            if scrape_failed:
-                # Mark as completed (not error) so it doesn't block the retry node
-                node["status"] = "COMPLETED"
-                node["result_summary"] = f"Scrape failed, retry injected: {result_str[:200]}"
-            else:
-                node["status"] = "ERROR" if result_str.startswith("Step failed") else "COMPLETED"
-                node["result_summary"] = result_str[:300]
+            node["status"] = "ERROR" if result_str.startswith("Step failed") else "COMPLETED"
+            node["result_summary"] = result_str[:300]
             safe_log(f"+++ [TICK_NODE] {next_node['id']} -> {node['status']} summary_len={len(node['result_summary'])}")
             break
-
-    # Recursive research: detect RE-EVALUATE signal or contradictions
-    # and inject a verification step before the final report node
-    if "RE-EVALUATE" in result_str or "contradiction" in result_str.lower():
-        safe_log(f">>> [RECURSION] {agent_id} detected a gap. Injecting refinement step.")
-        new_node = {
-            "id": f"refine_{int(time.time())}",
-            "label": "Deep Dive Verification",
-            "agent": agent_id,
-            "task": f"Verify and resolve contradiction: {result_str[:100]}...",
-            "dependencies": [next_node["id"]],
-            "status": "PENDING",
-            "result_summary": ""
-        }
-        nodes = workmap.get("nodes", [])
-        report_idx = next(
-            (i for i, n in enumerate(nodes) if "report" in n.get("label", "").lower()),
-            len(nodes)
-        )
-        nodes.insert(report_idx, new_node)
-        workmap["nodes"] = nodes
-        safe_log(f"+++ [RECURSION] Injected node {new_node['id']} at position {report_idx}")
-
-    # Forced verification for researcher agents: if a research step completed
-    # and the next step is a report, inject a cross-check step to slow down
-    # and ensure the agent doesn't skip verification
-    from interpreter import load_data
-    agent_data_list = load_data()
-    current_agent = next((a for a in agent_data_list if a["id"] == agent_id), None)
-    is_researcher = current_agent and current_agent.get("specialRole") == "deep-web-researcher"
-
-    if is_researcher and "RE-EVALUATE" not in result_str:
-        nodes = workmap.get("nodes", [])
-        completed_research = sum(
-            1 for n in nodes
-            if n["status"] == "COMPLETED" and "report" not in n.get("label", "").lower()
-        )
-        pending_nodes = [n for n in nodes if n["status"] == "PENDING"]
-        next_is_report = (
-            pending_nodes and "report" in pending_nodes[0].get("label", "").lower()
-        )
-
-        # If we've done research steps and the very next step is the report,
-        # inject a mandatory cross-check step
-        if next_is_report and completed_research >= 1:
-            verify_node = {
-                "id": f"crosscheck_{int(time.time())}",
-                "label": "Cross-Reference Verification",
-                "agent": agent_id,
-                "task": (
-                    "Review all findings gathered so far. Identify the 3 most critical claims. "
-                    "For each claim, use scrape_website on a DIFFERENT source to verify it. "
-                    "Flag any discrepancies or unverified claims."
-                ),
-                "dependencies": [next_node["id"]],
-                "status": "PENDING",
-                "result_summary": ""
-            }
-            report_idx = next(
-                (i for i, n in enumerate(nodes) if n["id"] == pending_nodes[0]["id"]),
-                len(nodes)
-            )
-            nodes.insert(report_idx, verify_node)
-            workmap["nodes"] = nodes
-            safe_log(f"+++ [RESEARCHER] Injected cross-check before report at position {report_idx}")
 
     all_done = all(n["status"] in ("COMPLETED", "ERROR") for n in workmap.get("nodes", []))
     if all_done:

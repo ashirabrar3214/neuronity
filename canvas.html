@@ -183,6 +183,30 @@
 
 
                     <div class="sidebar-section">
+                        <div class="section-title">Research</div>
+                        <div class="detail-item">
+                            <label>Project Size</label>
+                            <div class="project-size-toggle">
+                                <button class="size-btn active" data-size="small">Small</button>
+                                <button class="size-btn" data-size="medium">Medium</button>
+                                <button class="size-btn" data-size="large">Large</button>
+                            </div>
+                            <input type="hidden" id="detail-project-size" value="small">
+                        </div>
+                        <div class="detail-item">
+                            <label>Human Effort</label>
+                            <div class="effort-slider-container">
+                                <input type="range" id="detail-user-effort" class="effort-slider" min="1" max="10" value="1" step="1">
+                                <div class="effort-labels">
+                                    <span class="effort-label-left">Autonomous</span>
+                                    <span class="effort-value" id="effort-value-display">1</span>
+                                    <span class="effort-label-right">Guided</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section">
                         <div class="section-title">Communication</div>
                         <div class="detail-item">
                             <label>Channel</label>

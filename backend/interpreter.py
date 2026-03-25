@@ -170,6 +170,8 @@ class AgentModel(BaseModel):
     responsibility: str = ""
     agentType: str = "worker"
     specialRole: str = "custom"
+    userEffort: int = 1
+    projectSize: str = "small"
     x: float = 0
     y: float = 0
     connections: List[str] = []
@@ -554,6 +556,8 @@ async def chat_with_agent(request: ChatRequest):
         # ReAct loop fields — initialized here so LangGraph state has no missing keys
         # build_context will overwrite these with proper values
         "goal": request.message,
+        "user_effort": agent_data.get("userEffort", 1),
+        "project_size": agent_data.get("projectSize", "small"),
         "plan_iterations": 0,
         "max_plan_iterations": 50,
         "current_steps": [],
@@ -562,6 +566,9 @@ async def chat_with_agent(request: ChatRequest):
         "consecutive_clarifications": 0,
         "planner_response": "",
         "planner_question": "",
+        # HITL engine fields
+        "hitl_phase": "",
+        "hitl_session_id": "",
     }
 
     config = {

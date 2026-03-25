@@ -22,41 +22,12 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langgraph.graph import StateGraph, START, END
 
 from graph.state import AgentState
-from graph.llm import get_llm, create_research_cache, get_active_cache, invalidate_cache
+from graph.llm import get_llm
 from graph.tool_definitions import get_tools_for_agent
 from graph.checkpointer import get_checkpointer
 
 
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "agents_code")
-
-# Per-agent accumulated research data for Gemini context caching
-_research_data: dict[str, list[str]] = {}
-_research_cache_name: dict[str, str] = {}
-
-
-def _accumulate_research_cache(agent_id: str, content: str, state: dict):
-    """Append scraped content and create/update Gemini context cache when big enough."""
-    if agent_id not in _research_data:
-        _research_data[agent_id] = []
-    _research_data[agent_id].append(content)
-
-    total_chars = sum(len(r) for r in _research_data[agent_id])
-    current_cache = _research_cache_name.get(agent_id)
-    # ~4 chars per token; need 4096+ tokens → 16384+ chars
-    # Re-cache when 50% more content accumulated since last cache
-    if total_chars >= 16384 and (not current_cache or total_chars > 16384 * 1.5):
-        new_cache = create_research_cache(
-            agent_id=agent_id,
-            model="models/gemini-2.0-flash",
-            system_prompt=state.get("system_prompt", ""),
-            research_context="\n\n---\n\n".join(_research_data[agent_id]),
-            api_key=state["api_key"],
-            ttl_seconds=1800,
-        )
-        if new_cache:
-            _research_cache_name[agent_id] = new_cache
-            print(f"+++ [EXEC_NODE] Context cache created/updated: {new_cache} ({total_chars} chars)", flush=True)
-
 
 # ---------------------------------------------------------------------------
 # build_context — preserved from original + ReAct state init
@@ -144,22 +115,13 @@ async def build_context(state: AgentState) -> dict:
 
         if is_master:
             system_prompt += (
-                "\n## MASTER PROTOCOL (DEEP RESEARCH ENGINE)\n"
-                "You are an Elite Deep Research Analyst. You never stop at a quick answer.\n\n"
-                "## MANDATORY PHASE 1 — THE 'CLARIFY BEFORE ANYTHING ELSE' RULE\n"
-                "If the user's prompt is broad, short, or ambiguous (e.g. 'make a report on iran war'):\n"
+                "\n## MASTER PROTOCOL\n"
+                "You are a master agent that coordinates work across connected agents.\n\n"
+                "## CLARIFY BEFORE ACTING\n"
+                "If the user's prompt is broad, short, or ambiguous:\n"
                 "  - STOP IMMEDIATELY.\n"
                 "  - Plan exactly ONE step: decision='ASK_USER' with a list of 2-3 specific questions.\n"
-                "  - Get the user's explicit clarification before doing real work.\n\n"
-                "## PHASE 2 — DEEP INVESTIGATIVE RESEARCH\n"
-                "  - Your goal is EXHAUSTIVE research. You must scrape AT LEAST 15 distinct sources.\n"
-                "  - In a single turn, you should batch multiple find_sources and scrape_website calls.\n"
-                "  - Use reflect_and_plan every 5-10 scrapes to synthesize knowledge and find contradictions.\n\n"
-                "## ABSOLUTE RULES\n"
-                "  - NEVER answer from memory for current events (post-2024).\n"
-                "  - Use report_generation ONLY when you have genuinely exhaustively scoured the web (15+ sources).\n"
-                "  - Never use report_generation in your early iterations.\n"
-                "  - Keep executing find_sources with distinct, highly-specific long-tail queries until your context is massive.\n"
+                "  - Get the user's explicit clarification before doing real work.\n"
             )
 
     # Extract goal from last HumanMessage
@@ -232,21 +194,7 @@ AGENT SPECIALIZED INSTRUCTIONS (MUST FOLLOW):
 
 """
 
-    # Build example steps based on available tools
-    is_researcher = "find_sources" in tool_names
-    if is_researcher:
-        example_steps = """{{
-  "steps": [
-    {{"id": 1, "description": "Search for sources on the topic", "type": "tool", "tool_name": "find_sources", "tool_args": {{"query": "..."}}}},
-    {{"id": 2, "description": "Scrape the first non-Wikipedia source", "type": "tool", "tool_name": "scrape_website", "tool_args": {{"url": "...", "objective": "..."}}}},
-    {{"id": 3, "description": "Scrape a second source for cross-reference", "type": "tool", "tool_name": "scrape_website", "tool_args": {{"url": "...", "objective": "..."}}}}
-  ],
-  "decision": "CONTINUE",
-  "response": "",
-  "question": ""
-}}"""
-    else:
-        example_steps = """{{
+    example_steps = """{{
   "steps": [
     {{"id": 1, "description": "...", "type": "tool", "tool_name": "web_search", "tool_args": {{"query": "..."}}}},
     {{"id": 2, "description": "...", "type": "think"}},
@@ -273,14 +221,12 @@ Return ONLY a valid JSON object:
 {example_steps}
 
 RULES:
-- Always output between 3 and 10 steps. Maximize your batch size for Deep Research.
+- Always output between 3 and 10 steps.
 - "type" must be "tool", "think", or "ask".
 - For "tool" steps include "tool_name" and "tool_args".
-- "decision" = "DONE" only if you have exhaustively scraped 15+ sources.
+- "decision" = "DONE" only if the task is fully complete.
 - "decision" = "ASK_USER" only if critical scope clarification is needed.
 - Otherwise "decision" = "CONTINUE".
-- NEVER use report_generation in this first iteration.
-- Your priority right now is to cast a wide net: find_sources, then scrape 3-5 of the results.
 - Return ONLY the JSON. No explanation.
 """
 
@@ -295,23 +241,10 @@ def _build_refeed_planner_prompt(state: AgentState, tool_names: list) -> str:
     summaries_str = "\n".join(last_summaries) if last_summaries else "No context gathered yet."
 
     step_lines = []
-    has_scrape_failure = False
-    successful_scrapes = 0
     for s in current_steps:
         result_preview = str(s.get("result") or "no result")[:300]
         step_lines.append(f"- Step {s['id']} ({s['type']}): {s['description']} → {result_preview}")
-        result_lower = result_preview.lower()
-        if "error scraping" in result_lower or "minimal content" in result_lower:
-            has_scrape_failure = True
-        if "source:" in result_lower and ("full content:" in result_lower or "distilled facts:" in result_lower):
-            successful_scrapes += 1
     steps_str = "\n".join(step_lines) if step_lines else "No steps executed yet."
-
-    # Count total successful scrapes across all iterations
-    for summary in iteration_summaries:
-        summary_lower = summary.lower()
-        if "scraped" in summary_lower or "extracted" in summary_lower or "source:" in summary_lower:
-            successful_scrapes += 1
 
     # Inject specialized agent instructions if available
     agent_context = ""
@@ -320,23 +253,6 @@ def _build_refeed_planner_prompt(state: AgentState, tool_names: list) -> str:
 AGENT SPECIALIZED INSTRUCTIONS (MUST FOLLOW):
 {agent_prompt}
 
-"""
-
-    # Add resilience hint if scrape failures detected
-    scrape_hint = ""
-    if has_scrape_failure:
-        scrape_hint = f"""
-IMPORTANT: A scrape failed. Do NOT default to report_generation.
-1. Use find_sources with DIFFERENT search terms to bypass errors.
-2. Scrape alternative URLs — try news sites, academic journals, military briefs.
-3. You currently have {successful_scrapes} successful scrapes. Deep research requires 15-50.
-"""
-    elif successful_scrapes < 15:
-        scrape_hint = f"""
-EXHAUSTIVE RESEARCH MODE: You have ONLY scraped {successful_scrapes} sources so far.
-This is insufficient for a comprehensive deep analysis.
-Do NOT use report_generation yet.
-Plan up to 10 new steps containing specific find_sources queries to discover fresh angles, and batch scrape the results.
 """
 
     return f"""You are a planning module for an AI agent continuing toward a goal.
@@ -350,7 +266,7 @@ LAST 3 STEPS TAKEN:
 {steps_str}
 
 AVAILABLE TOOLS: {", ".join(tool_names)}
-{scrape_hint}
+
 Plan the next 3 steps, OR decide DONE/ASK_USER.
 
 Return ONLY a valid JSON object:
@@ -366,11 +282,9 @@ Return ONLY a valid JSON object:
 }}
 
 RULES:
-- Always output between 3 and 10 steps. Maximize your batch size.
-- "decision" = "DONE" only when your exhaustive research is fully complete — write complete answer in "response".
+- Always output between 3 and 10 steps.
+- "decision" = "DONE" only when the task is fully complete — write complete answer in "response".
 - "decision" = "ASK_USER" only when user input is strictly required.
-- Do not plan report_generation until you've successfully scraped at least 15 distinct sources.
-- Use reflect_and_plan if you need to synthesize what you've found to determine your next wave of search queries.
 - Otherwise "decision" = "CONTINUE".
 - Return ONLY the JSON. No explanation.
 """
@@ -424,8 +338,7 @@ async def plan(state: AgentState) -> dict:
                     pass
 
             # Task 2: The actual heavy LLM call
-            cache = _research_cache_name.get(agent_id)
-            llm = get_llm("planner", state["api_key"], cached_content=cache)
+            llm = get_llm("planner", state["api_key"])
 
             # Run both concurrently
             loading_task = asyncio.create_task(loading_sequence())
@@ -517,9 +430,6 @@ async def execute(state: AgentState) -> dict:
     executor_llm = get_llm("fast", api_key, streaming=False)
     steps = [dict(s) for s in state["current_steps"]]
 
-    # Track URLs discovered by find_sources for dynamic injection into scrape steps
-    discovered_urls = []
-
     for step in steps:
         step_type = step.get("type", "think")
         print(f"    [EXEC_NODE] step {step['id']} type={step_type} tool={step.get('tool_name','none')}", flush=True)
@@ -534,46 +444,15 @@ async def execute(state: AgentState) -> dict:
                 step["result"] = f"Tool '{tool_name}' not available with current permissions."
                 continue
 
-            # ── Force Triangulation: block premature report_generation ──
-            is_researcher = "scrape website" in permissions
-            if is_researcher and tool_name in ("report_generation", "generate_report"):
-                # Count successful scrapes in previous iterations + current batch
-                all_steps = list(state.get("current_steps", [])) + list(state.get("iteration_summaries", []))
-                scrape_ok = 0
-                for prev in state.get("iteration_summaries", []):
-                    if "scraped" in prev.lower() or "source:" in prev.lower() or "distilled" in prev.lower():
-                        scrape_ok += 1
-                for s in steps:
-                    if s.get("tool_name") == "scrape_website" and s.get("result") and "SOURCE:" in str(s.get("result", "")):
-                        scrape_ok += 1
-                MIN_SCRAPES = 15
-                if scrape_ok < MIN_SCRAPES:
-                    print(f"    [EXEC_NODE] TRIANGULATION BLOCK: {scrape_ok}/{MIN_SCRAPES} scrapes — rejecting report_generation", flush=True)
-                    step["result"] = (
-                        f"BLOCKED: Deep Research mandates exhaustive discovery. You only have {scrape_ok}/{MIN_SCRAPES} sources. "
-                        f"You MUST continue planning batch find_sources and scrape_website calls until you cross 15 sources."
-                    )
-                    continue
-
             try:
-                if tool_name == "find_sources":
-                    step["result"] = await tk.find_sources(
-                        tool_args.get("query", ""), agent_id, api_key
-                    )
-                    # Extract URLs for dynamic injection into later scrape steps
-                    if isinstance(step["result"], str):
-                        import re as _re
-                        discovered_urls = _re.findall(r'URL:\s*(https?://[^\s\]]+)', step["result"])
-                        print(f"    [EXEC_NODE] Discovered {len(discovered_urls)} URLs from find_sources", flush=True)
-
-                elif tool_name == "web_search":
+                if tool_name == "web_search":
                     step["result"] = await tk.web_search(
                         tool_args.get("query", ""), agent_id, api_key
                     )
 
-                elif tool_name == "deep_search":
-                    step["result"] = await tk.deep_search(
-                        tool_args.get("query", ""), agent_id, api_key
+                elif tool_name == "scrape_website":
+                    step["result"] = await tk.scrape_website(
+                        tool_args.get("url", ""), agent_id
                     )
 
                 elif tool_name == "list_workspace":
@@ -632,19 +511,10 @@ async def execute(state: AgentState) -> dict:
                     step["result"] = await tk.ask_user(agent_id, question)
 
                 elif tool_name == "generate_report":
-                    # Researcher agents → redirect to report_generation (PDF with LLM synthesis)
-                    if is_researcher:
-                        topic = tool_args.get("title", tool_args.get("topic", "Report"))
-                        context = tool_args.get("content", tool_args.get("context", ""))
-                        print(f"    [EXEC_NODE] Redirecting generate_report → report_generation for researcher", flush=True)
-                        tool_name = "report_generation"
-                        tool_args = {"topic": topic, "context": context}
-                        # Fall through to report_generation below
-                    else:
-                        title = tool_args.get("title", "Report")
-                        content = tool_args.get("content", "")
-                        input_str = f"{title}|{content}"
-                        step["result"] = await tk.generate_report(agent_id, input_str, working_dir)
+                    title = tool_args.get("title", "Report")
+                    content = tool_args.get("content", "")
+                    input_str = f"{title}|{content}"
+                    step["result"] = await tk.generate_report(agent_id, input_str, working_dir)
 
                 if tool_name == "report_generation" and not step.get("result"):
                     topic = tool_args.get("topic", "")
@@ -653,35 +523,6 @@ async def execute(state: AgentState) -> dict:
                     step["result"] = await tk.report_generation(
                         agent_id, input_str, working_dir, api_key, agent_name
                     )
-
-                    # Inject discovered URLs only if the agent gave an empty/placeholder URL
-                    # or if we can match a truncated version of a discovered URL.
-                    if discovered_urls:
-                        matched = False
-                        if url and url.startswith("http"):
-                            for i, durl in enumerate(discovered_urls):
-                                # If the agent's URL is a prefix of a discovered URL, they probably truncated it
-                                if durl.startswith(url):
-                                    url = discovered_urls.pop(i)
-                                    matched = True
-                                    print(f"    [EXEC_NODE] Matched truncated URL → {url[:80]}", flush=True)
-                                    break
-                                # If they exactly match, just remove it from the pool so we don't reuse it later
-                                elif url == durl:
-                                    discovered_urls.pop(i)
-                                    matched = True
-                                    break
-                        
-                        # If the agent gave NO url, grab the next available one
-                        if not url or url == "..." or not url.startswith("http"):
-                            url = discovered_urls.pop(0)
-                            print(f"    [EXEC_NODE] Injected URL for empty/placeholder: {url[:80]}", flush=True)
-
-                    step["result"] = await tk.scrape_website(url, objective, agent_id, api_key)
-
-                elif tool_name == "reflect_and_plan":
-                    findings = tool_args.get("current_findings", "")
-                    step["result"] = await tk.reflect_and_plan(agent_id, findings)
 
                 elif tool_name == "message_agent":
                     target_id = tool_args.get("target_agent_id", "")
@@ -699,14 +540,10 @@ async def execute(state: AgentState) -> dict:
                 else:
                     step["result"] = f"Tool '{tool_name}' not handled in executor."
 
-                # Truncate long results for storage (generous for scraped content)
+                # Truncate long results for storage
                 if isinstance(step["result"], str) and len(step["result"]) > 3000:
                     step["result"] = step["result"][:3000] + "...[truncated]"
                 print(f"+++ [EXEC_NODE] step {step['id']} result_len={len(str(step['result']))}", flush=True)
-
-                # Accumulate research data for Gemini context caching
-                if is_researcher and tool_name == "scrape_website" and step.get("result") and "SOURCE:" in str(step["result"]):
-                    _accumulate_research_cache(agent_id, str(step["result"])[:2000], state)
 
             except Exception as e:
                 print(f"!!! [EXEC_NODE] step {step['id']} tool={tool_name!r} error: {e}", flush=True)
@@ -779,12 +616,6 @@ async def respond(state: AgentState) -> dict:
     decision = state["planner_decision"]
     agent_id = state["agent_id"]
     print(f">>> [RESPOND_NODE] decision={decision}", flush=True)
-
-    # Clean up Gemini context cache on completion
-    if agent_id in _research_cache_name:
-        invalidate_cache(agent_id, state.get("api_key", ""))
-        _research_cache_name.pop(agent_id, None)
-        _research_data.pop(agent_id, None)
 
     if decision == "DONE":
         content = state["planner_response"] or "Task complete."
