@@ -144,24 +144,22 @@ async def build_context(state: AgentState) -> dict:
 
         if is_master:
             system_prompt += (
-                "\n## MASTER PROTOCOL\n"
-                "You are a Master Coordinator. You PLAN and DELEGATE — you never do the work yourself.\n\n"
-                "## MANDATORY PHASE 1 — CLARIFY BEFORE ANYTHING ELSE\n"
-                "For ANY non-trivial goal (research, reports, analysis, current events, plans):\n"
-                "  - Ask 2-3 TARGETED questions about scope, format, depth, time period, audience\n"
-                "  - Use decision='ASK_USER' with a numbered list of questions in the 'question' field\n"
-                "  - NEVER skip this phase. NEVER assume the user's full intent.\n"
-                "  - Example questions: 'What time period?', 'What format/length?', 'Any specific focus?'\n\n"
-                "## PHASE 2 — PLAN 6-8 SPECIFIC MICROTASKS (after clarification)\n"
-                "  - Each web_search must have a SPECIFIC, distinct query — not generic\n"
-                "  - Plan enough searches to cover all dimensions of the topic\n"
-                "  - report_generation comes LAST, only after ALL research steps complete\n\n"
+                "\n## MASTER PROTOCOL (DEEP RESEARCH ENGINE)\n"
+                "You are an Elite Deep Research Analyst. You never stop at a quick answer.\n\n"
+                "## MANDATORY PHASE 1 — THE 'CLARIFY BEFORE ANYTHING ELSE' RULE\n"
+                "If the user's prompt is broad, short, or ambiguous (e.g. 'make a report on iran war'):\n"
+                "  - STOP IMMEDIATELY.\n"
+                "  - Plan exactly ONE step: decision='ASK_USER' with a list of 2-3 specific questions.\n"
+                "  - Get the user's explicit clarification before doing real work.\n\n"
+                "## PHASE 2 — DEEP INVESTIGATIVE RESEARCH\n"
+                "  - Your goal is EXHAUSTIVE research. You must scrape AT LEAST 15 distinct sources.\n"
+                "  - In a single turn, you should batch multiple find_sources and scrape_website calls.\n"
+                "  - Use reflect_and_plan every 5-10 scrapes to synthesize knowledge and find contradictions.\n\n"
                 "## ABSOLUTE RULES\n"
-                "  - NEVER answer from memory for any current event, news, or fact after 2024\n"
-                "  - ALWAYS web_search before any report or analysis on recent/current topics\n"
-                "  - NEVER call report_generation more than ONCE per task\n"
-                "  - NEVER produce a report with fluff — only include verified, searched facts\n"
-                "  - If web_search returns no results, try a DIFFERENT, more specific query\n"
+                "  - NEVER answer from memory for current events (post-2024).\n"
+                "  - Use report_generation ONLY when you have genuinely exhaustively scoured the web (15+ sources).\n"
+                "  - Never use report_generation in your early iterations.\n"
+                "  - Keep executing find_sources with distinct, highly-specific long-tail queries until your context is massive.\n"
             )
 
     # Extract goal from last HumanMessage
@@ -192,9 +190,9 @@ async def build_context(state: AgentState) -> dict:
 # ---------------------------------------------------------------------------
 
 def _normalize_steps(steps: list) -> list:
-    """Normalize 1-7 steps with all required fields. No filler padding."""
+    """Normalize 1-10 steps with all required fields. No filler padding."""
     normalized = []
-    for i, s in enumerate(steps[:7]):
+    for i, s in enumerate(steps[:10]):
         normalized.append({
             "id": i + 1,
             "description": s.get("description", f"Step {i + 1}"),
@@ -275,16 +273,15 @@ Return ONLY a valid JSON object:
 {example_steps}
 
 RULES:
-- Always output EXACTLY 3 steps. Prefer tool steps over think steps for research tasks.
+- Always output between 3 and 10 steps. Maximize your batch size for Deep Research.
 - "type" must be "tool", "think", or "ask".
 - For "tool" steps include "tool_name" and "tool_args".
-- "decision" = "DONE" only if goal is fully achievable from what you already know — include full "response".
-- "decision" = "ASK_USER" only if critical user input is required — include "question".
+- "decision" = "DONE" only if you have exhaustively scraped 15+ sources.
+- "decision" = "ASK_USER" only if critical scope clarification is needed.
 - Otherwise "decision" = "CONTINUE".
-- If a tool call failed (e.g. scrape blocked), plan retries with different sources — NEVER give up after one failure.
-- Avoid Wikipedia URLs — they are often blocked. Prefer news sites, research papers, and direct sources.
-- Do NOT use report_generation in the first planning round. First gather data from at least 2-3 sources.
-- Return ONLY the JSON. No markdown fences, no explanation.
+- NEVER use report_generation in this first iteration.
+- Your priority right now is to cast a wide net: find_sources, then scrape 3-5 of the results.
+- Return ONLY the JSON. No explanation.
 """
 
 
@@ -329,16 +326,17 @@ AGENT SPECIALIZED INSTRUCTIONS (MUST FOLLOW):
     scrape_hint = ""
     if has_scrape_failure:
         scrape_hint = f"""
-IMPORTANT: A scrape failed. Do NOT give up or ask the user. Instead:
-1. Use find_sources with DIFFERENT search terms to find alternative sources
-2. Scrape those alternative URLs instead — try news sites like BBC, Reuters, AP, Al Jazeera article pages
-3. Try at least 3-5 different sources before considering the topic exhausted
-4. Do NOT use report_generation until you have successfully scraped at least 2 sources (current: {successful_scrapes})
+IMPORTANT: A scrape failed. Do NOT default to report_generation.
+1. Use find_sources with DIFFERENT search terms to bypass errors.
+2. Scrape alternative URLs — try news sites, academic journals, military briefs.
+3. You currently have {successful_scrapes} successful scrapes. Deep research requires 15-50.
 """
-    elif successful_scrapes < 2:
+    elif successful_scrapes < 15:
         scrape_hint = f"""
-NOTE: You have only {successful_scrapes} successful scrape(s) so far. Continue scraping more sources before generating a report.
-Do NOT use report_generation until you have scraped at least 2-3 sources successfully.
+EXHAUSTIVE RESEARCH MODE: You have ONLY scraped {successful_scrapes} sources so far.
+This is insufficient for a comprehensive deep analysis.
+Do NOT use report_generation yet.
+Plan up to 10 new steps containing specific find_sources queries to discover fresh angles, and batch scrape the results.
 """
 
     return f"""You are a planning module for an AI agent continuing toward a goal.
@@ -368,12 +366,13 @@ Return ONLY a valid JSON object:
 }}
 
 RULES:
-- Always output EXACTLY 3 steps.
-- "decision" = "DONE" when goal is fully achieved — write complete answer in "response".
-- "decision" = "ASK_USER" only when user input is strictly required — write question in "question".
-- If a tool failed, plan retries with different inputs — NEVER give up after one failure.
-- Otherwise "CONTINUE".
-- Return ONLY the JSON. No markdown fences, no explanation.
+- Always output between 3 and 10 steps. Maximize your batch size.
+- "decision" = "DONE" only when your exhaustive research is fully complete — write complete answer in "response".
+- "decision" = "ASK_USER" only when user input is strictly required.
+- Do not plan report_generation until you've successfully scraped at least 15 distinct sources.
+- Use reflect_and_plan if you need to synthesize what you've found to determine your next wave of search queries.
+- Otherwise "decision" = "CONTINUE".
+- Return ONLY the JSON. No explanation.
 """
 
 
@@ -547,12 +546,12 @@ async def execute(state: AgentState) -> dict:
                 for s in steps:
                     if s.get("tool_name") == "scrape_website" and s.get("result") and "SOURCE:" in str(s.get("result", "")):
                         scrape_ok += 1
-                MIN_SCRAPES = 2
+                MIN_SCRAPES = 15
                 if scrape_ok < MIN_SCRAPES:
                     print(f"    [EXEC_NODE] TRIANGULATION BLOCK: {scrape_ok}/{MIN_SCRAPES} scrapes — rejecting report_generation", flush=True)
                     step["result"] = (
-                        f"BLOCKED: Only {scrape_ok} source(s) scraped. Need at least {MIN_SCRAPES}. "
-                        f"Use find_sources with different search terms, then scrape_website on multiple results."
+                        f"BLOCKED: Deep Research mandates exhaustive discovery. You only have {scrape_ok}/{MIN_SCRAPES} sources. "
+                        f"You MUST continue planning batch find_sources and scrape_website calls until you cross 15 sources."
                     )
                     continue
 
@@ -655,22 +654,29 @@ async def execute(state: AgentState) -> dict:
                         agent_id, input_str, working_dir, api_key, agent_name
                     )
 
-                elif tool_name == "scrape_website":
-                    url = tool_args.get("url", "")
-                    objective = tool_args.get("objective", "")
-                    # Always prefer discovered URLs — planner often truncates them
+                    # Inject discovered URLs only if the agent gave an empty/placeholder URL
+                    # or if we can match a truncated version of a discovered URL.
                     if discovered_urls:
                         matched = False
                         if url and url.startswith("http"):
                             for i, durl in enumerate(discovered_urls):
-                                if durl.startswith(url) or url.startswith(durl):
+                                # If the agent's URL is a prefix of a discovered URL, they probably truncated it
+                                if durl.startswith(url):
                                     url = discovered_urls.pop(i)
                                     matched = True
                                     print(f"    [EXEC_NODE] Matched truncated URL → {url[:80]}", flush=True)
                                     break
-                        if not matched:
+                                # If they exactly match, just remove it from the pool so we don't reuse it later
+                                elif url == durl:
+                                    discovered_urls.pop(i)
+                                    matched = True
+                                    break
+                        
+                        # If the agent gave NO url, grab the next available one
+                        if not url or url == "..." or not url.startswith("http"):
                             url = discovered_urls.pop(0)
-                            print(f"    [EXEC_NODE] Injected URL: {url[:80]}", flush=True)
+                            print(f"    [EXEC_NODE] Injected URL for empty/placeholder: {url[:80]}", flush=True)
+
                     step["result"] = await tk.scrape_website(url, objective, agent_id, api_key)
 
                 elif tool_name == "reflect_and_plan":

@@ -855,11 +855,29 @@ async def scrape_website(url, objective, agent_id, api_key):
         except Exception as e:
             safe_log(f"!!! [Jina] Exception: {e}", agent_id=agent_id)
 
-    # ── Layer 3: Error ───────────────────────────────────────────────────────
+    # ── Layer 3: Old httpx + BeautifulSoup fallback ──────────────────────────
+    if not content:
+        safe_log(f"    [HTTPX] Trying native fallback for: {url[:70]}", agent_id=agent_id)
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(url, headers={"User-Agent": "Mozilla/5.0"}, follow_redirects=True)
+                if response.status_code == 200:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    for element in soup(["script", "style", "nav", "footer", "header"]):
+                        element.decompose()
+                    text = soup.get_text(separator='\n', strip=True)
+                    if len(text) > 100:
+                        safe_log(f"+++ [HTTPX] Success: {url[:60]}", agent_id=agent_id)
+                        content = text
+        except Exception as e:
+            safe_log(f"!!! [HTTPX] Exception: {e}", agent_id=agent_id)
+
+    # ── Layer 4: Error ───────────────────────────────────────────────────────
     if not content:
         return (
-            f"Error scraping {url}: Both Crawl4AI and Jina Reader failed. "
-            f"Use find_sources to search for a DIFFERENT source covering the same topic."
+            f"Error scraping {url}: Crawl4AI, Jina Proxy, and HTTPX all failed. "
+            f"The site is inaccessible. Use find_sources to search for a DIFFERENT source covering the same topic."
         )
 
     # Token protection: if too large, distill relevant facts via LLM

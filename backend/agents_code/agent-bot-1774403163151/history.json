@@ -2,5 +2,9 @@
   {
     "role": "user",
     "content": "make a report on iran war"
+  },
+  {
+    "role": "assistant",
+    "content": "Starting deep research on Iran war."
   }
 ]
