@@ -430,7 +430,17 @@ async def plan(state: AgentState) -> dict:
 
             # Run both concurrently
             loading_task = asyncio.create_task(loading_sequence())
-            result = await llm.ainvoke([HumanMessage(content=prompt)])
+            try:
+                result = await llm.ainvoke([HumanMessage(content=prompt)])
+            except Exception as primary_err:
+                err_str = str(primary_err).lower()
+                if "429" in err_str or "quota" in err_str or "resource exhausted" in err_str:
+                    print(f"!!! [PLAN_NODE] Rate limit on 3.1-pro — falling back to gemini-3-flash-preview", flush=True)
+                    print(f"[STATUS:{agent_id}] Rate limited. Switching to fallback model...", flush=True)
+                    fallback_llm = get_llm("think", state["api_key"])
+                    result = await fallback_llm.ainvoke([HumanMessage(content=prompt)])
+                else:
+                    raise
 
             # Kill the loading sequence the exact millisecond the LLM finishes
             loading_task.cancel()

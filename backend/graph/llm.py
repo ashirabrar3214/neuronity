@@ -3,7 +3,7 @@ import time
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 FAST_MODEL = os.getenv("FAST_MODEL", "gemini-2.0-flash")
-REASONING_MODEL = os.getenv("REASONING_MODEL", "gemini-2.0-flash")
+REASONING_MODEL = os.getenv("REASONING_MODEL", "gemini-3-flash-preview")
 PLANNER_MODEL = os.getenv("PLANNER_MODEL", "gemini-3.1-pro-preview")
 
 # Minimum token count for Gemini context caching (API requirement)

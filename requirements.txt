@@ -6,6 +6,7 @@ ddgs
 python-dotenv
 httpx
 beautifulsoup4
+crawl4ai
 langchain-core
 langchain-google-genai
 langgraph

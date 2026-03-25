@@ -464,9 +464,31 @@ async def execute_next_node(agent_id, api_key, provider):
         is_pdf_step=is_pdf, session_id=session_id
     )
 
-    # Reload and update workmap
+    # Reload workmap to ensure we have the latest state before updating
     with open(workmap_path, "r", encoding="utf-8") as f:
         workmap = json.load(f)
+
+    # 1. New Deadlock Fix: If report is blocked, reset predecessors
+    if "BLOCKED" in str(result) and "scrapes" in str(result).lower():
+        safe_log(f">>> [DEADLOCK] {agent_id} needs more data. Resetting research nodes.")
+        
+        # Reset current node so it doesn't stay IN_PROGRESS
+        for node in workmap["nodes"]:
+            if node["id"] == next_node["id"]:
+                node["status"] = "PENDING"
+                break
+        
+        # Reset previous search/scrape nodes so agent can find new leads
+        for node in workmap["nodes"]:
+            label = node.get("label", "").lower()
+            if "search" in label or "scrape" in label:
+                node["status"] = "PENDING"
+                node["result_summary"] = "Additional research required to satisfy triangulation."
+                
+        save_workmap_json(workmap, agent_id)
+        return "in_progress"
+
+    # Reload and update workmap (original logic continues)
 
     result_str = str(result)
 

@@ -186,10 +186,8 @@ async def find_sources(query, agent_id, api_key):
     if not results:
         return "No sources found. Try different search terms."
 
-    # Filter out Wikipedia entirely — always blocked from this environment
-    filtered = [r for r in results if "wikipedia.org" not in r.get("href", "")]
-    if not filtered:
-        filtered = results  # fallback if all results are Wikipedia
+    # Include all results including Wikipedia
+    filtered = results
 
     formatted = []
     for i, r in enumerate(filtered, 1):
@@ -799,89 +797,78 @@ async def ask_user(agent_id, tool_input):
 # SCRAPE WEBSITE CAPABILITY
 # ─────────────────────────────────────────────────
 
-_SCRAPE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-    "Referer": "https://www.google.com/",
-}
-
-def _rewrite_url(url):
-    """Rewrite known problematic URLs to more scrape-friendly versions."""
-    # Wikipedia is fully blocked from this environment — skip rewrites for it
-    return url
-
-
-async def _fetch_page(url, client):
-    """Fetch a page and extract text. Returns (text, error_msg)."""
-    response = await client.get(url, timeout=20, follow_redirects=True)
-    response.raise_for_status()
-
-    content_type = response.headers.get("content-type", "")
-    if "text/html" not in content_type and "text/plain" not in content_type:
-        return None, f"unsupported content type '{content_type}'"
-
-    soup = BeautifulSoup(response.text, 'html.parser')
-
-    for element in soup(["script", "style", "nav", "footer", "header", "aside", "iframe", "noscript"]):
-        element.decompose()
-
-    article = soup.find("article") or soup.find("main") or soup.find("body")
-    text = article.get_text(separator='\n', strip=True) if article else soup.get_text(separator='\n', strip=True)
-
-    if len(text.strip()) < 100:
-        return None, "page returned minimal content (possibly blocked or paywall)"
-
-    return text, None
-
 
 async def scrape_website(url, objective, agent_id, api_key):
     """
-    Fetches full content of a website. If the content is too long,
-    it uses Gemini-Flash to extract only the facts relevant to the objective.
-    Tries URL rewrites and a cache fallback on failure.
+    Fetches full content of a website using a 3-layer strategy:
+    1. Crawl4AI (stealth headless browser — handles 403s, JS rendering, CAPTCHAs)
+    2. Jina Reader proxy fallback (https://r.jina.ai/) — works even if local IP is flagged
+    3. Error — only if both layers fail
+    Returns LLM-ready Markdown. Large pages are distilled via Gemini.
     """
     safe_log(f"[STATUS:{agent_id}] Scraping: {url[:60]}...", agent_id=agent_id)
 
-    # Build list of URLs to try: original (rewritten) + Google cache fallback
-    primary_url = _rewrite_url(url)
-    urls_to_try = [primary_url]
-    if primary_url != url:
-        urls_to_try.append(url)  # also try original if rewrite differs
-    urls_to_try.append(f"https://webcache.googleusercontent.com/search?q=cache:{url}")
+    content = None
 
-    text = None
-    last_error = ""
-
+    # ── Layer 1: Crawl4AI stealth browser ────────────────────────────────────
     try:
-        async with httpx.AsyncClient(headers=_SCRAPE_HEADERS) as client:
-            for try_url in urls_to_try:
-                try:
-                    text, err = await _fetch_page(try_url, client)
-                    if text:
-                        safe_log(f"[STATUS:{agent_id}] Success: {try_url[:60]}", agent_id=agent_id)
-                        break
-                    last_error = err or "unknown error"
-                except httpx.HTTPStatusError as e:
-                    last_error = f"HTTP {e.response.status_code}"
-                    safe_log(f"[STATUS:{agent_id}] {try_url[:40]} failed: {last_error}", agent_id=agent_id)
-                except (httpx.TimeoutException, Exception) as e:
-                    last_error = str(e)
-                    safe_log(f"[STATUS:{agent_id}] {try_url[:40]} failed: {last_error}", agent_id=agent_id)
+        from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+
+        browser_config = BrowserConfig(
+            headless=True,
+            verbose=False,
+            use_managed_browser=True,   # Undetected browser mode
+        )
+        run_config = CrawlerRunConfig(
+            cache_mode="bypass",
+        )
+
+        async with AsyncWebCrawler(config=browser_config) as crawler:
+            result = await crawler.arun(url=url, config=run_config)
+
+        if result.success and result.markdown and len(result.markdown.strip()) > 100:
+            safe_log(f"+++ [Crawl4AI] Success: {url[:60]}", agent_id=agent_id)
+            content = result.markdown
+        else:
+            reason = getattr(result, 'error_message', 'empty content')
+            safe_log(f"!!! [Crawl4AI] Failed ({reason}) — trying Jina Reader...", agent_id=agent_id)
 
     except Exception as e:
-        return f"Error scraping {url}: {str(e)}"
+        safe_log(f"!!! [Crawl4AI] Exception ({e}) — trying Jina Reader...", agent_id=agent_id)
 
-    if not text:
-        return f"Error scraping {url}: {last_error}. Use find_sources to search for an alternative source covering the same topic."
+    # ── Layer 2: Jina Reader proxy fallback ──────────────────────────────────
+    if not content:
+        try:
+            jina_url = f"https://r.jina.ai/{url}"
+            safe_log(f"    [Jina] Fetching via proxy: {jina_url[:70]}", agent_id=agent_id)
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(
+                    jina_url,
+                    headers={"Accept": "text/markdown", "X-Return-Format": "markdown"},
+                    follow_redirects=True
+                )
+                if response.status_code == 200 and len(response.text.strip()) > 100:
+                    safe_log(f"+++ [Jina] Success: {url[:60]}", agent_id=agent_id)
+                    content = response.text
+                else:
+                    safe_log(f"!!! [Jina] Failed (HTTP {response.status_code})", agent_id=agent_id)
+        except Exception as e:
+            safe_log(f"!!! [Jina] Exception: {e}", agent_id=agent_id)
+
+    # ── Layer 3: Error ───────────────────────────────────────────────────────
+    if not content:
+        return (
+            f"Error scraping {url}: Both Crawl4AI and Jina Reader failed. "
+            f"Use find_sources to search for a DIFFERENT source covering the same topic."
+        )
 
     # Token protection: if too large, distill relevant facts via LLM
-    if len(text) > 12000:
-        safe_log(f"[STATUS:{agent_id}] Page large ({len(text)} chars). Distilling facts...", agent_id=agent_id)
-        distilled = await synthesize_fact_with_gemini(objective, text[:25000], api_key)
+    if len(content) > 12000:
+        safe_log(f"[STATUS:{agent_id}] Page large ({len(content)} chars). Distilling facts...", agent_id=agent_id)
+        distilled = await synthesize_fact_with_gemini(objective, content[:25000], api_key)
         return f"SOURCE: {url}\nDISTILLED FACTS:\n{distilled}"
 
-    return f"SOURCE: {url}\nFULL CONTENT:\n{text}"
+    return f"SOURCE: {url}\nFULL CONTENT:\n{content}"
 
 
 # ─────────────────────────────────────────────────
