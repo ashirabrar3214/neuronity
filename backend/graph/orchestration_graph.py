@@ -312,7 +312,7 @@ def provision_workmap_agents(workmap, master_agent_id):
             agent_work_dir = ""
 
         # Inherit permissions from master so spawned workers can use the same tools
-        master_perms = (master.get("permissions", []) if master else [])
+        master_perms = (master.get("permissions", []) if master else []) or ["web_search", "scrape_website", "report_generation"]
 
         new_agent = {
             "id": agent_id,
@@ -452,7 +452,7 @@ async def execute_next_node(agent_id, api_key, provider):
     if target_agent in ("self", "", None):
         target_agent = agent_id
 
-    PDF_KEYWORDS = ["report_generation", "pdf", "create a pdf", "generate a pdf", "final report"]
+    PDF_KEYWORDS = ["report", "pdf", "generate", "create", "generation"]
     is_pdf = any(w in next_node["task"].lower() for w in PDF_KEYWORDS)
     session_id = workmap.get("project_id", f"wm_{int(time.time())}")
 

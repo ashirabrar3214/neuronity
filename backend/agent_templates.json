@@ -3,7 +3,10 @@
     "name": "Deep Web Researcher",
     "description": "Elite investigator that scrapes full articles and resolves contradictions using recursive verification.",
     "brain": "gemini-3.1-pro-preview",
-    "permissions": ["scrape website", "report generation"],
+    "permissions": [
+      "scrape_website",
+      "report_generation"
+    ],
     "agentType": "worker",
     "responsibility": "Perform deep, multi-source investigative research and verify facts."
   }
