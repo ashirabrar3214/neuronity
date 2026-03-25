@@ -186,11 +186,16 @@ async def find_sources(query, agent_id, api_key):
     if not results:
         return "No sources found. Try different search terms."
 
+    # Filter out Wikipedia entirely — always blocked from this environment
+    filtered = [r for r in results if "wikipedia.org" not in r.get("href", "")]
+    if not filtered:
+        filtered = results  # fallback if all results are Wikipedia
+
     formatted = []
-    for i, r in enumerate(results, 1):
+    for i, r in enumerate(filtered, 1):
         formatted.append(f"{i}. {r['title']}\n   URL: {r['href']}")
 
-    return "SOURCES FOUND (use scrape_website to read each one):\n\n" + "\n\n".join(formatted)
+    return "SOURCES FOUND (use scrape_website on MULTIPLE URLs, not just the first one):\n\n" + "\n\n".join(formatted)
 
 
 async def web_search(query, agent_id, api_key):
@@ -801,47 +806,82 @@ _SCRAPE_HEADERS = {
     "Referer": "https://www.google.com/",
 }
 
+def _rewrite_url(url):
+    """Rewrite known problematic URLs to more scrape-friendly versions."""
+    # Wikipedia is fully blocked from this environment — skip rewrites for it
+    return url
+
+
+async def _fetch_page(url, client):
+    """Fetch a page and extract text. Returns (text, error_msg)."""
+    response = await client.get(url, timeout=20, follow_redirects=True)
+    response.raise_for_status()
+
+    content_type = response.headers.get("content-type", "")
+    if "text/html" not in content_type and "text/plain" not in content_type:
+        return None, f"unsupported content type '{content_type}'"
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    for element in soup(["script", "style", "nav", "footer", "header", "aside", "iframe", "noscript"]):
+        element.decompose()
+
+    article = soup.find("article") or soup.find("main") or soup.find("body")
+    text = article.get_text(separator='\n', strip=True) if article else soup.get_text(separator='\n', strip=True)
+
+    if len(text.strip()) < 100:
+        return None, "page returned minimal content (possibly blocked or paywall)"
+
+    return text, None
+
+
 async def scrape_website(url, objective, agent_id, api_key):
     """
     Fetches full content of a website. If the content is too long,
     it uses Gemini-Flash to extract only the facts relevant to the objective.
+    Tries URL rewrites and a cache fallback on failure.
     """
     safe_log(f"[STATUS:{agent_id}] Scraping: {url[:60]}...", agent_id=agent_id)
+
+    # Build list of URLs to try: original (rewritten) + Google cache fallback
+    primary_url = _rewrite_url(url)
+    urls_to_try = [primary_url]
+    if primary_url != url:
+        urls_to_try.append(url)  # also try original if rewrite differs
+    urls_to_try.append(f"https://webcache.googleusercontent.com/search?q=cache:{url}")
+
+    text = None
+    last_error = ""
+
     try:
         async with httpx.AsyncClient(headers=_SCRAPE_HEADERS) as client:
-            response = await client.get(url, timeout=20, follow_redirects=True)
-            response.raise_for_status()
+            for try_url in urls_to_try:
+                try:
+                    text, err = await _fetch_page(try_url, client)
+                    if text:
+                        safe_log(f"[STATUS:{agent_id}] Success: {try_url[:60]}", agent_id=agent_id)
+                        break
+                    last_error = err or "unknown error"
+                except httpx.HTTPStatusError as e:
+                    last_error = f"HTTP {e.response.status_code}"
+                    safe_log(f"[STATUS:{agent_id}] {try_url[:40]} failed: {last_error}", agent_id=agent_id)
+                except (httpx.TimeoutException, Exception) as e:
+                    last_error = str(e)
+                    safe_log(f"[STATUS:{agent_id}] {try_url[:40]} failed: {last_error}", agent_id=agent_id)
 
-            content_type = response.headers.get("content-type", "")
-            if "text/html" not in content_type and "text/plain" not in content_type:
-                return f"Error scraping {url}: unsupported content type '{content_type}'"
-
-            soup = BeautifulSoup(response.text, 'html.parser')
-
-            # Remove non-content elements
-            for element in soup(["script", "style", "nav", "footer", "header", "aside", "iframe", "noscript"]):
-                element.decompose()
-
-            # Prefer article body if present
-            article = soup.find("article") or soup.find("main") or soup.find("body")
-            text = article.get_text(separator='\n', strip=True) if article else soup.get_text(separator='\n', strip=True)
-
-            if len(text.strip()) < 100:
-                return f"Error scraping {url}: page returned minimal content (possibly blocked or paywall)"
-
-            # Token protection: if too large, distill relevant facts via LLM
-            if len(text) > 12000:
-                safe_log(f"[STATUS:{agent_id}] Page large ({len(text)} chars). Distilling facts...", agent_id=agent_id)
-                distilled = await synthesize_fact_with_gemini(objective, text[:25000], api_key)
-                return f"SOURCE: {url}\nDISTILLED FACTS:\n{distilled}"
-
-            return f"SOURCE: {url}\nFULL CONTENT:\n{text}"
-    except httpx.HTTPStatusError as e:
-        return f"Error scraping {url}: HTTP {e.response.status_code}"
-    except httpx.TimeoutException:
-        return f"Error scraping {url}: request timed out"
     except Exception as e:
         return f"Error scraping {url}: {str(e)}"
+
+    if not text:
+        return f"Error scraping {url}: {last_error}. Use find_sources to search for an alternative source covering the same topic."
+
+    # Token protection: if too large, distill relevant facts via LLM
+    if len(text) > 12000:
+        safe_log(f"[STATUS:{agent_id}] Page large ({len(text)} chars). Distilling facts...", agent_id=agent_id)
+        distilled = await synthesize_fact_with_gemini(objective, text[:25000], api_key)
+        return f"SOURCE: {url}\nDISTILLED FACTS:\n{distilled}"
+
+    return f"SOURCE: {url}\nFULL CONTENT:\n{text}"
 
 
 # ─────────────────────────────────────────────────

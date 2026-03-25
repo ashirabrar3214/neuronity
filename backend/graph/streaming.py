@@ -9,7 +9,7 @@ import os
 import asyncio
 
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from graph.llm import get_llm
+from graph.llm import get_llm, create_research_cache, get_active_cache, invalidate_cache
 from graph.tool_definitions import get_tools_for_agent
 
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "agents_code")
@@ -129,9 +129,19 @@ async def _react_loop(state: dict):
 
     summaries: list       = []   # compressed summaries of each executed step
     completed_steps: list = []   # all executed step dicts (for refeed context)
+    discovered_urls: list = []   # URLs found by find_sources for injection
+    research_data: list   = []   # accumulated raw scrape content for caching
+    cache_name: str       = None # Gemini context cache name
     max_steps             = 20
     consecutive_fallbacks = 0
     consecutive_failures  = 0    # consecutive tool call failures
+
+    # Check for existing cache from a previous turn
+    is_researcher = "scrape website" in permissions
+    if is_researcher:
+        cache_name = get_active_cache(agent_id)
+        if cache_name:
+            print(f"+++ [REACT] Reusing existing context cache: {cache_name}", flush=True)
 
     print(f">>> [REACT] agent={agent_id} type={agent_type} goal={goal[:60]!r} max_steps={max_steps}", flush=True)
 
@@ -146,6 +156,7 @@ async def _react_loop(state: dict):
             force_knowledge=(consecutive_failures >= 3),
             history_context=history_context,
             steps_done=step_num,
+            cached_content=cache_name,
         ):
             if ev_type == "token":
                 yield _sse({"type": "thought_token", "content": ev_data})
@@ -158,14 +169,77 @@ async def _react_loop(state: dict):
 
         # ── Terminal decisions (always before fallback check) ─────────────
         if decision == "DONE":
-            print(f"--- [REACT] DONE at step {step_num+1} response_len={len(plan.get('response') or '')}", flush=True)
-            yield _sse({"type": "response", "content": plan.get("response") or "Task complete."})
-            return
+            # Researcher anti-fabrication: reject DONE if no report was actually generated
+            is_researcher = "scrape website" in permissions
+            if is_researcher:
+                has_report = any(
+                    s.get("tool_name") in ("report_generation", "generate_report")
+                    and s.get("result")
+                    and "BLOCKED" not in str(s.get("result", ""))
+                    for s in completed_steps
+                )
+                if not has_report and step_num < max_steps - 2:
+                    print(f"    [REACT] FABRICATION BLOCK: researcher said DONE but no report generated. Forcing CONTINUE.", flush=True)
+                    plan["decision"] = "CONTINUE"
+                    # Inject scrape_website if we have discovered URLs, otherwise find_sources
+                    if discovered_urls:
+                        next_url = discovered_urls.pop(0)
+                        print(f"    [REACT] Injecting scrape of: {next_url[:60]}", flush=True)
+                        plan["steps"] = [{"id": 1, "description": f"Scrape {next_url[:50]}", "type": "tool",
+                                          "tool_name": "scrape_website", "tool_args": {"url": next_url, "objective": goal[:100]},
+                                          "confidence": 95, "clarification_question": ""}]
+                    else:
+                        plan["steps"] = [{"id": 1, "description": "Search for more sources to scrape", "type": "tool",
+                                          "tool_name": "find_sources", "tool_args": {"query": goal[:60] + " casualties timeline analysis"},
+                                          "confidence": 95, "clarification_question": ""}]
+                    decision = "CONTINUE"
+                    steps = plan["steps"]
+                else:
+                    print(f"--- [REACT] DONE at step {step_num+1} response_len={len(plan.get('response') or '')}", flush=True)
+                    if cache_name:
+                        invalidate_cache(agent_id, api_key)
+                    yield _sse({"type": "response", "content": plan.get("response") or "Task complete."})
+                    return
+            else:
+                print(f"--- [REACT] DONE at step {step_num+1} response_len={len(plan.get('response') or '')}", flush=True)
+                if cache_name:
+                    invalidate_cache(agent_id, api_key)
+                yield _sse({"type": "response", "content": plan.get("response") or "Task complete."})
+                return
 
         if decision == "ASK_USER":
-            print(f"--- [REACT] ASK_USER at step {step_num+1}", flush=True)
-            yield _sse({"type": "response", "content": plan.get("question") or "I have a question."})
-            return
+            # Researcher anti-escape: don't let researcher ask user to avoid doing work
+            is_researcher = "scrape website" in permissions
+            if is_researcher and step_num < 10:
+                scrape_ok = sum(
+                    1 for s in completed_steps
+                    if s.get("tool_name") == "scrape_website"
+                    and s.get("result") and "SOURCE:" in str(s.get("result", ""))
+                    and "duckduckgo.com" not in str(s.get("result", ""))
+                )
+                if scrape_ok < 3:
+                    print(f"    [REACT] ASK_USER BLOCKED: researcher has only {scrape_ok} scrapes, forcing more research", flush=True)
+                    plan["decision"] = "CONTINUE"
+                    if discovered_urls:
+                        next_url = discovered_urls.pop(0)
+                        print(f"    [REACT] Injecting scrape of: {next_url[:60]}", flush=True)
+                        plan["steps"] = [{"id": 1, "description": f"Scrape {next_url[:50]}", "type": "tool",
+                                          "tool_name": "scrape_website", "tool_args": {"url": next_url, "objective": goal[:100]},
+                                          "confidence": 95, "clarification_question": ""}]
+                    else:
+                        plan["steps"] = [{"id": 1, "description": "Find more sources with different search terms", "type": "tool",
+                                          "tool_name": "find_sources", "tool_args": {"query": goal[:60] + " latest news analysis"},
+                                          "confidence": 95, "clarification_question": ""}]
+                    decision = "CONTINUE"
+                    steps = plan["steps"]
+                else:
+                    print(f"--- [REACT] ASK_USER at step {step_num+1}", flush=True)
+                    yield _sse({"type": "response", "content": plan.get("question") or "I have a question."})
+                    return
+            else:
+                print(f"--- [REACT] ASK_USER at step {step_num+1}", flush=True)
+                yield _sse({"type": "response", "content": plan.get("question") or "I have a question."})
+                return
 
         # ── Get the single step ───────────────────────────────────────────
         step = steps[0] if steps else None
@@ -211,6 +285,36 @@ async def _react_loop(state: dict):
                 yield _sse({"type": "hitl_question", "content": question, "confidence": confidence})
                 return
 
+            # ── Force Triangulation: block premature report generation ──
+            is_researcher = "scrape website" in permissions
+            if is_researcher and tool_name in ("report_generation", "generate_report"):
+                # Count successful scrapes so far (exclude search engine pages)
+                scrape_ok = sum(
+                    1 for s in completed_steps
+                    if s.get("tool_name") == "scrape_website"
+                    and s.get("result")
+                    and "SOURCE:" in str(s.get("result", ""))
+                    and "duckduckgo.com" not in str(s.get("result", ""))
+                )
+                MIN_SCRAPES = 2
+                if scrape_ok < MIN_SCRAPES:
+                    remaining = MIN_SCRAPES - scrape_ok
+                    print(f"    [REACT] TRIANGULATION BLOCK: only {scrape_ok}/{MIN_SCRAPES} successful scrapes — rejecting {tool_name}", flush=True)
+                    step["result"] = (
+                        f"BLOCKED: Only {scrape_ok}/{MIN_SCRAPES} sources scraped. Need {remaining} more. "
+                        f"Your NEXT step must be find_sources with NEW search terms (try different keywords, "
+                        f"e.g. 'casualties', 'timeline', 'strikes'), then scrape_website on each result URL. "
+                        f"Do NOT ask the user. Do NOT try report_generation or generate_report again until you have {MIN_SCRAPES} scrapes."
+                    )
+                    yield _sse({"type": "action", "content": f"{tool_name} [BLOCKED — need {remaining} more scrapes]"})
+                    yield _sse({"type": "action_result", "content": step["result"][:150]})
+                    # Skip to compress — planner will re-plan with scrape instructions
+                    summary = await _compress(goal, [step], api_key, step_num)
+                    summaries.append(summary)
+                    completed_steps.append(step)
+                    _completed_steps_ref[agent_id].append(step)
+                    continue
+
             arg_str = ""
             if tool_args:
                 first = str(list(tool_args.values())[0])
@@ -218,10 +322,32 @@ async def _react_loop(state: dict):
             yield _sse({"type": "action", "content": f"{tool_name}{arg_str}"})
             await asyncio.sleep(0.05)
 
+            # Dynamic URL injection: always prefer discovered URLs over planner-guessed ones
+            if tool_name == "scrape_website" and discovered_urls:
+                url = tool_args.get("url", "")
+                # Try to match planner's URL to a discovered one (handles truncation)
+                matched = False
+                if url and url.startswith("http"):
+                    for i, durl in enumerate(discovered_urls):
+                        if durl.startswith(url) or url.startswith(durl):
+                            tool_args["url"] = discovered_urls.pop(i)
+                            matched = True
+                            print(f"    [REACT] Matched truncated URL → {tool_args['url'][:80]}", flush=True)
+                            break
+                if not matched:
+                    tool_args["url"] = discovered_urls.pop(0)
+                    print(f"    [REACT] Injected URL: {tool_args['url'][:80]}", flush=True)
+
             result = await _run_tool(tool_name, tool_args, state, summaries)
             step["result"] = result
             preview = str(result)[:150] + ("…" if len(str(result)) > 150 else "")
             yield _sse({"type": "action_result", "content": preview})
+
+            # Track discovered URLs from find_sources
+            if tool_name == "find_sources" and isinstance(result, str):
+                import re as _re
+                discovered_urls = _re.findall(r'URL:\s*(https?://[^\s\]]+)', result)
+                print(f"    [REACT] Discovered {len(discovered_urls)} URLs", flush=True)
             await asyncio.sleep(0.05)
 
             if _is_tool_failure(str(result)):
@@ -229,6 +355,24 @@ async def _react_loop(state: dict):
                 print(f"    [REACT] step {step_num+1} TOOL FAILURE (consecutive={consecutive_failures}) tool={tool_name}", flush=True)
             else:
                 consecutive_failures = 0
+
+            # ── Accumulate research data & update Gemini context cache ──
+            if is_researcher and tool_name == "scrape_website" and result and "SOURCE:" in str(result):
+                research_data.append(str(result)[:2000])
+                total_chars = sum(len(r) for r in research_data)
+                # ~4 chars per token; need 4096+ tokens → 16384+ chars
+                if total_chars >= 16384 and (not cache_name or total_chars > 16384 * 1.5):
+                    new_cache = create_research_cache(
+                        agent_id=agent_id,
+                        model="models/gemini-2.0-flash",
+                        system_prompt=system_prompt,
+                        research_context="\n\n---\n\n".join(research_data),
+                        api_key=api_key,
+                        ttl_seconds=1800,
+                    )
+                    if new_cache:
+                        cache_name = new_cache
+                        print(f"+++ [REACT] Context cache created/updated: {cache_name} ({total_chars} chars)", flush=True)
 
         elif step_type == "think":
             yield _sse({"type": "action", "content": f"→ {desc[:60]}"})
@@ -245,7 +389,9 @@ async def _react_loop(state: dict):
         completed_steps.append(step)
         _completed_steps_ref[agent_id].append(step)
 
-    # Cap hit — surface what was gathered
+    # Cap hit — surface what was gathered; clean up cache
+    if cache_name:
+        invalidate_cache(agent_id, api_key)
     print(f"--- [REACT] CAP HIT at step {max_steps} — summaries={len(summaries)}", flush=True)
     content = (
         "Here is what I gathered:\n\n" + "\n\n".join(summaries[-5:])
@@ -277,6 +423,7 @@ async def _stream_planner(
     force_knowledge: bool = False,
     history_context: str = "",
     steps_done: int = 0,
+    cached_content: str = None,
 ):
     """
     Async generator. Streams <thinking>...</thinking> tokens to the caller,
@@ -294,9 +441,9 @@ async def _stream_planner(
     for mode in ("planner", "fast"):
         full_text = ""
         thinking_shown = 0
-        print(f">>> [PLANNER] trying mode={mode} summaries={len(summaries)} steps_done={steps_done}", flush=True)
+        print(f">>> [PLANNER] trying mode={mode} summaries={len(summaries)} steps_done={steps_done} cache={'yes' if cached_content else 'no'}", flush=True)
         try:
-            llm = get_llm(mode, api_key, streaming=True)
+            llm = get_llm(mode, api_key, streaming=True, cached_content=cached_content)
             async for chunk in llm.astream([HumanMessage(content=prompt)]):
                 raw = chunk.content
                 if isinstance(raw, list):
@@ -534,11 +681,21 @@ async def _run_tool(tool_name: str, tool_args: dict, state: dict, summaries: lis
             return await tk.ask_user(agent_id, tool_args.get("question", "I have a question."))
 
         elif tool_name == "generate_report":
-            title   = tool_args.get("title", "Report")
-            content = tool_args.get("content", "")
-            return await tk.generate_report(agent_id, f"{title}|{content}", working_dir)
+            # Researcher agents should always use report_generation (PDF with LLM synthesis)
+            is_researcher = "scrape website" in permissions
+            if is_researcher:
+                topic = tool_args.get("title", tool_args.get("topic", "Report"))
+                context = tool_args.get("content", tool_args.get("context", ""))
+                print(f"    [TOOL] Redirecting generate_report → report_generation for researcher", flush=True)
+                # Fall through to report_generation logic below
+                tool_name = "report_generation"
+                tool_args = {"topic": topic, "context": context}
+            else:
+                title   = tool_args.get("title", "Report")
+                content = tool_args.get("content", "")
+                return await tk.generate_report(agent_id, f"{title}|{content}", working_dir)
 
-        elif tool_name == "report_generation":
+        if tool_name == "report_generation":
             topic   = tool_args.get("topic", "")
             context = tool_args.get("context", "")
             # If the planner used a placeholder or empty context, inject

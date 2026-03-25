@@ -22,12 +22,40 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langgraph.graph import StateGraph, START, END
 
 from graph.state import AgentState
-from graph.llm import get_llm
+from graph.llm import get_llm, create_research_cache, get_active_cache, invalidate_cache
 from graph.tool_definitions import get_tools_for_agent
 from graph.checkpointer import get_checkpointer
 
 
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "agents_code")
+
+# Per-agent accumulated research data for Gemini context caching
+_research_data: dict[str, list[str]] = {}
+_research_cache_name: dict[str, str] = {}
+
+
+def _accumulate_research_cache(agent_id: str, content: str, state: dict):
+    """Append scraped content and create/update Gemini context cache when big enough."""
+    if agent_id not in _research_data:
+        _research_data[agent_id] = []
+    _research_data[agent_id].append(content)
+
+    total_chars = sum(len(r) for r in _research_data[agent_id])
+    current_cache = _research_cache_name.get(agent_id)
+    # ~4 chars per token; need 4096+ tokens → 16384+ chars
+    # Re-cache when 50% more content accumulated since last cache
+    if total_chars >= 16384 and (not current_cache or total_chars > 16384 * 1.5):
+        new_cache = create_research_cache(
+            agent_id=agent_id,
+            model="models/gemini-2.0-flash",
+            system_prompt=state.get("system_prompt", ""),
+            research_context="\n\n---\n\n".join(_research_data[agent_id]),
+            api_key=state["api_key"],
+            ttl_seconds=1800,
+        )
+        if new_cache:
+            _research_cache_name[agent_id] = new_cache
+            print(f"+++ [EXEC_NODE] Context cache created/updated: {new_cache} ({total_chars} chars)", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -195,21 +223,32 @@ def _build_initial_planner_prompt(state: AgentState, tool_names: list) -> str:
     goal = state["goal"]
     permissions = state["permissions"]
     capabilities_str = ", ".join(permissions) if permissions else "none"
+    agent_prompt = state.get("current_prompt_md", "")
 
-    return f"""You are a planning module for an AI agent.
+    # Inject specialized agent instructions if available
+    agent_context = ""
+    if agent_prompt:
+        agent_context = f"""
+AGENT SPECIALIZED INSTRUCTIONS (MUST FOLLOW):
+{agent_prompt}
 
-GOAL: {goal}
+"""
 
-AGENT CAPABILITIES: {capabilities_str}
-AVAILABLE TOOLS: {", ".join(tool_names)}
-
-Plan the first 3 steps to work toward the goal. Consider:
-- What context or information is missing?
-- Should you search the web, read files, or reason internally first?
-- Only use "ask" type if user input is absolutely essential right now.
-
-Return ONLY a valid JSON object:
-{{
+    # Build example steps based on available tools
+    is_researcher = "find_sources" in tool_names
+    if is_researcher:
+        example_steps = """{{
+  "steps": [
+    {{"id": 1, "description": "Search for sources on the topic", "type": "tool", "tool_name": "find_sources", "tool_args": {{"query": "..."}}}},
+    {{"id": 2, "description": "Scrape the first non-Wikipedia source", "type": "tool", "tool_name": "scrape_website", "tool_args": {{"url": "...", "objective": "..."}}}},
+    {{"id": 3, "description": "Scrape a second source for cross-reference", "type": "tool", "tool_name": "scrape_website", "tool_args": {{"url": "...", "objective": "..."}}}}
+  ],
+  "decision": "CONTINUE",
+  "response": "",
+  "question": ""
+}}"""
+    else:
+        example_steps = """{{
   "steps": [
     {{"id": 1, "description": "...", "type": "tool", "tool_name": "web_search", "tool_args": {{"query": "..."}}}},
     {{"id": 2, "description": "...", "type": "think"}},
@@ -218,15 +257,33 @@ Return ONLY a valid JSON object:
   "decision": "CONTINUE",
   "response": "",
   "question": ""
-}}
+}}"""
+
+    return f"""You are a planning module for an AI agent.
+
+GOAL: {goal}
+
+AGENT CAPABILITIES: {capabilities_str}
+AVAILABLE TOOLS: {", ".join(tool_names)}
+{agent_context}
+Plan the first 3 steps to work toward the goal. Consider:
+- What context or information is missing?
+- Should you search the web, read files, or reason internally first?
+- Only use "ask" type if user input is absolutely essential right now.
+
+Return ONLY a valid JSON object:
+{example_steps}
 
 RULES:
-- Always output EXACTLY 3 steps.
+- Always output EXACTLY 3 steps. Prefer tool steps over think steps for research tasks.
 - "type" must be "tool", "think", or "ask".
 - For "tool" steps include "tool_name" and "tool_args".
 - "decision" = "DONE" only if goal is fully achievable from what you already know — include full "response".
 - "decision" = "ASK_USER" only if critical user input is required — include "question".
 - Otherwise "decision" = "CONTINUE".
+- If a tool call failed (e.g. scrape blocked), plan retries with different sources — NEVER give up after one failure.
+- Avoid Wikipedia URLs — they are often blocked. Prefer news sites, research papers, and direct sources.
+- Do NOT use report_generation in the first planning round. First gather data from at least 2-3 sources.
 - Return ONLY the JSON. No markdown fences, no explanation.
 """
 
@@ -235,20 +292,59 @@ def _build_refeed_planner_prompt(state: AgentState, tool_names: list) -> str:
     goal = state["goal"]
     iteration_summaries = state["iteration_summaries"]
     current_steps = state["current_steps"]
+    agent_prompt = state.get("current_prompt_md", "")
 
     last_summaries = iteration_summaries[-3:]
     summaries_str = "\n".join(last_summaries) if last_summaries else "No context gathered yet."
 
     step_lines = []
+    has_scrape_failure = False
+    successful_scrapes = 0
     for s in current_steps:
-        result_preview = str(s.get("result") or "no result")[:120]
+        result_preview = str(s.get("result") or "no result")[:300]
         step_lines.append(f"- Step {s['id']} ({s['type']}): {s['description']} → {result_preview}")
+        result_lower = result_preview.lower()
+        if "error scraping" in result_lower or "minimal content" in result_lower:
+            has_scrape_failure = True
+        if "source:" in result_lower and ("full content:" in result_lower or "distilled facts:" in result_lower):
+            successful_scrapes += 1
     steps_str = "\n".join(step_lines) if step_lines else "No steps executed yet."
+
+    # Count total successful scrapes across all iterations
+    for summary in iteration_summaries:
+        summary_lower = summary.lower()
+        if "scraped" in summary_lower or "extracted" in summary_lower or "source:" in summary_lower:
+            successful_scrapes += 1
+
+    # Inject specialized agent instructions if available
+    agent_context = ""
+    if agent_prompt:
+        agent_context = f"""
+AGENT SPECIALIZED INSTRUCTIONS (MUST FOLLOW):
+{agent_prompt}
+
+"""
+
+    # Add resilience hint if scrape failures detected
+    scrape_hint = ""
+    if has_scrape_failure:
+        scrape_hint = f"""
+IMPORTANT: A scrape failed. Do NOT give up or ask the user. Instead:
+1. Use find_sources with DIFFERENT search terms to find alternative sources
+2. Scrape those alternative URLs instead — try news sites like BBC, Reuters, AP, Al Jazeera article pages
+3. Try at least 3-5 different sources before considering the topic exhausted
+4. Do NOT use report_generation until you have successfully scraped at least 2 sources (current: {successful_scrapes})
+"""
+    elif successful_scrapes < 2:
+        scrape_hint = f"""
+NOTE: You have only {successful_scrapes} successful scrape(s) so far. Continue scraping more sources before generating a report.
+Do NOT use report_generation until you have scraped at least 2-3 sources successfully.
+"""
 
     return f"""You are a planning module for an AI agent continuing toward a goal.
 
 GOAL: {goal}
-
+{agent_context}
 CONTEXT GATHERED SO FAR:
 {summaries_str}
 
@@ -256,7 +352,7 @@ LAST 3 STEPS TAKEN:
 {steps_str}
 
 AVAILABLE TOOLS: {", ".join(tool_names)}
-
+{scrape_hint}
 Plan the next 3 steps, OR decide DONE/ASK_USER.
 
 Return ONLY a valid JSON object:
@@ -275,6 +371,7 @@ RULES:
 - Always output EXACTLY 3 steps.
 - "decision" = "DONE" when goal is fully achieved — write complete answer in "response".
 - "decision" = "ASK_USER" only when user input is strictly required — write question in "question".
+- If a tool failed, plan retries with different inputs — NEVER give up after one failure.
 - Otherwise "CONTINUE".
 - Return ONLY the JSON. No markdown fences, no explanation.
 """
@@ -328,7 +425,8 @@ async def plan(state: AgentState) -> dict:
                     pass
 
             # Task 2: The actual heavy LLM call
-            llm = get_llm("planner", state["api_key"])
+            cache = _research_cache_name.get(agent_id)
+            llm = get_llm("planner", state["api_key"], cached_content=cache)
 
             # Run both concurrently
             loading_task = asyncio.create_task(loading_sequence())
@@ -410,6 +508,9 @@ async def execute(state: AgentState) -> dict:
     executor_llm = get_llm("fast", api_key, streaming=False)
     steps = [dict(s) for s in state["current_steps"]]
 
+    # Track URLs discovered by find_sources for dynamic injection into scrape steps
+    discovered_urls = []
+
     for step in steps:
         step_type = step.get("type", "think")
         print(f"    [EXEC_NODE] step {step['id']} type={step_type} tool={step.get('tool_name','none')}", flush=True)
@@ -424,11 +525,37 @@ async def execute(state: AgentState) -> dict:
                 step["result"] = f"Tool '{tool_name}' not available with current permissions."
                 continue
 
+            # ── Force Triangulation: block premature report_generation ──
+            is_researcher = "scrape website" in permissions
+            if is_researcher and tool_name in ("report_generation", "generate_report"):
+                # Count successful scrapes in previous iterations + current batch
+                all_steps = list(state.get("current_steps", [])) + list(state.get("iteration_summaries", []))
+                scrape_ok = 0
+                for prev in state.get("iteration_summaries", []):
+                    if "scraped" in prev.lower() or "source:" in prev.lower() or "distilled" in prev.lower():
+                        scrape_ok += 1
+                for s in steps:
+                    if s.get("tool_name") == "scrape_website" and s.get("result") and "SOURCE:" in str(s.get("result", "")):
+                        scrape_ok += 1
+                MIN_SCRAPES = 2
+                if scrape_ok < MIN_SCRAPES:
+                    print(f"    [EXEC_NODE] TRIANGULATION BLOCK: {scrape_ok}/{MIN_SCRAPES} scrapes — rejecting report_generation", flush=True)
+                    step["result"] = (
+                        f"BLOCKED: Only {scrape_ok} source(s) scraped. Need at least {MIN_SCRAPES}. "
+                        f"Use find_sources with different search terms, then scrape_website on multiple results."
+                    )
+                    continue
+
             try:
                 if tool_name == "find_sources":
                     step["result"] = await tk.find_sources(
                         tool_args.get("query", ""), agent_id, api_key
                     )
+                    # Extract URLs for dynamic injection into later scrape steps
+                    if isinstance(step["result"], str):
+                        import re as _re
+                        discovered_urls = _re.findall(r'URL:\s*(https?://[^\s\]]+)', step["result"])
+                        print(f"    [EXEC_NODE] Discovered {len(discovered_urls)} URLs from find_sources", flush=True)
 
                 elif tool_name == "web_search":
                     step["result"] = await tk.web_search(
@@ -496,12 +623,21 @@ async def execute(state: AgentState) -> dict:
                     step["result"] = await tk.ask_user(agent_id, question)
 
                 elif tool_name == "generate_report":
-                    title = tool_args.get("title", "Report")
-                    content = tool_args.get("content", "")
-                    input_str = f"{title}|{content}"
-                    step["result"] = await tk.generate_report(agent_id, input_str, working_dir)
+                    # Researcher agents → redirect to report_generation (PDF with LLM synthesis)
+                    if is_researcher:
+                        topic = tool_args.get("title", tool_args.get("topic", "Report"))
+                        context = tool_args.get("content", tool_args.get("context", ""))
+                        print(f"    [EXEC_NODE] Redirecting generate_report → report_generation for researcher", flush=True)
+                        tool_name = "report_generation"
+                        tool_args = {"topic": topic, "context": context}
+                        # Fall through to report_generation below
+                    else:
+                        title = tool_args.get("title", "Report")
+                        content = tool_args.get("content", "")
+                        input_str = f"{title}|{content}"
+                        step["result"] = await tk.generate_report(agent_id, input_str, working_dir)
 
-                elif tool_name == "report_generation":
+                if tool_name == "report_generation" and not step.get("result"):
                     topic = tool_args.get("topic", "")
                     context = tool_args.get("context", "")
                     input_str = f"{topic}|{context}"
@@ -512,6 +648,19 @@ async def execute(state: AgentState) -> dict:
                 elif tool_name == "scrape_website":
                     url = tool_args.get("url", "")
                     objective = tool_args.get("objective", "")
+                    # Always prefer discovered URLs — planner often truncates them
+                    if discovered_urls:
+                        matched = False
+                        if url and url.startswith("http"):
+                            for i, durl in enumerate(discovered_urls):
+                                if durl.startswith(url) or url.startswith(durl):
+                                    url = discovered_urls.pop(i)
+                                    matched = True
+                                    print(f"    [EXEC_NODE] Matched truncated URL → {url[:80]}", flush=True)
+                                    break
+                        if not matched:
+                            url = discovered_urls.pop(0)
+                            print(f"    [EXEC_NODE] Injected URL: {url[:80]}", flush=True)
                     step["result"] = await tk.scrape_website(url, objective, agent_id, api_key)
 
                 elif tool_name == "reflect_and_plan":
@@ -538,6 +687,10 @@ async def execute(state: AgentState) -> dict:
                 if isinstance(step["result"], str) and len(step["result"]) > 3000:
                     step["result"] = step["result"][:3000] + "...[truncated]"
                 print(f"+++ [EXEC_NODE] step {step['id']} result_len={len(str(step['result']))}", flush=True)
+
+                # Accumulate research data for Gemini context caching
+                if is_researcher and tool_name == "scrape_website" and step.get("result") and "SOURCE:" in str(step["result"]):
+                    _accumulate_research_cache(agent_id, str(step["result"])[:2000], state)
 
             except Exception as e:
                 print(f"!!! [EXEC_NODE] step {step['id']} tool={tool_name!r} error: {e}", flush=True)
@@ -608,7 +761,14 @@ async def compress(state: AgentState) -> dict:
 async def respond(state: AgentState) -> dict:
     """Terminal node — formats the final AIMessage."""
     decision = state["planner_decision"]
+    agent_id = state["agent_id"]
     print(f">>> [RESPOND_NODE] decision={decision}", flush=True)
+
+    # Clean up Gemini context cache on completion
+    if agent_id in _research_cache_name:
+        invalidate_cache(agent_id, state.get("api_key", ""))
+        _research_cache_name.pop(agent_id, None)
+        _research_data.pop(agent_id, None)
 
     if decision == "DONE":
         content = state["planner_response"] or "Task complete."

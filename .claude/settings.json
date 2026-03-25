@@ -7,7 +7,11 @@
       "Bash(python -c \"import py_compile; py_compile.compile\\(''toolkit.py'', doraise=True\\); print\\(''OK''\\)\")",
       "Bash(curl -s http://localhost:8000/docs -o /dev/null -w \"%{http_code}\")",
       "Bash(python -c \"import py_compile; py_compile.compile\\(''graph/streaming.py'', doraise=True\\); py_compile.compile\\(''toolkit.py'', doraise=True\\); print\\(''OK''\\)\")",
-      "Bash(pip show:*)"
+      "Bash(pip show:*)",
+      "Bash(grep -E \"\\\\.py$|^d\")",
+      "Read(//d/New folder/**)",
+      "Read(//c/Users/Asus/**)",
+      "Bash(python test_deep_researcher.py)"
     ]
   }
 }

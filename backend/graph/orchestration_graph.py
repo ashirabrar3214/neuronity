@@ -470,10 +470,39 @@ async def execute_next_node(agent_id, api_key, provider):
 
     result_str = str(result)
 
+    # Detect scrape failures and inject a retry node with alternative-source instructions
+    scrape_failed = "Error scraping" in result_str or "CRITICAL: Could not read" in result_str
+    if scrape_failed:
+        safe_log(f">>> [RETRY] {agent_id} scrape failed. Injecting alternative-source task.")
+        retry_node = {
+            "id": f"retry_{int(time.time())}",
+            "label": "Alternative Source Lookup",
+            "agent": next_node.get("agent", agent_id),
+            "task": (
+                f"Previous scrape failed: {result_str[:120]}. "
+                f"Use find_sources to search for a DIFFERENT source covering the same topic. "
+                f"Then use scrape_website on the new URL. Do NOT retry the same URL."
+            ),
+            "dependencies": [next_node["id"]],
+            "status": "PENDING",
+            "result_summary": ""
+        }
+        nodes = workmap.get("nodes", [])
+        # Insert right after the current node
+        current_idx = next((i for i, n in enumerate(nodes) if n["id"] == next_node["id"]), len(nodes))
+        nodes.insert(current_idx + 1, retry_node)
+        workmap["nodes"] = nodes
+        safe_log(f"+++ [RETRY] Injected retry node {retry_node['id']} at position {current_idx + 1}")
+
     for node in workmap.get("nodes", []):
         if node["id"] == next_node["id"]:
-            node["status"] = "ERROR" if result_str.startswith("Step failed") else "COMPLETED"
-            node["result_summary"] = result_str[:300]
+            if scrape_failed:
+                # Mark as completed (not error) so it doesn't block the retry node
+                node["status"] = "COMPLETED"
+                node["result_summary"] = f"Scrape failed, retry injected: {result_str[:200]}"
+            else:
+                node["status"] = "ERROR" if result_str.startswith("Step failed") else "COMPLETED"
+                node["result_summary"] = result_str[:300]
             safe_log(f"+++ [TICK_NODE] {next_node['id']} -> {node['status']} summary_len={len(node['result_summary'])}")
             break
 
