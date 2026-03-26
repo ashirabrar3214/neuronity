@@ -3,7 +3,7 @@ import re
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Frame, PageTemplate
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Frame, PageTemplate, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -12,10 +12,29 @@ from reportlab.pdfbase.ttfonts import TTFont
 FONT_NAME = 'Times-Roman'
 FONT_SIZE = 11
 
-def convert_citations_to_superscript(text):
-    """Convert [1], [2], etc. citations to superscript format for ReportLab."""
-    # Replace [1], [2], [3] with <super>1</super>, <super>2</super>, etc.
-    return re.sub(r'\[(\d+)\]', r'<super>\1</super>', text)
+def convert_citations_to_superscript(text, url_map=None):
+    """
+    Convert citations to superscript format for ReportLab.
+    Handles both [1] format and [http://...] format.
+    """
+    if url_map is None:
+        url_map = {}
+        
+    # First, handle the [1] style
+    text = re.sub(r'\[(\d+)\]', r'<super>[\1]</super>', text)
+    
+    # Second, handle the [http://...] style by converting them to numbers
+    def url_replacer(match):
+        url = match.group(1)
+        if url not in url_map:
+            # Assign a new number if we haven't seen this URL
+            url_map[url] = len(url_map) + 1
+        num = url_map[url]
+        return f'<super>[{num}]</super>'
+        
+    text = re.sub(r'\[(https?://[^\]]+)\]', url_replacer, text)
+    
+    return text, url_map
 
 class ReportPDFGenerator:
     def __init__(self, filename, title):
@@ -114,36 +133,101 @@ class ReportPDFGenerator:
         story.append(Paragraph(self.title, self.styles['ReportTitle']))
         story.append(Spacer(1, 0.2*inch))
         
+        # Track URLs so numbering matches across sections
+        self.url_map = {}
+        
         # Summary/Introduction
         if content_data.get("summary"):
             story.append(Paragraph("Executive Summary", self.styles['SectionHeader']))
-            summary_text = convert_citations_to_superscript(content_data["summary"])
+            # Fix spacing: Replace single newlines with spaces, keep double newlines
+            clean_summary = re.sub(r'(?<!\n)\n(?!\n)', ' ', content_data["summary"])
+            summary_text, self.url_map = convert_citations_to_superscript(clean_summary, self.url_map)
             story.append(Paragraph(summary_text, self.styles['NormalText']))
             story.append(Spacer(1, 0.2*inch))
 
         # Main Sections
         for section in content_data.get("sections", []):
             story.append(Paragraph(section["title"], self.styles['SectionHeader']))
-            section_content = convert_citations_to_superscript(section["content"])
-            story.append(Paragraph(section_content, self.styles['NormalText']))
-            story.append(Spacer(1, 0.1*inch))
+            
+            # --- NEW: Smart Block Parsing (Text vs Tables) ---
+            # Split the section by double-newlines to process paragraph by paragraph
+            blocks = re.split(r'\n\s*\n', section["content"].strip())
+            
+            for block in blocks:
+                block = block.strip()
+                if not block:
+                    continue
+                    
+                lines = block.split('\n')
+                # Detect a Markdown table: At least 3 lines, has pipes, and has a '---' separator row
+                is_table = len(lines) >= 3 and '|' in lines[0] and re.search(r'\|[\s\-:]+\|', lines[1])
+                
+                if is_table:
+                    table_data = []
+                    for i, line in enumerate(lines):
+                        line = line.strip()
+                        # Skip the markdown separator row (e.g., |---|---|)
+                        if re.match(r'^\|?[\s\-:\|]+\|?$', line):
+                            continue
+                            
+                        # Split by pipe, ignore empty outer strings
+                        cells = [c.strip() for c in line.strip('|').split('|')]
+                        
+                        row_data = []
+                        for cell in cells:
+                            cell_text, self.url_map = convert_citations_to_superscript(cell, self.url_map)
+                            # Make the header row bold
+                            if len(table_data) == 0: 
+                                cell_text = f"<b>{cell_text}</b>"
+                            # Wrap text in Paragraph so it wraps nicely inside the cell
+                            row_data.append(Paragraph(cell_text, self.styles['NormalText']))
+                            
+                        if row_data:
+                            table_data.append(row_data)
+                            
+                    if table_data:
+                        # Render the native PDF Table
+                        t = Table(table_data)
+                        t.setStyle(TableStyle([
+                            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e0e0e0')), # Grey header
+                            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                            ('PADDING', (0,0), (-1,-1), 6),
+                        ]))
+                        story.append(t)
+                        story.append(Spacer(1, 0.15*inch))
+                else:
+                    # Normal Paragraph: Apply the spacing fix safely here!
+                    clean_content = re.sub(r'(?<!\n)\n(?!\n)', ' ', block)
+                    section_content, self.url_map = convert_citations_to_superscript(clean_content, self.url_map)
+                    story.append(Paragraph(section_content, self.styles['NormalText']))
+                    story.append(Spacer(1, 0.1*inch))
+            # -------------------------------------------------
             
         # Sources Page
         story.append(PageBreak())
         story.append(Paragraph("Sources and References", self.styles['SectionHeader']))
         story.append(Spacer(1, 0.1*inch))
         
-        for source in content_data.get("sources", []):
+        # Fallback to the original list because the LLM is now correctly formatting [1], [2]
+        ordered_sources = content_data.get("sources", [])
+        
+        for i, source in enumerate(ordered_sources):
             title = source.get("title", "Source")
             url = source.get("url", "#")
-            # PDF links in reportlab use <a> tags
+            
+            # THE FIX: Always number the bibliography (1, 2, 3...) instead of using bullet points
+            list_num = i + 1
+            prefix = f"<b>[{list_num}]</b> "
+            
             link_html = f'<a href="{url}" color="blue">{title}</a>'
-            story.append(Paragraph(f"• {link_html}<br/><i>{url}</i>", self.styles['SourceItem']))
+            story.append(Paragraph(f"{prefix}{link_html}<br/><i>{url}</i>", self.styles['SourceItem']))
             story.append(Spacer(1, 0.05*inch))
             
         # Build the PDF
         doc.build(story, onFirstPage=self.draw_fixed_elements, onLaterPages=self.draw_fixed_elements)
         return self.filename
+
 
 if __name__ == "__main__":
     # Test generation

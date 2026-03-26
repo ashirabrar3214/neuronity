@@ -13,7 +13,7 @@ from graph.knowledge_store import KnowledgeStore
 
 async def test_synthesis():
     # --- CHANGE THIS TO YOUR LATEST AGENT FOLDER ---
-    target_agent_id = "agent-bot-1774555676414" 
+    target_agent_id = "agent-bot-1774558755353" 
     # -----------------------------------------------
     
     working_dir = os.path.join(os.path.dirname(__file__), "agents_code", target_agent_id)

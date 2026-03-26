@@ -246,7 +246,7 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
         3. Deep-Dive Sections: At least 6-8 comprehensive sections covering technical evolution, market impacts, strategic pivots, competitive landscape, and future projections.
            - Each section must have a clear, descriptive 'title'.
            - Every section must have at least 500 words of analysis.
-        4. Sources: Extract ALL URLs and titles found in the graph data provided into the separate JSON list.
+        4. Sources: Extract ALL URLs found in the data. You MUST extract the actual title of the article. DO NOT use lazy placeholders like "Discovered Source" or "Reference".
         
         # OUTPUT FORMAT:
         The output MUST be a PURE JSON object (no markdown code blocks) with this structure:
@@ -264,8 +264,8 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
         Return ONLY the JSON. Verify it is valid JSON with escaped newlines and quotes.
         """
 
-        # 3. Use Gemini 3.1 Pro for the final heavy lifting
-        model = PLANNER_MODEL
+        # 3. Use Gemini 3 Flash for the final heavy lifting
+        model = REASONING_MODEL
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         headers = {"Content-Type": "application/json"}
         data = {
