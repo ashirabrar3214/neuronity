@@ -43,7 +43,7 @@ class KnowledgeStore:
             try:
                 with open(graph_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                self.graph = json_graph.node_link_graph(data, directed=True)
+                self.graph = json_graph.node_link_graph(data, directed=True, edges="links")
             except Exception:
                 self.graph = nx.DiGraph()
         else:
@@ -164,6 +164,32 @@ class KnowledgeStore:
 
         return fid
 
+    def add_fact_node(self, content: str, source_id: str, entity_ids: list) -> str:
+        """Adds a Fact and links it to both the Source and relevant Entities."""
+        fid = self._next_id("fact")
+        self.graph.add_node(fid, node_type="fact", content=content, extracted_at=time.strftime("%Y-%m-%dT%H:%M:%SZ"))
+        
+        # Link Fact to its Source
+        if source_id and self.graph.has_node(source_id):
+            self.graph.add_edge(source_id, fid, edge_type="extracted_from")
+        
+        # Link Fact to Entities (The Bridge)
+        for eid in entity_ids:
+            if self.graph.has_node(eid):
+                self.graph.add_edge(fid, eid, edge_type="relates_to")
+        return fid
+
+    def add_entity_node(self, name: str, category: str, source_id: str) -> str:
+        """Creates a unique entity node (deduplicated) and links to source."""
+        eid = f"ent_{name.lower().replace(' ', '_')}"
+        if not self.graph.has_node(eid):
+            self.graph.add_node(eid, node_type="entity", label=name, category=category)
+        
+        # Link Entity to Source (Direct Mention)
+        if source_id and self.graph.has_node(source_id):
+            self.graph.add_edge(eid, source_id, edge_type="mentioned_in")
+        return eid
+
     def get_entity_connections(self, entity_label: str) -> dict:
         """Finds all sources and tables connected to a specific entity."""
         ent_id = f"ent_{entity_label.lower().replace(' ', '_')}"
@@ -212,6 +238,20 @@ class KnowledgeStore:
                         }
 
         return {"facts": facts, "sources": list(sources.values())}
+
+    def get_llm_graph(self) -> dict:
+        """Returns the graph structure (nodes/links) while explicitly stripping 'full_text' from the output."""
+        from networkx.readwrite import json_graph
+        # Convert to dictionary first
+        data = json_graph.node_link_data(self.graph, edges="links")
+        
+        # Strip the computationally heavy content from the output list
+        if "nodes" in data:
+            for node in data["nodes"]:
+                if "full_text" in node:
+                    del node["full_text"]
+                    
+        return data
 
     def _ensure_topic(self, label: str) -> str:
         """Get or create a topic node by label. Returns topic_id."""

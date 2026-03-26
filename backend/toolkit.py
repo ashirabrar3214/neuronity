@@ -631,57 +631,75 @@ def get_research_config(project_size: str, human_effort: int) -> dict:
 
 # --- Website Scraping ---
 
+def extract_svo_triples(text):
+    """Robustly extracts Facts using Linguistic Dependency Parsing."""
+    if not nlp: return []
+    doc = nlp(text)
+    triples = []
+    for sent in doc.sents:
+        # Check for Subject-Verb-Object structure
+        subjects = [t.text for t in sent if "subj" in t.dep_]
+        verbs = [t.text for t in sent if t.pos_ == "VERB"]
+        objs = [t.text for t in sent if "obj" in t.dep_]
+        
+        # If it's a complete thought with a data point (Date/Money), it's a Fact
+        has_data = any(ent.label_ in ["DATE", "MONEY", "PERCENT"] for ent in sent.ents)
+        
+        if (subjects and verbs and objs) or (subjects and has_data):
+            triples.append({
+                "fact": sent.text.strip(),
+                "entities": [(ent.text, ent.label_) for ent in sent.ents]
+            })
+    return triples
+
 async def scrape_website(url, agent_id):
-    """
-    Scrapes a URL, extracts rich data locally, and injects it into the Graph.
-    """
+    """The robust orchestrator for local GraphRAG ingestion."""
     safe_log(f"[STATUS:{agent_id}] Deep Extraction: {url[:60]}...", agent_id=agent_id)
     url = url.strip().strip("'\"`")
     if not url.startswith("http"): url = "https://" + url
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
     }
 
     try:
+        # 1. Fetch raw HTML
         async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
-            response = await client.get(url, headers=headers)
-            if response.status_code != 200:
-                return f"Error: HTTP {response.status_code}"
-            
-            html = response.text
+            res = await client.get(url, headers=headers)
+            if res.status_code != 200:
+                return f"Error: HTTP {res.status_code}"
+            html = res.text
 
-        # --- STEP 1: Local Rich Extraction ---
-        rich_data = extract_rich_metadata(html, url)
-        
-        # --- STEP 2: Knowledge Injection ---
+        # 2. Local Rich Extraction (No LLM)
+        main_text = trafilatura.extract(html, include_tables=True)
+        metadata = trafilatura.metadata.extract_metadata(html)
+        soup = BeautifulSoup(html, 'html.parser')
+        tables = [str(t.get_text(separator=" | ")).strip() for t in soup.find_all('table')]
+
+        # 3. Knowledge Graph Injection
         store = KnowledgeStore(agent_id)
         store.load()
-        
-        # Add the Source Node (with Tables and Metadata)
-        source_id = store.add_source(
+        sid = store.add_source(
             url=url, 
-            title=rich_data["title"], 
-            snippet=rich_data["text"][:300] if rich_data["text"] else "No content", 
-            full_text=rich_data["text"] if rich_data["text"] else "",
-            metadata={"tables": rich_data["tables"], "date": rich_data["date"]}
+            title=metadata.title if metadata else "Unknown", 
+            snippet=main_text[:300] if main_text else "No content",
+            full_text=main_text if main_text else "", 
+            metadata={"tables": tables, "date": metadata.date if metadata else None}
         )
+
+        # 4. SVO Fact & Entity Linking
+        if main_text:
+            facts = extract_svo_triples(main_text[:10000]) # Process first 10k chars
+            for f in facts:
+                e_ids = []
+                for name, cat in f["entities"]:
+                    e_ids.append(store.add_entity_node(name, cat, sid))
+                store.add_fact_node(f["fact"], sid, e_ids)
+
+            store.save()
+            return f"SOURCE: {url}\n\nSuccessfully mapped {len(facts)} facts and {len(tables)} tables to graph.\n\n{main_text[:2000]}..."
         
-        # Add Entity Nodes (The "Hopping Points")
-        if rich_data["entities"]:
-            for ent in rich_data["entities"]:
-                store.add_entity(ent["text"], ent["label"], source_id)
-            
-        store.save()
-
-        # --- STEP 3: Return Clean Text to Agent ---
-        text = rich_data["text"] if rich_data["text"] else ""
-        if len(text) > 3000:
-            text = text[:3000] + "\n\n[... structural details saved to graph ...]"
-
-        return f"SOURCE: {url}\n\n{text}"
+        return f"SOURCE: {url}\n\nScraped successfully but no main text found."
 
     except Exception as e:
         safe_log(f"!!! [SCRAPE] Error: {e}", agent_id=agent_id)
