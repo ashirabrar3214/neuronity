@@ -1,0 +1,321 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "node_type": "source",
+      "url": "https://www.grandviewresearch.com/industry-analysis/large-language-model-llm-market-report",
+      "title": "Large Language Models Market Size | Industry Report, 2030",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T14:02:42Z",
+      "id": "src_001"
+    },
+    {
+      "node_type": "fact",
+      "content": "The global large language model market size was estimated at USD 5,617.4 million in 2024.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T14:02:42Z",
+      "id": "fact_001"
+    },
+    {
+      "node_type": "topic",
+      "label": "market_size",
+      "summary": "",
+      "id": "topic_market_size"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_market",
+      "summary": "",
+      "id": "topic_llm_market"
+    },
+    {
+      "node_type": "fact",
+      "content": "The global large language model market is projected to reach USD 35,434.4 million by 2030.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T14:02:42Z",
+      "id": "fact_002"
+    },
+    {
+      "node_type": "topic",
+      "label": "market_forecast",
+      "summary": "",
+      "id": "topic_market_forecast"
+    },
+    {
+      "node_type": "fact",
+      "content": "The large language model market is expected to grow at a CAGR of 36.9% from 2025 to 2030.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T14:02:42Z",
+      "id": "fact_003"
+    },
+    {
+      "node_type": "topic",
+      "label": "market_growth",
+      "summary": "",
+      "id": "topic_market_growth"
+    },
+    {
+      "node_type": "topic",
+      "label": "cagr",
+      "summary": "",
+      "id": "topic_cagr"
+    },
+    {
+      "node_type": "source",
+      "url": "https://www.marketresearchfuture.com/reports/large-language-model-market-22213",
+      "title": "Large Language Model (LLM) Market Size, Industry Report - 2035",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T14:02:42Z",
+      "id": "src_002"
+    },
+    {
+      "node_type": "fact",
+      "content": "Advancements in natural language processing, cloud deployment, and enterprise AI adoption are driving strong growth momentum in the large language model market.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T14:02:42Z",
+      "id": "fact_004"
+    },
+    {
+      "node_type": "topic",
+      "label": "market_drivers",
+      "summary": "",
+      "id": "topic_market_drivers"
+    },
+    {
+      "node_type": "topic",
+      "label": "nlp",
+      "summary": "",
+      "id": "topic_nlp"
+    },
+    {
+      "node_type": "topic",
+      "label": "cloud_computing",
+      "summary": "",
+      "id": "topic_cloud_computing"
+    },
+    {
+      "node_type": "topic",
+      "label": "enterprise_ai",
+      "summary": "",
+      "id": "topic_enterprise_ai"
+    },
+    {
+      "node_type": "source",
+      "url": "https://www.sciencedirect.com/science/article/pii/S2666764925000323",
+      "title": "Integrative innovation of large language models in industries ...",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T14:02:42Z",
+      "id": "src_003"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models are enhancing natural language processing tasks through pre-training on extensive datasets.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T14:02:42Z",
+      "id": "fact_005"
+    },
+    {
+      "node_type": "topic",
+      "label": "pre-training",
+      "summary": "",
+      "id": "topic_pre-training"
+    },
+    {
+      "node_type": "topic",
+      "label": "datasets",
+      "summary": "",
+      "id": "topic_datasets"
+    },
+    {
+      "node_type": "source",
+      "url": "https://www.businessresearchinsights.com/market-reports/large-language-model-llm-market-117072",
+      "title": "Large Language Model (LLM) Market Size, 2035 | CAGR 79.8%",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T14:02:42Z",
+      "id": "src_004"
+    },
+    {
+      "node_type": "fact",
+      "content": "One trend in the Large Language Model (LLM) market is the monitoring of models\u2019 enhancement to the particular industry they serve, for instance, healthcare, finance, or legal.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T14:02:42Z",
+      "id": "fact_006"
+    },
+    {
+      "node_type": "topic",
+      "label": "market_trends",
+      "summary": "",
+      "id": "topic_market_trends"
+    },
+    {
+      "node_type": "topic",
+      "label": "industry_specific_llms",
+      "summary": "",
+      "id": "topic_industry_specific_llms"
+    },
+    {
+      "node_type": "topic",
+      "label": "healthcare",
+      "summary": "",
+      "id": "topic_healthcare"
+    },
+    {
+      "node_type": "topic",
+      "label": "finance",
+      "summary": "",
+      "id": "topic_finance"
+    },
+    {
+      "node_type": "topic",
+      "label": "legal",
+      "summary": "",
+      "id": "topic_legal"
+    }
+  ],
+  "links": [
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_001"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_002"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_003"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_001",
+      "target": "topic_market_size"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_001",
+      "target": "topic_llm_market"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_002",
+      "target": "topic_market_size"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_002",
+      "target": "topic_llm_market"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_002",
+      "target": "topic_market_forecast"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_003",
+      "target": "topic_market_growth"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_003",
+      "target": "topic_llm_market"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_003",
+      "target": "topic_cagr"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_002",
+      "target": "fact_004"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_004",
+      "target": "topic_market_drivers"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_004",
+      "target": "topic_nlp"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_004",
+      "target": "topic_cloud_computing"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_004",
+      "target": "topic_enterprise_ai"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_005"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_005",
+      "target": "topic_nlp"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_005",
+      "target": "topic_pre-training"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_005",
+      "target": "topic_datasets"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_004",
+      "target": "fact_006"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_006",
+      "target": "topic_market_trends"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_006",
+      "target": "topic_industry_specific_llms"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_006",
+      "target": "topic_healthcare"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_006",
+      "target": "topic_finance"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_006",
+      "target": "topic_legal"
+    }
+  ]
+}

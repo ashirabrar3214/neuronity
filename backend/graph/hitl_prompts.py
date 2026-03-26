@@ -48,19 +48,17 @@ CURRENT KNOWLEDGE:
 
 AVAILABLE TOOLS: {", ".join(tool_names)}
 
-Select up to {batch_size} tool calls to fill gaps. 
-
 STRATEGY RULES:
-1. If you already have basic definitions or history, DO NOT search for them again.
-2. Search for "Criticism of [Concept]", "Methodology behind [Data Point]", or "Future projections for [Topic]".
+1. If you do NOT have any REAL URLs in your CURRENT KNOWLEDGE yet, you MUST output EXACTLY 1 `web_search` tool call. Do not use scrape_website.
+2. If you DO have REAL URLs from a previous web_search in your CURRENT KNOWLEDGE, you MUST output EXACTLY {batch_size} `scrape_website` tool calls to comprehensively scrape every single URL found. Do not skip any.
 3. Target primary sources, industry reports, and analytical articles over basic encyclopedias.
-4. Use web_search to discover URLs BEFORE you use scrape_website.
-5. CRITICAL: ONLY use scrape_website if you already have REAL URLs from a previous web_search. If you do not have URLs yet, ONLY use web_search.
+4. CRITICAL: NEVER output dummy URLs like "https://...". Use the precise URLs from the previous search.
 
 Return ONLY a JSON object using this structure:
 {{
   "tool_calls": [
-    {{"tool_name": "web_search", "tool_args": {{"query": "highly specific analytical search term"}}}}
+    {{"tool_name": "web_search", "tool_args": {{"query": "highly specific analytical search term"}}}},
+    {{"tool_name": "scrape_website", "tool_args": {{"url": "https://example.com/actual-url-from-knowledge"}}}}
   ],
   "reasoning": "Brief explanation of why this deepens the research"
 }}
@@ -133,7 +131,7 @@ RULES:
 - options MUST be derived from actual facts found.
 - AMNESIA PREVENTION: Do NOT suggest options that the user has already rejected, skipped, or complained about in the USER STEERS.
 - DIRECT COMMANDS: If the USER STEERS indicate a direct command (e.g., "focus on strikes", "told you to look for X"), your analysis MUST acknowledge this, and your options MUST be specific sub-topics of that command. Do not revert to old topics.
-- ready_to_act = true if there's enough data to write at least one output unit on the user's requested topic.
+- ready_to_act = true ONLY IF the knowledge graph contains deeply scraped facts from actual websites. If you have only performed initial web_searches (and thus only have brief snippets), you MUST set ready_to_act to false so the next turn triggers a deep-dive scraping phase.
 - gaps should be specific.
 - Generate 2-3 options, not more.
 - Return ONLY the JSON. No markdown."""

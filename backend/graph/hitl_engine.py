@@ -403,37 +403,65 @@ async def _phase_gather(state: dict, store: KnowledgeStore, dial: int):
         text = await _call_model("fast", prompt, state["api_key"])
         parsed = _parse_json(text)
         tool_calls = parsed.get("tool_calls", [])
+        
+        # Anti-laziness: Auto-expand scrape_website calls using known URLs
+        has_scrape = any(tc.get("tool_name") == "scrape_website" for tc in tool_calls)
+        if has_scrape:
+            import re
+            # Extract URLs from the context that the LLM was reading
+            known_urls = re.findall(r'https?://[^\s<>"\']+', graph_summary)
+            planned_urls = {tc.get("tool_args", {}).get("url") for tc in tool_calls if tc.get("tool_name") == "scrape_website"}
+            
+            # Fill remaining slots up to batch_size
+            for url in known_urls:
+                if len(tool_calls) >= batch_size: break
+                if url not in planned_urls and not url.endswith(('.jpg', '.png', '.pdf')):
+                    tool_calls.append({"tool_name": "scrape_website", "tool_args": {"url": url}})
+                    planned_urls.add(url)
+                    
         _log(f"+++ [HITL:GATHER] planned {len(tool_calls)} tool calls")
     except Exception as e:
         _log(f"!!! [HITL:GATHER] Planning error: {e}, falling back to web_search")
         tool_calls = [{"tool_name": "web_search", "tool_args": {"query": state["goal"]}}]
 
-    # Execute each tool call
-    raw_results = []
+    # Pre-yield all actions to UI so it instantly displays the batch
+    valid_calls = []
     for tc in tool_calls[:batch_size]:
         tool_name = tc.get("tool_name", "")
         tool_args = tc.get("tool_args", {})
-
-        if not tool_name:
-            continue
-
+        if not tool_name: continue
+        valid_calls.append(tc)
         arg_preview = str(list(tool_args.values())[0])[:40] if tool_args else ""
         yield _sse({"type": "action", "content": f"{tool_name}: {arg_preview}"})
 
-        result = await _execute_tool(tool_name, tool_args, state)
+    # Execute all tools concurrently
+    tasks = []
+    for tc in valid_calls:
+        tasks.append(_execute_tool(tc["tool_name"], tc.get("tool_args", {}), state))
+        
+    results_gathered = await asyncio.gather(*tasks, return_exceptions=True)
 
-        preview = str(result)[:150]
+    # Post-yield results and save
+    raw_results = []
+    for tc, result in zip(valid_calls, results_gathered):
+        tool_name = tc["tool_name"]
+        if isinstance(result, Exception):
+            result_str = f"Error: {str(result)}"
+        else:
+            result_str = str(result)
+            
+        preview = result_str[:150]
         yield _sse({"type": "action_result", "content": preview})
-        _log(f"    [HITL:GATHER] {tool_name} -> {len(str(result))} chars")
+        _log(f"    [HITL:GATHER] {tool_name} -> {len(result_str)} chars")
 
         raw_results.append({
             "tool_name": tool_name,
-            "tool_args": tool_args,
-            "raw_result": str(result)[:3000],
+            "tool_args": tc.get("tool_args", {}),
+            "raw_result": result_str[:3000],
             "timestamp": __import__("time").strftime("%Y-%m-%dT%H:%M:%SZ"),
         })
 
-        await asyncio.sleep(0.05)
+    await asyncio.sleep(0.05)
 
     # Store raw results in scratchpad
     store.add_raw_results(raw_results)
