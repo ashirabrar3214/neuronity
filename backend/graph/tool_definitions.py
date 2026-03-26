@@ -55,6 +55,23 @@ async def scrape_website(
 
 
 # ---------------------------------------------------------------------------
+# GRAPH TOOLS
+# ---------------------------------------------------------------------------
+
+@tool
+async def query_graph(
+    entity_query: str,
+    state: Annotated[dict, InjectedState],
+) -> str:
+    """Search the internal knowledge graph for an entity (person, company, date) 
+    to see how it is connected across different research papers and articles."""
+    import toolkit
+    agent_id = _get(state, "agent_id")
+    print(f">>> [TOOL_DEF:query_graph] agent={agent_id} query={entity_query!r}", flush=True)
+    return await toolkit.query_graph(entity_query, agent_id)
+
+
+# ---------------------------------------------------------------------------
 # REPORT GENERATION TOOLS
 # ---------------------------------------------------------------------------
 
@@ -443,7 +460,7 @@ def get_tools_for_agent(permissions: list, has_connections: bool,
         tools.append(message_agent)
 
     # Always-available tools
-    tools.extend([ask_user, update_plan])
+    tools.extend([ask_user, update_plan, query_graph])
 
     # Training-only tools
     if is_training:

@@ -6,6 +6,18 @@ import httpx
 import asyncio
 import re
 from pdf_generator import ReportPDFGenerator
+from graph.knowledge_store import KnowledgeStore
+
+import trafilatura
+from bs4 import BeautifulSoup
+import spacy
+
+# Load the smallest, fastest NLP model (uses < 200MB RAM)
+try:
+    nlp = spacy.load("en_core_web_sm")
+except:
+    # Fallback if not downloaded yet
+    nlp = None
 
 # -- LLM Models (Abstracting for easy upgrades) --
 FAST_MODEL = os.getenv("FAST_MODEL", "gemini-2.0-flash")
@@ -173,8 +185,8 @@ def _chunk_text(text, max_chars=12000):
 
 async def report_generation(agent_id, tool_input, working_dir, api_key, agent_name="Agent"):
     """
-    Advanced tool for creating a detailed PDF research report in the working directory.
-    Usage: [TOOL: report_generation(Topic | Context/Sources)]
+    Advanced tool that synthesizes a PDF research report using GraphRAG data and Gemini 3.1 Pro.
+    Usage: [TOOL: report_generation(Topic)]
     """
     safe_log(f"[STATUS:{agent_id}] PDF: Synthesis for '{tool_input[:40]}...'", agent_id=agent_id)
     
@@ -182,58 +194,59 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
         if not working_dir:
             return "Error: No working directory assigned. Cannot save report."
             
-        if "|" in tool_input:
-            topic, context = tool_input.split("|", 1)
-        else:
-            topic = tool_input
-            context = "No specific context provided. Research based on the topic alone."
-            
-        # Strip hallucinations like topic="..." or context="..."
-        topic = topic.strip()
+        # 1. Setup & Graph Retrieval
+        topic = tool_input.split("|")[0].strip()
+        # Support hallucinations like topic="..."
         if "=" in topic and (topic.lower().startswith("topic=") or topic.lower().startswith("subject=")):
             topic = topic.split("=", 1)[-1].strip()
         topic = topic.strip("'").strip('"').strip("`")
 
-        context = context.strip()
-        if "=" in context and (context.lower().startswith("context=") or context.lower().startswith("research=")):
-            context = context.split("=", 1)[-1].strip()
-        context = context.strip("'").strip('"').strip("`")
+        store = KnowledgeStore(agent_id)
+        store.load()
         
-        # 1. Synthesis Phase
-        prompt = f"""You are a senior report writer. Create a comprehensive, formal research report on the following topic.
+        # Get the "Map of Facts" instead of relying on memory
+        graph_data = store.get_full_report_context(topic)
+        
+        # 2. Craft the 'Senior Analyst' Prompt
+        prompt = f"""You are a Senior Strategic Analyst. Write a comprehensive, formal research report based on the provided Knowledge Graph data.
+        
+        TOPIC: {topic}
+        
+        RESEARCH DATA (The Knowledge Graph):
+        {json.dumps(graph_data, indent=2)}
+        
+        STRICT INSTRUCTIONS:
+        - Use the provided 'tables' exactly as they appear for your data sections.
+        - Compare facts across different sources using the provided timestamps.
+        - Analyze trends, identify consensus/conflicts, and provide strategic insights.
+        
+        STRICT REPORT STRUCTURE:
+        1. Title: A professional, catchy, and descriptive title for the report.
+        2. Executive Summary: 1-2 powerful paragraphs.
+        3. Sections: Multiple detailed sections. Each section must have a clear 'Title' and several paragraphs of information. Use the tables where relevant.
+        4. Sources: Extract ALL URLs and titles found in the graph data provided. Do NOT hallucinate links.
+        
+        FORMATTING RULES:
+        - The output MUST be a JSON object with this structure:
+        {{
+          "title": "Professional Report Title",
+          "summary": "Full summary text...",
+          "sections": [
+            {{ "title": "Section Title", "content": "Detailed paragraph text..." }},
+            ...
+          ],
+          "sources": [
+            {{ "title": "Source Label", "url": "http://..." }},
+            ...
+          ]
+        }}
+        - Use authoritative, professional, and insightful language.
+        - Escape newlines as \\n and backslashes as \\\\ within JSON string values.
+        - Return ONLY the JSON object. No markdown wrapper.
+        """
 
-TOPIC: {topic}
-
-RESEARCH DATA / CONTEXT:
-{context}
-
-STRICT REPORT STRUCTURE:
-1. Title: A professional, catchy, and descriptive title for the report (e.g., 'Recent Tensions in the Iran Conflict' instead of just 'Iran War').
-2. Executive Summary: 1-2 powerful paragraphs.
-3. Sections: Multiple detailed sections. Each section must have a clear 'Title' and several paragraphs of information.
-4. Sources: Extract ALL URLs and titles found in the context provided. Do NOT hallucinate links.
-
-FORMATTING RULES:
-- The output MUST be a JSON object with this structure:
-{{
-  "title": "Professional Report Title",
-  "summary": "Full summary text...",
-  "sections": [
-    {{ "title": "Section Title", "content": "Detailed paragraph text..." }},
-    ...
-  ],
-  "sources": [
-    {{ "title": "Source Label", "url": "http://..." }},
-    ...
-  ]
-}}
-- Use authoritative, professional language.
-- Ensure sections are informative and flow logically.
-- CRITICAL FOR JSON: Within string values, escape newlines as \\n and backslashes as \\\\ so the JSON is valid.
-- Return ONLY the JSON object. No markdown wrapper.
-"""
-
-        model = FAST_MODEL
+        # 3. Use Gemini 3.1 Pro for the final heavy lifting
+        model = PLANNER_MODEL
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         headers = {"Content-Type": "application/json"}
         data = {
@@ -620,15 +633,11 @@ def get_research_config(project_size: str, human_effort: int) -> dict:
 
 async def scrape_website(url, agent_id):
     """
-    Scrapes a URL and returns its text content (truncated to fit context).
-    Uses httpx with a browser-like User-Agent for best compatibility.
+    Scrapes a URL, extracts rich data locally, and injects it into the Graph.
     """
-    safe_log(f"[STATUS:{agent_id}] Scraping: {url[:60]}...", agent_id=agent_id)
-
-    # Sanitize URL
+    safe_log(f"[STATUS:{agent_id}] Deep Extraction: {url[:60]}...", agent_id=agent_id)
     url = url.strip().strip("'\"`")
-    if not url.startswith("http"):
-        url = "https://" + url
+    if not url.startswith("http"): url = "https://" + url
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -640,61 +649,45 @@ async def scrape_website(url, agent_id):
         async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
             response = await client.get(url, headers=headers)
             if response.status_code != 200:
-                return f"Error: HTTP {response.status_code} from {url}"
-
-            content_type = response.headers.get("content-type", "")
-            if "text/html" not in content_type and "text/plain" not in content_type:
-                return f"Skipped: Non-text content ({content_type}) at {url}"
-
+                return f"Error: HTTP {response.status_code}"
+            
             html = response.text
 
-        # Extract text from HTML
-        text = _extract_text_from_html(html)
+        # --- STEP 1: Local Rich Extraction ---
+        rich_data = extract_rich_metadata(html, url)
+        
+        # --- STEP 2: Knowledge Injection ---
+        store = KnowledgeStore(agent_id)
+        store.load()
+        
+        # Add the Source Node (with Tables and Metadata)
+        source_id = store.add_source(
+            url=url, 
+            title=rich_data["title"], 
+            snippet=rich_data["text"][:300] if rich_data["text"] else "No content", 
+            full_text=rich_data["text"] if rich_data["text"] else "",
+            metadata={"tables": rich_data["tables"], "date": rich_data["date"]}
+        )
+        
+        # Add Entity Nodes (The "Hopping Points")
+        if rich_data["entities"]:
+            for ent in rich_data["entities"]:
+                store.add_entity(ent["text"], ent["label"], source_id)
+            
+        store.save()
 
-        if not text or len(text) < 50:
-            return f"Scraped {url} but found no meaningful text content."
-
-        # Truncate to ~3000 chars to fit context
+        # --- STEP 3: Return Clean Text to Agent ---
+        text = rich_data["text"] if rich_data["text"] else ""
         if len(text) > 3000:
-            text = text[:3000] + "\n\n[... content truncated ...]"
+            text = text[:3000] + "\n\n[... structural details saved to graph ...]"
 
-        safe_log(f"+++ [SCRAPE] {url[:40]} -> {len(text)} chars", agent_id=agent_id)
         return f"SOURCE: {url}\n\n{text}"
 
-    except httpx.TimeoutException:
-        return f"Error: Timeout scraping {url}"
     except Exception as e:
         safe_log(f"!!! [SCRAPE] Error: {e}", agent_id=agent_id)
-        return f"Error scraping {url}: {str(e)[:150]}"
+        return f"Error scraping {url}: {str(e)}"
 
 
-def _extract_text_from_html(html: str) -> str:
-    """
-    Lightweight HTML-to-text extraction without BeautifulSoup dependency.
-    Strips tags, scripts, styles, and normalizes whitespace.
-    """
-    # Remove script and style blocks
-    html = re.sub(r'<script[^>]*>[\s\S]*?</script>', '', html, flags=re.IGNORECASE)
-    html = re.sub(r'<style[^>]*>[\s\S]*?</style>', '', html, flags=re.IGNORECASE)
-    html = re.sub(r'<nav[^>]*>[\s\S]*?</nav>', '', html, flags=re.IGNORECASE)
-    html = re.sub(r'<footer[^>]*>[\s\S]*?</footer>', '', html, flags=re.IGNORECASE)
-    html = re.sub(r'<header[^>]*>[\s\S]*?</header>', '', html, flags=re.IGNORECASE)
-
-    # Convert common block elements to newlines
-    html = re.sub(r'<(br|hr|/p|/div|/h[1-6]|/li|/tr)[^>]*>', '\n', html, flags=re.IGNORECASE)
-
-    # Strip remaining tags
-    text = re.sub(r'<[^>]+>', ' ', html)
-
-    # Decode HTML entities
-    text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-    text = text.replace('&quot;', '"').replace('&#39;', "'").replace('&nbsp;', ' ')
-
-    # Normalize whitespace
-    text = re.sub(r'[ \t]+', ' ', text)
-    text = re.sub(r'\n\s*\n+', '\n\n', text)
-
-    return text.strip()
 
 
 # --- Human Steering Check ---
@@ -761,3 +754,60 @@ Be concise. No fluff."""
     except Exception as e:
         safe_log(f"!!! [STEERING] Error: {e}", agent_id=agent_id)
         return f"Steering check error: {str(e)[:150]}"
+
+
+async def query_graph(entity_query, agent_id):
+    """
+    Search the knowledge graph for a specific entity to find connections
+    between different articles, including tables and dates.
+    """
+    store = KnowledgeStore(agent_id)
+    store.load()
+    
+    result = store.get_entity_connections(entity_query)
+    if "error" in result:
+        return result["error"]
+
+    # Format the 'hop' results for the LLM
+    output = [f"### Connections for Entity: {result['entity']} ({result['category']})"]
+    for m in result["mentions"]:
+        output.append(f"- **Source**: {m['title']} ({m['url']})")
+        output.append(f"  **Date**: {m['date']}")
+        if m["tables"]:
+            output.append(f"  **Data Tables**: {len(m['tables'])} found.")
+            for i, tbl in enumerate(m["tables"]):
+                output.append(f"  [Table {i+1}]: {tbl}")
+    
+    return "\n".join(output)
+
+
+def extract_rich_metadata(html_content, url):
+    """Local, no-LLM extraction of facts, tables, and entities."""
+    # 1. Extract Main Text and Metadata using Trafilatura
+    downloaded = trafilatura.extract(html_content, include_comments=False, 
+                                    include_tables=True, output_format='markdown')
+    metadata = trafilatura.metadata.extract_metadata(html_content)
+    
+    # 2. Extract Tables specifically with BeautifulSoup for Markdown conversion
+    soup = BeautifulSoup(html_content, 'html.parser')
+    tables = []
+    for table in soup.find_all('table'):
+        # Just store the raw table text or a simple Markdown representation
+        tables.append(str(table.get_text(separator=" | ")).strip())
+
+    # 3. Local Named Entity Recognition (NER)
+    entities = []
+    if nlp and downloaded:
+        doc = nlp(downloaded[:10000]) # Process first 10k chars for speed
+        # Find people, orgs, and dates to use as "Hopping Points"
+        entities = [{"text": ent.text, "label": ent.label_} 
+                    for ent in doc.ents if ent.label_ in ["PERSON", "ORG", "GPE", "DATE", "MONEY"]]
+
+    return {
+        "text": downloaded,
+        "date": metadata.date if metadata else None,
+        "title": metadata.title if metadata else "Unknown",
+        "tables": tables,
+        "entities": entities,
+        "url": url
+    }

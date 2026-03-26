@@ -19,7 +19,7 @@ from networkx.readwrite import json_graph
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "agents_code")
 
 # Auto-increment counters (reset per load)
-_counters = {"src": 0, "fact": 0, "topic": 0}
+_counters = {"src": 0, "fact": 0, "topic": 0, "ent": 0}
 
 
 class KnowledgeStore:
@@ -104,23 +104,44 @@ class KnowledgeStore:
         _counters[prefix] = _counters.get(prefix, 0) + 1
         return f"{prefix}_{_counters[prefix]:03d}"
 
-    def add_source(self, url: str, title: str, snippet: str, full_text: str = "") -> str:
-        """Add a source node. Returns source_id."""
+    def add_source(self, url: str, title: str, snippet: str, full_text: str = "", metadata: dict = None) -> str:
+        """Add a source node with rich metadata (tables, dates)."""
         # Deduplicate by URL
         for nid, attrs in self.graph.nodes(data=True):
             if attrs.get("node_type") == "source" and attrs.get("url") == url:
                 return nid
 
         sid = self._next_id("src")
+        # Store full rich data in the node attributes
         self.graph.add_node(sid,
             node_type="source",
             url=url,
             title=title,
             snippet=snippet[:300],
-            full_text=full_text[:3000],
+            full_text=full_text[:5000], # Increased for better local context
+            tables=metadata.get("tables", []) if metadata else [],
+            published_date=metadata.get("date") if metadata else None,
             scraped_at=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
         return sid
+
+    def add_entity(self, name: str, entity_type: str, source_id: str) -> str:
+        """Create or update an entity node and link it to a source."""
+        # Normalize name for the ID (e.g., "Apple Inc." -> "ent_apple_inc")
+        ent_id = f"ent_{name.lower().replace(' ', '_')}"
+        
+        if not self.graph.has_node(ent_id):
+            self.graph.add_node(ent_id,
+                node_type="entity",
+                label=name,
+                category=entity_type # PERSON, ORG, DATE, etc.
+            )
+        
+        # Create a 'mentioned_in' relationship for "hopping"
+        if source_id and self.graph.has_node(source_id):
+            self.graph.add_edge(ent_id, source_id, edge_type="mentioned_in")
+            
+        return ent_id
 
     def add_fact(self, content: str, source_id: str, topic_tags: list, confidence: float = 0.8) -> str:
         """Add a fact node with edges to its source and topics. Returns fact_id."""
@@ -142,6 +163,55 @@ class KnowledgeStore:
             self.graph.add_edge(fid, topic_id, edge_type="belongs_to")
 
         return fid
+
+    def get_entity_connections(self, entity_label: str) -> dict:
+        """Finds all sources and tables connected to a specific entity."""
+        ent_id = f"ent_{entity_label.lower().replace(' ', '_')}"
+        if not self.graph.has_node(ent_id):
+            return {"error": f"Entity '{entity_label}' not found in graph."}
+
+        connected_sources = []
+        # Find all source nodes connected to this entity via 'mentioned_in'
+        for source_id in self.graph.neighbors(ent_id):
+            attrs = self.graph.nodes[source_id]
+            if attrs.get("node_type") == "source":
+                connected_sources.append({
+                    "source_id": source_id,
+                    "title": attrs.get("title"),
+                    "url": attrs.get("url"),
+                    "date": attrs.get("published_date"),
+                    "tables": attrs.get("tables", [])
+                })
+
+        return {
+            "entity": entity_label,
+            "category": self.graph.nodes[ent_id].get("category"),
+            "mentions": connected_sources
+        }
+
+    def get_full_report_context(self, topic_label: str) -> dict:
+        """Gathers all facts, tables, and source info for a final report."""
+        facts = self.get_facts_by_topic(topic_label)
+        
+        # Also find every Source node connected to this topic to grab their Tables
+        sources = {}
+        norm = topic_label.strip().lower().replace(" ", "_")
+        topic_id = f"topic_{norm}"
+        
+        if self.graph.has_node(topic_id):
+            # Path: Topic <- Fact <- Source
+            for fact_pred in self.graph.predecessors(topic_id):
+                for src_pred in self.graph.predecessors(fact_pred):
+                    attrs = self.graph.nodes[src_pred]
+                    if attrs.get("node_type") == "source":
+                        sources[src_pred] = {
+                            "title": attrs.get("title"),
+                            "url": attrs.get("url"),
+                            "tables": attrs.get("tables", []),
+                            "date": attrs.get("published_date")
+                        }
+
+        return {"facts": facts, "sources": list(sources.values())}
 
     def _ensure_topic(self, label: str) -> str:
         """Get or create a topic node by label. Returns topic_id."""
