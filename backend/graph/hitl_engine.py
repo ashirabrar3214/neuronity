@@ -71,7 +71,8 @@ def should_auto_act(dial: int, ready_to_act: bool, gather_count: int) -> bool:
 
 def get_gather_batch_size(dial: int) -> int:
     """How many tool calls per GATHER phase."""
-    return max(1, 11 - dial)  # H=1→10, H=10→1
+    # Hardcoded to 20 tool calls (sources) to match the DDGS output
+    return 20
 
 
 # ---------------------------------------------------------------------------

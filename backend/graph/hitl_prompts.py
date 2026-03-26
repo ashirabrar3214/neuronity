@@ -36,13 +36,11 @@ RULES:
 
 def gather_plan_prompt(goal: str, steers: str, gaps: str, tool_names: list,
                        batch_size: int, graph_summary: str) -> str:
-    """Select next N tool calls. Used with fast model (Flash)."""
-    return f"""You are a research planner selecting the next batch of tool calls.
+    """Select next N tool calls with a focus on depth and critique."""
+    return f"""You are a Lead Researcher planning the next deep-dive investigation.
 
 GOAL: {goal}
-
 USER DIRECTION: {steers if steers else "No specific direction yet."}
-
 KNOWN GAPS: {gaps if gaps else "None identified yet."}
 
 CURRENT KNOWLEDGE:
@@ -50,48 +48,43 @@ CURRENT KNOWLEDGE:
 
 AVAILABLE TOOLS: {", ".join(tool_names)}
 
-Select exactly {batch_size} tool calls to fill gaps and advance the goal.
-Prioritize diverse sources — don't repeat searches you've already done.
+Select up to {batch_size} tool calls to fill gaps. 
 
-TOOL USAGE GUIDE:
-- web_search: Use for finding sources. Args: {{"query": "search terms"}}
-- scrape_website: Use to read a specific URL found via web_search. Args: {{"url": "https://..."}}
-- read_file: Use to read a file. Args: {{"path": "file_path"}}
-- scout_file: Use to check file metadata. Args: {{"path": "file_path"}}
-- list_workspace: Use to see working directory contents. Args: {{}}
+STRATEGY RULES:
+1. If you already have basic definitions or history, DO NOT search for them again.
+2. Search for "Criticism of [Concept]", "Methodology behind [Data Point]", or "Future projections for [Topic]".
+3. Target primary sources, industry reports, and analytical articles over basic encyclopedias.
+4. Use web_search to discover URLs BEFORE you use scrape_website.
+5. CRITICAL: ONLY use scrape_website if you already have REAL URLs from a previous web_search. If you do not have URLs yet, ONLY use web_search.
 
-Return ONLY a JSON object:
+Return ONLY a JSON object using this structure:
 {{
   "tool_calls": [
-    {{"tool_name": "web_search", "tool_args": {{"query": "specific search terms"}}}},
-    {{"tool_name": "scrape_website", "tool_args": {{"url": "https://..."}}}}
+    {{"tool_name": "web_search", "tool_args": {{"query": "highly specific analytical search term"}}}}
   ],
-  "reasoning": "Brief explanation of why these calls"
+  "reasoning": "Brief explanation of why this deepens the research"
 }}
 
-RULES:
-- Return exactly {batch_size} tool calls.
-- CRITICAL: Your tool calls MUST strictly follow the most recent USER DIRECTION. If the user says "focus on X", your queries MUST be specifically about X. Do not search for old, irrelevant gaps.
-- Use web_search to discover URLs, then scrape_website to read them in detail.
-- Return ONLY the JSON. No markdown."""
+Return ONLY the JSON. No markdown."""
 
 
 def extract_facts_prompt(raw_results: str, goal: str) -> str:
-    """Extract structured facts from raw tool results. Used with fast model (Flash)."""
-    return f"""You are a fact extraction engine. Extract key claims and data points from raw research data.
+    """Extract relational facts from raw tool results."""
+    return f"""You are an expert intelligence analyst. Extract high-value strategic claims, methodologies, and data points from the raw research data.
 
 RESEARCH GOAL: {goal}
 
 RAW DATA:
 {raw_results[:6000]}
 
-Extract facts as a JSON object:
+Extract findings as a JSON object using this strict structure:
 {{
   "facts": [
     {{
-      "content": "One specific factual claim or data point",
-      "source_url": "URL where this was found (or 'unknown')",
-      "source_title": "Title of the source article/page",
+      "content": "The core claim or data point (e.g., 'Generative AI is a $140B market')",
+      "context_or_evidence": "The underlying reasoning, methodology, or condition for this claim (e.g., 'Based on 2025 VC funding metrics and projected enterprise adoption rates')",
+      "source_url": "URL where this was found",
+      "source_title": "Title of the source",
       "topic_tags": ["tag1", "tag2"],
       "confidence": 0.9
     }}
@@ -99,12 +92,10 @@ Extract facts as a JSON object:
 }}
 
 RULES:
-- Each fact must be a SINGLE, specific claim — not a paragraph.
-- Include numbers, dates, names, and specifics when available.
-- topic_tags should be 1-3 short labels (e.g., "casualties", "political_response", "economic_impact").
-- confidence: 0.9+ for stats/quotes from reliable sources, 0.7-0.8 for general claims, 0.5-0.6 for uncertain/unverified.
-- Extract 3-15 facts per batch. Quality over quantity.
-- Do NOT hallucinate facts — only extract what is actually in the raw data.
+- Do NOT just extract basic dates or definitions. Look for market dynamics, technical specifications, expert quotes, and forward-looking projections.
+- If a source provides a number, you MUST extract the 'context_or_evidence' explaining how they got that number.
+- topic_tags should be specific (e.g., "labor_market_disruption", "llm_scaling_laws").
+- Extract 3-10 highly detailed facts per batch. Quality over quantity.
 - Return ONLY the JSON. No markdown."""
 
 
@@ -150,30 +141,28 @@ RULES:
 
 def act_synthesis_prompt(goal: str, steer: str, relevant_facts: str,
                          outputs_so_far: str) -> str:
-    """Write ONE unit of output with numbered citations. Used with planner model (Gemini 3)."""
+    """Write ONE unit of output focusing on tensions and second-order effects."""
     existing = f"\nALREADY WRITTEN:\n{outputs_so_far}\n" if outputs_so_far else ""
 
-    return f"""You are an expert analyst writing one focused section of a deliverable.
+    return f"""You are a Senior Strategic Analyst writing a high-level briefing.
 
 GOAL: {goal}
-
 CURRENT FOCUS: {steer}
 {existing}
-FACTS TO USE (cite these using numbers in brackets):
+
+EVIDENCE BASE (cite using numbers in brackets):
 {relevant_facts}
 
-Write ONE focused paragraph (or code block, or analysis section) that:
-1. Directly addresses the current focus
-2. Uses SPECIFIC data from the facts provided
-3. Cites sources using numbered citations: [1], [2], [3], etc. (e.g., "According to recent analysis, the conflict intensified significantly[1] with multiple strikes reported[2].")
-4. Provides analysis — don't just list facts, synthesize them into insight
+Write ONE focused analytical section (2-3 paragraphs) that:
+1. Directly addresses the current focus using the provided evidence.
+2. Analyzes the data for tensions, contradictions, or emergent trends. (e.g., If one source says AI creates jobs and another says it destroys them, analyze that conflict).
+3. Evaluates the second-order effects or strategic implications of these facts. Do NOT just summarize the history.
+4. Cites sources strictly using numbered citations: [1], [2].
 
 RULES:
-- Write EXACTLY ONE unit of output — one paragraph, one function, one section. Not more.
-- Every claim must be backed by a fact from the list above.
-- Use numbered citations [1], [2], [3] etc. in the text (cite at the end of sentences/clauses)
-- Use professional, authoritative language.
-- Do NOT write introductions, conclusions, or meta-commentary. Just the content.
+- Assume the reader already knows the basic definitions. Skip the intro fluff.
+- Every major claim must be backed by a fact from the list and cited.
+- Use professional, authoritative, and objective language (e.g., McKinsey or RAND Corporation style).
 - Return ONLY the written content. No JSON, no markdown headers wrapping it."""
 
 

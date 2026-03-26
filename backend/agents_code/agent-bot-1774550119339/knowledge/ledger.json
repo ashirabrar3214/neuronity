@@ -1,0 +1,33 @@
+{
+  "session_id": "hitl_1774550138",
+  "goal": "make a report on the rise of AI",
+  "current_phase": "REFLECT",
+  "understanding": {
+    "intent": "research_report",
+    "domain": "technology",
+    "scope_clarifications": []
+  },
+  "phase_history": [
+    {
+      "phase": "GATHER",
+      "timestamp": "2026-03-26T13:35:45Z",
+      "summary": "Understood: research_report"
+    },
+    {
+      "phase": "STORE",
+      "timestamp": "2026-03-26T13:36:09Z",
+      "summary": "Gathered 10 results"
+    },
+    {
+      "phase": "REFLECT",
+      "timestamp": "2026-03-26T13:36:18Z",
+      "summary": "Stored 8 facts"
+    }
+  ],
+  "user_steers": [],
+  "options_presented": [],
+  "outputs_written": [],
+  "gaps": [],
+  "gather_cycles_completed": 1,
+  "max_gather_cycles": 10
+}

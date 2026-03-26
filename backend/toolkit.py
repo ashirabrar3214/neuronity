@@ -69,7 +69,7 @@ async def _ddgs_search_raw(query, agent_id):
         from ddgs import DDGS
         def do_search():
             results = []
-            search_results = DDGS().text(query, max_results=7)
+            search_results = DDGS().text(query, max_results=20)
             for result in search_results:
                 body = result.get("body", "")
                 results.append({
@@ -671,29 +671,63 @@ async def scrape_website(url, agent_id):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
 
+    # 1. First Attempt: Rapid Jina Reader (Great for simple sites & avoiding JS overhead)
+    jina_url = f"https://r.jina.ai/{url}"
     try:
-        # 1. Fetch raw HTML
-        async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
-            res = await client.get(url, headers=headers)
-            if res.status_code != 200:
-                return f"Error: HTTP {res.status_code}"
-            html = res.text
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
+            res = await client.get(jina_url)
+            if res.status_code == 200 and len(res.text) > 500:
+                safe_log(f"+++ [SCRAPE:{agent_id}] Jina Reader succeeded", agent_id=agent_id)
+                main_text = res.text
+                metadata_title = f"Jina Extraction: {url}"
+                metadata_date = None
+                tables = []
+            else:
+                raise Exception("Jina returned empty/invalid response")
+    except Exception as e:
+        safe_log(f"--- [SCRAPE:{agent_id}] Jina Reader failed ({e}), failing over to Crawl4AI", agent_id=agent_id)
+        
+        # 2. Fallback: Full stealth Crawl4AI (Bypasses Cloudflare, loads JS)
+        try:
+            from crawl4ai import AsyncWebCrawler
+            from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
+            from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
-        # 2. Local Rich Extraction (No LLM)
-        main_text = trafilatura.extract(html, include_tables=True)
-        metadata = trafilatura.metadata.extract_metadata(html)
-        soup = BeautifulSoup(html, 'html.parser')
-        tables = [str(t.get_text(separator=" | ")).strip() for t in soup.find_all('table')]
+            browser_config = BrowserConfig(
+                headless=True,
+                verbose=False,
+                extra_args=["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"]
+            )
+            run_config = CrawlerRunConfig(
+                markdown_generator=DefaultMarkdownGenerator()
+            )
 
+            async with AsyncWebCrawler(config=browser_config) as crawler:
+                result = await crawler.arun(url=url, config=run_config)
+                
+                if not result.success:
+                    return f"Error: Crawl4AI failed to access {url}"
+                
+                main_text = result.markdown
+                metadata_title = result.metadata.get("title", f"Crawl4AI: {url}") if result.metadata else f"Crawl4AI: {url}"
+                metadata_date = None
+                tables = []
+                safe_log(f"+++ [SCRAPE:{agent_id}] Crawl4AI succeeded", agent_id=agent_id)
+                
+        except Exception as e2:
+            safe_log(f"!!! [SCRAPE:{agent_id}] Both Jina AND Crawl4AI failed: {e2}", agent_id=agent_id)
+            return f"Error: All scraping attempts failed for {url}. Reason: {str(e2)}"
+
+    try:
         # 3. Knowledge Graph Injection
         store = KnowledgeStore(agent_id)
         store.load()
         sid = store.add_source(
             url=url, 
-            title=metadata.title if metadata else "Unknown", 
+            title=metadata_title, 
             snippet=main_text[:300] if main_text else "No content",
             full_text=main_text if main_text else "", 
-            metadata={"tables": tables, "date": metadata.date if metadata else None}
+            metadata={"tables": tables, "date": metadata_date}
         )
 
         # 4. SVO Fact & Entity Linking
@@ -706,13 +740,13 @@ async def scrape_website(url, agent_id):
                 store.add_fact_node(f["fact"], sid, e_ids)
 
             store.save()
-            return f"SOURCE: {url}\n\nSuccessfully mapped {len(facts)} facts and {len(tables)} tables to graph.\n\n{main_text[:2000]}..."
+            return f"SOURCE: {url}\n\nSuccessfully mapped {len(facts)} facts to graph.\n\n{main_text[:2000]}..."
         
         return f"SOURCE: {url}\n\nScraped successfully but no main text found."
 
-    except Exception as e:
-        safe_log(f"!!! [SCRAPE] Error: {e}", agent_id=agent_id)
-        return f"Error scraping {url}: {str(e)}"
+    except Exception as graph_err:
+        safe_log(f"!!! [SCRAPE:{agent_id}] Graph injection error: {graph_err}", agent_id=agent_id)
+        return f"Error mapping {url} to Knowledge Graph: {str(graph_err)}"
 
 
 
