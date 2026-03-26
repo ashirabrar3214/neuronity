@@ -48,17 +48,21 @@ CURRENT KNOWLEDGE:
 
 AVAILABLE TOOLS: {", ".join(tool_names)}
 
-STRATEGY RULES:
-1. If you do NOT have any REAL URLs in your CURRENT KNOWLEDGE yet, you MUST output EXACTLY 1 `web_search` tool call. Do not use scrape_website.
-2. If you DO have REAL URLs from a previous web_search in your CURRENT KNOWLEDGE, you MUST output EXACTLY {batch_size} `scrape_website` tool calls to comprehensively scrape every single URL found. Do not skip any.
-3. Target primary sources, industry reports, and analytical articles over basic encyclopedias.
-4. CRITICAL: NEVER output dummy URLs like "https://...". Use the precise URLs from the previous search.
+Select up to {batch_size} tool calls to fill gaps. You MUST maximize your batch size to gather data quickly!
 
-Return ONLY a JSON object using this structure:
+STRATEGY RULES - CRITICAL:
+1. THE SEARCH-SCRAPE RHYTHM: If your CURRENT KNOWLEDGE contains sources that were only found via `web_search` (you only have their snippets), you MUST prioritize calling `scrape_website` on those exact URLs in this batch to read the full text.
+2. NEVER rely solely on search engine snippets for facts. You must read the full page.
+3. NEVER use placeholder URLs like "https://...". 
+4. If you need new information, use `web_search` with highly specific, analytical search terms (e.g., "Methodology behind [Data Point]").
+5. MAXIMUM ONE SEARCH: You are STRICTLY FORBIDDEN from outputting more than ONE `web_search` tool call per batch. If you have 20 slots, use 1 for search and 19 for scraping.
+
+Return ONLY a JSON object in this format:
 {{
   "tool_calls": [
-    {{"tool_name": "web_search", "tool_args": {{"query": "highly specific analytical search term"}}}},
-    {{"tool_name": "scrape_website", "tool_args": {{"url": "https://example.com/actual-url-from-knowledge"}}}}
+    {{"tool_name": "scrape_website", "tool_args": {{"url": "exact_url_from_previous_search_1"}}}},
+    {{"tool_name": "scrape_website", "tool_args": {{"url": "exact_url_from_previous_search_2"}}}},
+    {{"tool_name": "web_search", "tool_args": {{"query": "new highly specific search term"}}}}
   ],
   "reasoning": "Brief explanation of why this deepens the research"
 }}

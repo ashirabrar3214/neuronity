@@ -404,19 +404,28 @@ async def _phase_gather(state: dict, store: KnowledgeStore, dial: int):
         parsed = _parse_json(text)
         tool_calls = parsed.get("tool_calls", [])
         
-        # Anti-laziness: Auto-expand scrape_website calls using known URLs
-        has_scrape = any(tc.get("tool_name") == "scrape_website" for tc in tool_calls)
-        if has_scrape:
-            import re
-            # Extract URLs from the context that the LLM was reading
-            known_urls = re.findall(r'https?://[^\s<>"\']+', graph_summary)
+        # Prevent web_search spam: strictly allow only 1 web_search per batch!
+        web_search_calls = [tc for tc in tool_calls if tc.get("tool_name") == "web_search"]
+        if len(web_search_calls) > 1:
+            tool_calls = [tc for tc in tool_calls if tc.get("tool_name") != "web_search"] + [web_search_calls[0]]
+
+        # Anti-laziness AND Anti-Spam: Auto-expand scrape_website calls using known URLs
+        # Extract URLs directly from the knowledge graph sources
+        known_urls = []
+        for nid, attrs in store.graph.nodes(data=True):
+            if attrs.get("node_type") == "source" and attrs.get("url"):
+                url = attrs["url"]
+                if url != "unknown" and url not in known_urls:
+                    known_urls.append(url)
+        
+        if known_urls:
             planned_urls = {tc.get("tool_args", {}).get("url") for tc in tool_calls if tc.get("tool_name") == "scrape_website"}
             
-            # Fill remaining slots up to batch_size
+            # Prioritize inserting scrapes at the front so they execute first
             for url in known_urls:
                 if len(tool_calls) >= batch_size: break
                 if url not in planned_urls and not url.endswith(('.jpg', '.png', '.pdf')):
-                    tool_calls.append({"tool_name": "scrape_website", "tool_args": {"url": url}})
+                    tool_calls.insert(0, {"tool_name": "scrape_website", "tool_args": {"url": url}})
                     planned_urls.add(url)
                     
         _log(f"+++ [HITL:GATHER] planned {len(tool_calls)} tool calls")
@@ -424,44 +433,43 @@ async def _phase_gather(state: dict, store: KnowledgeStore, dial: int):
         _log(f"!!! [HITL:GATHER] Planning error: {e}, falling back to web_search")
         tool_calls = [{"tool_name": "web_search", "tool_args": {"query": state["goal"]}}]
 
-    # Pre-yield all actions to UI so it instantly displays the batch
-    valid_calls = []
+    # Execute each tool call CONCURRENTLY
+    raw_results = []
+    tasks = []
+
+    # 1. Fire off all tasks at the exact same time
     for tc in tool_calls[:batch_size]:
         tool_name = tc.get("tool_name", "")
         tool_args = tc.get("tool_args", {})
-        if not tool_name: continue
-        valid_calls.append(tc)
+
+        if not tool_name:
+            continue
+
+        # Tell the UI we are starting this action immediately
         arg_preview = str(list(tool_args.values())[0])[:40] if tool_args else ""
         yield _sse({"type": "action", "content": f"{tool_name}: {arg_preview}"})
 
-    # Execute all tools concurrently
-    tasks = []
-    for tc in valid_calls:
-        tasks.append(_execute_tool(tc["tool_name"], tc.get("tool_args", {}), state))
-        
-    results_gathered = await asyncio.gather(*tasks, return_exceptions=True)
+        # Wrapper function to keep track of which task is which
+        async def run_tool(name, args, orig_tc):
+            res = await _execute_tool(name, args, state)
+            return orig_tc, name, args, res
 
-    # Post-yield results and save
-    raw_results = []
-    for tc, result in zip(valid_calls, results_gathered):
-        tool_name = tc["tool_name"]
-        if isinstance(result, Exception):
-            result_str = f"Error: {str(result)}"
-        else:
-            result_str = str(result)
-            
-        preview = result_str[:150]
+        tasks.append(asyncio.create_task(run_tool(tool_name, tool_args, tc)))
+
+    # 2. Process them exactly as they finish (no waiting for the slowest one)
+    for future in asyncio.as_completed(tasks):
+        tc, tool_name, tool_args, result = await future
+
+        preview = str(result)[:150]
         yield _sse({"type": "action_result", "content": preview})
-        _log(f"    [HITL:GATHER] {tool_name} -> {len(result_str)} chars")
+        _log(f"    [HITL:GATHER] {tool_name} -> {len(str(result))} chars")
 
         raw_results.append({
             "tool_name": tool_name,
-            "tool_args": tc.get("tool_args", {}),
-            "raw_result": result_str[:3000],
+            "tool_args": tool_args,
+            "raw_result": str(result)[:3000],
             "timestamp": __import__("time").strftime("%Y-%m-%dT%H:%M:%SZ"),
         })
-
-    await asyncio.sleep(0.05)
 
     # Store raw results in scratchpad
     store.add_raw_results(raw_results)
