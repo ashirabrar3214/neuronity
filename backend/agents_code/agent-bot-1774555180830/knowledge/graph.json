@@ -1,0 +1,1014 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "node_type": "source",
+      "url": "https://www.sciencedirect.com/science/article/pii/S2949719125000445",
+      "title": "The evolution of language models: From N-Grams to LLMs, and ...",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T15:00:21Z",
+      "id": "src_001"
+    },
+    {
+      "node_type": "fact",
+      "content": "The evolution of language models has progressed from early basic models like N-grams and Bag of Words (BoW) to advanced large language models (LLMs).",
+      "context_or_evidence": "This progression represents a shift from foundational language understanding to more sophisticated generative capabilities.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:00:21Z",
+      "id": "fact_001"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_evolution",
+      "summary": "",
+      "id": "topic_llm_evolution"
+    },
+    {
+      "node_type": "topic",
+      "label": "language_modeling",
+      "summary": "",
+      "id": "topic_language_modeling"
+    },
+    {
+      "node_type": "topic",
+      "label": "n-grams",
+      "summary": "",
+      "id": "topic_n-grams"
+    },
+    {
+      "node_type": "topic",
+      "label": "bag_of_words",
+      "summary": "",
+      "id": "topic_bag_of_words"
+    },
+    {
+      "node_type": "source",
+      "url": "https://www.dataversity.net/articles/a-brief-history-of-large-language-models/",
+      "title": "A Brief History of Large Language Models - Dataversity",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T15:00:21Z",
+      "id": "src_002"
+    },
+    {
+      "node_type": "fact",
+      "content": "The history of large language models begins with the concept of semantics, which was developed by Michel Br\u00e9al in 1883.",
+      "context_or_evidence": "Br\u00e9al's work on how languages are organized, how they change, and how words connect laid the groundwork for computational understanding of language.",
+      "confidence": 0.85,
+      "extracted_at": "2026-03-26T15:00:21Z",
+      "id": "fact_002"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_history",
+      "summary": "",
+      "id": "topic_llm_history"
+    },
+    {
+      "node_type": "topic",
+      "label": "semantics",
+      "summary": "",
+      "id": "topic_semantics"
+    },
+    {
+      "node_type": "topic",
+      "label": "michel_breal",
+      "summary": "",
+      "id": "topic_michel_breal"
+    },
+    {
+      "node_type": "topic",
+      "label": "language_origins",
+      "summary": "",
+      "id": "topic_language_origins"
+    },
+    {
+      "node_type": "source",
+      "url": "https://link.springer.com/chapter/10.1007/978-3-031-92285-5_2",
+      "title": "History of Large Language Models | Springer Nature Link",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T15:00:21Z",
+      "id": "src_003"
+    },
+    {
+      "node_type": "fact",
+      "content": "Advancements in Natural Language Processing (NLP) are crucial to LLM development, particularly in Natural Language Understanding (NLU) and Natural Language Generation (NLG).",
+      "context_or_evidence": "The transformer architecture has played an innovative role in these advancements, enabling more effective processing and generation of text.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:00:21Z",
+      "id": "fact_003"
+    },
+    {
+      "node_type": "topic",
+      "label": "nlp",
+      "summary": "",
+      "id": "topic_nlp"
+    },
+    {
+      "node_type": "topic",
+      "label": "nlu",
+      "summary": "",
+      "id": "topic_nlu"
+    },
+    {
+      "node_type": "topic",
+      "label": "nlg",
+      "summary": "",
+      "id": "topic_nlg"
+    },
+    {
+      "node_type": "topic",
+      "label": "transformer_architecture",
+      "summary": "",
+      "id": "topic_transformer_architecture"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_development",
+      "summary": "",
+      "id": "topic_llm_development"
+    },
+    {
+      "node_type": "source",
+      "url": "https://theexpertcommunity.com/artificial-intelligence/evolution-of-large-language-models/",
+      "title": "Evolution of Large Language Models (2026 Updated)",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T15:00:21Z",
+      "id": "src_004"
+    },
+    {
+      "node_type": "fact",
+      "content": "Recent advancements in LLMs emphasize Retrieval-Augmented Generation (RAG), multimodality, and model lifecycle management.",
+      "context_or_evidence": "These areas are key focuses for updating content and improving the capabilities of LLMs.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:00:21Z",
+      "id": "fact_004"
+    },
+    {
+      "node_type": "topic",
+      "label": "retrieval_augmented_generation",
+      "summary": "",
+      "id": "topic_retrieval_augmented_generation"
+    },
+    {
+      "node_type": "topic",
+      "label": "multimodality",
+      "summary": "",
+      "id": "topic_multimodality"
+    },
+    {
+      "node_type": "topic",
+      "label": "model_lifecycle",
+      "summary": "",
+      "id": "topic_model_lifecycle"
+    },
+    {
+      "node_type": "source",
+      "url": "https://arxiv.org/abs/2402.06853",
+      "title": "History, Development, and Principles of Large Language Models ...",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T15:00:21Z",
+      "id": "src_005"
+    },
+    {
+      "node_type": "fact",
+      "content": "The survey aims to provide a comprehensive overview of LLMs to assist a broader audience.",
+      "context_or_evidence": "The survey explores the historical background of language models and traces their evolution to facilitate a comprehensive understanding.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:00:21Z",
+      "id": "fact_005"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_survey",
+      "summary": "",
+      "id": "topic_llm_survey"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_overview",
+      "summary": "",
+      "id": "topic_llm_overview"
+    },
+    {
+      "node_type": "topic",
+      "label": "historical_context",
+      "summary": "",
+      "id": "topic_historical_context"
+    },
+    {
+      "node_type": "fact",
+      "content": "The paper is titled \"History, Development, and Principles of Large Language Models-An Introductory Survey.\"",
+      "context_or_evidence": "This is the title of the arXiv submission 2402.06853.",
+      "confidence": 1.0,
+      "extracted_at": "2026-03-26T15:01:05Z",
+      "id": "fact_522"
+    },
+    {
+      "node_type": "topic",
+      "label": "survey_paper",
+      "summary": "",
+      "id": "topic_survey_paper"
+    },
+    {
+      "node_type": "fact",
+      "content": "The paper was submitted on February 10, 2024, and last revised on September 23, 2024.",
+      "context_or_evidence": "This information is available on the arXiv page for the paper.",
+      "confidence": 1.0,
+      "extracted_at": "2026-03-26T15:01:05Z",
+      "id": "fact_523"
+    },
+    {
+      "node_type": "topic",
+      "label": "publication_timeline",
+      "summary": "",
+      "id": "topic_publication_timeline"
+    },
+    {
+      "node_type": "fact",
+      "content": "The paper is categorized under Computer Science > Computation and Language.",
+      "context_or_evidence": "This categorization is listed on the arXiv page.",
+      "confidence": 1.0,
+      "extracted_at": "2026-03-26T15:01:05Z",
+      "id": "fact_524"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_classification",
+      "summary": "",
+      "id": "topic_llm_classification"
+    },
+    {
+      "node_type": "topic",
+      "label": "research_area",
+      "summary": "",
+      "id": "topic_research_area"
+    },
+    {
+      "node_type": "fact",
+      "content": "The authors of the paper include Zichong Wang, Zhibo Chu, and Thang...",
+      "context_or_evidence": "The author list is available on the arXiv page.",
+      "confidence": 1.0,
+      "extracted_at": "2026-03-26T15:01:05Z",
+      "id": "fact_525"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_authors",
+      "summary": "",
+      "id": "topic_llm_authors"
+    },
+    {
+      "node_type": "topic",
+      "label": "research_team",
+      "summary": "",
+      "id": "topic_research_team"
+    },
+    {
+      "node_type": "fact",
+      "content": "Mainstream multimodal models, wider adoption of retrieval augmented generation (RAG), the rise of agent and tool-using systems, and active model deprecation cycles are key shifts observed from 2024-2026.",
+      "context_or_evidence": "Observed trends in the development and deployment of large language models.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:01:33Z",
+      "id": "fact_668"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_trends",
+      "summary": "",
+      "id": "topic_llm_trends"
+    },
+    {
+      "node_type": "topic",
+      "label": "multimodal_models",
+      "summary": "",
+      "id": "topic_multimodal_models"
+    },
+    {
+      "node_type": "topic",
+      "label": "agent_systems",
+      "summary": "",
+      "id": "topic_agent_systems"
+    },
+    {
+      "node_type": "topic",
+      "label": "model_deprecation",
+      "summary": "",
+      "id": "topic_model_deprecation"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models have moved from research curiosities to production-grade systems.",
+      "context_or_evidence": "General observation about the maturity and adoption of LLMs.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:01:33Z",
+      "id": "fact_669"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_adoption",
+      "summary": "",
+      "id": "topic_llm_adoption"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_maturity",
+      "summary": "",
+      "id": "topic_llm_maturity"
+    },
+    {
+      "node_type": "topic",
+      "label": "production_systems",
+      "summary": "",
+      "id": "topic_production_systems"
+    },
+    {
+      "node_type": "fact",
+      "content": "Generative AI was combined with large language models to produce a smarter version of artificial intelligence.",
+      "context_or_evidence": "General statement about the synergistic effect of combining generative AI and LLMs.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:01:33Z",
+      "id": "fact_670"
+    },
+    {
+      "node_type": "topic",
+      "label": "generative_ai",
+      "summary": "",
+      "id": "topic_generative_ai"
+    },
+    {
+      "node_type": "topic",
+      "label": "llms",
+      "summary": "",
+      "id": "topic_llms"
+    },
+    {
+      "node_type": "topic",
+      "label": "ai_evolution",
+      "summary": "",
+      "id": "topic_ai_evolution"
+    },
+    {
+      "node_type": "fact",
+      "content": "Natural language processing (NLP) translates human communications into a language understood by computers, and back again.",
+      "context_or_evidence": "Explanation of the core function of NLP.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:01:33Z",
+      "id": "fact_671"
+    },
+    {
+      "node_type": "topic",
+      "label": "natural_language_processing",
+      "summary": "",
+      "id": "topic_natural_language_processing"
+    },
+    {
+      "node_type": "topic",
+      "label": "human_computer_interaction",
+      "summary": "",
+      "id": "topic_human_computer_interaction"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models have transitioned from research curiosities to production-grade systems between 2024 and 2026.",
+      "context_or_evidence": "Observed shifts include the mainstream adoption of multimodal models, wider use of retrieval augmented generation (RAG), the emergence of agent and tool-using systems, and the implementation of active model deprecation cycles.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:02:02Z",
+      "id": "fact_803"
+    },
+    {
+      "node_type": "fact",
+      "content": "GPT-4 technical details are documented in a 2023 arXiv preprint.",
+      "context_or_evidence": "Reference to 'Achiam, J., Adler, S., Agarwal, S., Ahmad, L., Akkaya, I., Aleman, F.L., Almeida, D., Altenschmidt, J., Altman, S., Anadkat, S., et al.: Gpt-4 technical report. arXiv preprint arXiv:2303.08774 (2023)' indicates a publicly available technical report.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:02:02Z",
+      "id": "fact_804"
+    },
+    {
+      "node_type": "topic",
+      "label": "gpt-4",
+      "summary": "",
+      "id": "topic_gpt-4"
+    },
+    {
+      "node_type": "topic",
+      "label": "technical_report",
+      "summary": "",
+      "id": "topic_technical_report"
+    },
+    {
+      "node_type": "topic",
+      "label": "model_documentation",
+      "summary": "",
+      "id": "topic_model_documentation"
+    },
+    {
+      "node_type": "fact",
+      "content": "PaLM 2 technical details are documented in a 2023 arXiv preprint.",
+      "context_or_evidence": "Reference to 'Anil, R., Dai, A.M., Firat, O., Johnson, M., Lepikhin, D., Passos, A., Shakeri, S., Taropa, E., Bailey, P., Chen, Z., et al.: Palm 2 technical report. arXiv preprint arXiv:2305.10403 (2023)' indicates a publicly available technical report.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:02:02Z",
+      "id": "fact_805"
+    },
+    {
+      "node_type": "topic",
+      "label": "palm_2",
+      "summary": "",
+      "id": "topic_palm_2"
+    },
+    {
+      "node_type": "fact",
+      "content": "The Expert Community blog emphasizes the importance of Retrieval Augmented Generation (RAG), multimodality, and model lifecycle management in the evolution of LLMs.",
+      "context_or_evidence": "The blog's introduction explicitly states that the content is updated to emphasize RAG, multimodality, model lifecycle, and clear dated citations.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:02:02Z",
+      "id": "fact_806"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models have transitioned from research curiosities to production-grade systems between 2024 and 2026.",
+      "context_or_evidence": "Observed shifts include the mainstreaming of multimodal models, wider adoption of retrieval augmented generation (RAG), the rise of agent and tool-using systems, and active model deprecation cycles.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:02:40Z",
+      "id": "fact_938"
+    },
+    {
+      "node_type": "topic",
+      "label": "ai_agents",
+      "summary": "",
+      "id": "topic_ai_agents"
+    },
+    {
+      "node_type": "fact",
+      "content": "Key areas of focus in LLM development as of 2026 include Retrieval Augmented Generation (RAG), multimodality, and model lifecycle management.",
+      "context_or_evidence": "These areas are being emphasized in updated content and research, with clear, dated citations.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:02:40Z",
+      "id": "fact_939"
+    },
+    {
+      "node_type": "topic",
+      "label": "rag",
+      "summary": "",
+      "id": "topic_rag"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models are based on artificial neural networks, with recent improvements in deep learning supporting their development.",
+      "context_or_evidence": "The article highlights the role of deep learning advancements in enabling the progress of LLMs.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:02:40Z",
+      "id": "fact_940"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_architecture",
+      "summary": "",
+      "id": "topic_llm_architecture"
+    },
+    {
+      "node_type": "topic",
+      "label": "neural_networks",
+      "summary": "",
+      "id": "topic_neural_networks"
+    },
+    {
+      "node_type": "topic",
+      "label": "deep_learning",
+      "summary": "",
+      "id": "topic_deep_learning"
+    },
+    {
+      "node_type": "fact",
+      "content": "Semantic technology, including semantics, the semantic web, and natural language processing, underpins large language models.",
+      "context_or_evidence": "The history of LLMs is traced back to the concept of semantics developed by Michel Br\u00e9al in 1883, focusing on language organization and word connections.",
+      "confidence": 0.85,
+      "extracted_at": "2026-03-26T15:02:40Z",
+      "id": "fact_941"
+    },
+    {
+      "node_type": "topic",
+      "label": "semantic_technology",
+      "summary": "",
+      "id": "topic_semantic_technology"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_foundations",
+      "summary": "",
+      "id": "topic_llm_foundations"
+    },
+    {
+      "node_type": "fact",
+      "content": "Natural language processing (NLP) translates human communications into a language understood by computers and vice versa.",
+      "context_or_evidence": "NLP systems provide an understanding of human instructions, enabling computers to understand written text, recognize speech, and translate between languages.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:02:40Z",
+      "id": "fact_942"
+    },
+    {
+      "node_type": "topic",
+      "label": "language_translation",
+      "summary": "",
+      "id": "topic_language_translation"
+    }
+  ],
+  "links": [
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_001"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_001",
+      "target": "topic_llm_evolution"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_001",
+      "target": "topic_language_modeling"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_001",
+      "target": "topic_n-grams"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_001",
+      "target": "topic_bag_of_words"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_002",
+      "target": "fact_002"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_002",
+      "target": "fact_670"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_002",
+      "target": "fact_671"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_002",
+      "target": "fact_940"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_002",
+      "target": "fact_941"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_002",
+      "target": "fact_942"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_002",
+      "target": "topic_llm_history"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_002",
+      "target": "topic_semantics"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_002",
+      "target": "topic_michel_breal"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_002",
+      "target": "topic_language_origins"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_003"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_804"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_805"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_003",
+      "target": "topic_nlp"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_003",
+      "target": "topic_nlu"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_003",
+      "target": "topic_nlg"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_003",
+      "target": "topic_transformer_architecture"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_003",
+      "target": "topic_llm_development"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_004",
+      "target": "fact_004"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_004",
+      "target": "fact_668"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_004",
+      "target": "fact_669"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_004",
+      "target": "fact_803"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_004",
+      "target": "fact_806"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_004",
+      "target": "fact_938"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_004",
+      "target": "fact_939"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_004",
+      "target": "topic_llm_evolution"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_004",
+      "target": "topic_retrieval_augmented_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_004",
+      "target": "topic_multimodality"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_004",
+      "target": "topic_model_lifecycle"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_005",
+      "target": "fact_005"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_005",
+      "target": "fact_522"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_005",
+      "target": "fact_523"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_005",
+      "target": "fact_524"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_005",
+      "target": "fact_525"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_005",
+      "target": "topic_llm_survey"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_005",
+      "target": "topic_llm_overview"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_005",
+      "target": "topic_historical_context"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_522",
+      "target": "topic_llm_overview"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_522",
+      "target": "topic_survey_paper"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_523",
+      "target": "topic_llm_development"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_523",
+      "target": "topic_publication_timeline"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_524",
+      "target": "topic_llm_classification"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_524",
+      "target": "topic_research_area"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_525",
+      "target": "topic_llm_authors"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_525",
+      "target": "topic_research_team"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_668",
+      "target": "topic_llm_trends"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_668",
+      "target": "topic_multimodal_models"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_668",
+      "target": "topic_retrieval_augmented_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_668",
+      "target": "topic_agent_systems"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_668",
+      "target": "topic_model_deprecation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_669",
+      "target": "topic_llm_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_669",
+      "target": "topic_llm_maturity"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_669",
+      "target": "topic_production_systems"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_670",
+      "target": "topic_generative_ai"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_670",
+      "target": "topic_llms"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_670",
+      "target": "topic_ai_evolution"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_671",
+      "target": "topic_natural_language_processing"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_671",
+      "target": "topic_human_computer_interaction"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_803",
+      "target": "topic_llm_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_803",
+      "target": "topic_multimodal_models"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_803",
+      "target": "topic_retrieval_augmented_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_803",
+      "target": "topic_agent_systems"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_803",
+      "target": "topic_model_lifecycle"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_804",
+      "target": "topic_gpt-4"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_804",
+      "target": "topic_technical_report"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_804",
+      "target": "topic_model_documentation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_805",
+      "target": "topic_palm_2"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_805",
+      "target": "topic_technical_report"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_805",
+      "target": "topic_model_documentation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_806",
+      "target": "topic_retrieval_augmented_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_806",
+      "target": "topic_multimodal_models"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_806",
+      "target": "topic_model_lifecycle"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_806",
+      "target": "topic_llm_trends"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_938",
+      "target": "topic_llm_maturity"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_938",
+      "target": "topic_multimodal_models"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_938",
+      "target": "topic_retrieval_augmented_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_938",
+      "target": "topic_ai_agents"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_938",
+      "target": "topic_model_lifecycle"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_939",
+      "target": "topic_llm_development"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_939",
+      "target": "topic_rag"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_939",
+      "target": "topic_multimodality"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_939",
+      "target": "topic_model_lifecycle"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_940",
+      "target": "topic_llm_architecture"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_940",
+      "target": "topic_neural_networks"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_940",
+      "target": "topic_deep_learning"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_941",
+      "target": "topic_semantic_technology"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_941",
+      "target": "topic_natural_language_processing"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_941",
+      "target": "topic_llm_foundations"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_942",
+      "target": "topic_natural_language_processing"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_942",
+      "target": "topic_human_computer_interaction"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_942",
+      "target": "topic_language_translation"
+    }
+  ]
+}

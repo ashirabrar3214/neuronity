@@ -143,12 +143,13 @@ class KnowledgeStore:
             
         return ent_id
 
-    def add_fact(self, content: str, source_id: str, topic_tags: list, confidence: float = 0.8) -> str:
+    def add_fact(self, content: str, source_id: str, topic_tags: list, confidence: float = 0.8, context_or_evidence: str = "") -> str:
         """Add a fact node with edges to its source and topics. Returns fact_id."""
         fid = self._next_id("fact")
         self.graph.add_node(fid,
             node_type="fact",
             content=content,
+            context_or_evidence=context_or_evidence,
             confidence=confidence,
             extracted_at=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
@@ -289,6 +290,8 @@ class KnowledgeStore:
                 facts.append({
                     "id": pred,
                     "content": attrs.get("content", ""),
+                    # ADD THIS LINE SO THE EVIDENCE ISN'T LOST:
+                    "context_or_evidence": attrs.get("context_or_evidence", ""),
                     "confidence": attrs.get("confidence", 0),
                     "sources": sources,
                 })
@@ -325,7 +328,7 @@ class KnowledgeStore:
 
     def get_graph_summary(self) -> str:
         """Condensed string for LLM context."""
-        sources = [n for n, d in self.graph.nodes(data=True) if d.get("node_type") == "source"]
+        sources = [d for n, d in self.graph.nodes(data=True) if d.get("node_type") == "source"]
         facts = [n for n, d in self.graph.nodes(data=True) if d.get("node_type") == "fact"]
         topics = self.get_all_topics()
 
@@ -337,8 +340,16 @@ class KnowledgeStore:
         if topic_lines:
             summary += "\nTopics:\n" + "\n".join(topic_lines)
 
-        # Include recent facts for context
-        recent_facts = facts[-10:]  # Last 10 facts
+        # --- THE FIX: Reveal URLs to the agent so it can scrape them ---
+        if sources:
+            summary += "\n\nKnown Sources (You MUST scrape these if you haven't yet):\n"
+            for s in sources[-15:]: # Show up to 15 recent URLs
+                url = s.get('url', 'unknown')
+                title = s.get('title', 'Untitled')[:50]
+                summary += f"  - {title}... | URL: {url}\n"
+        # ---------------------------------------------------------------
+
+        recent_facts = facts[-10:]
         if recent_facts:
             summary += "\n\nRecent facts:"
             for fid in recent_facts:

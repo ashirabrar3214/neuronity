@@ -61,8 +61,8 @@ def should_checkpoint(dial: int, gather_count: int, phase: str) -> bool:
 def should_auto_act(dial: int, ready_to_act: bool, gather_count: int) -> bool:
     """Determine if the engine should skip checkpoint and auto-produce output."""
     if dial <= 3:
-        # Autopilot: auto-act when ready, or after 2+ gather cycles
-        return ready_to_act or gather_count >= 2
+        # THE FIX: Only auto-act if the Planner confirms we have deeply scraped data
+        return ready_to_act and gather_count >= 2 
     if dial <= 7:
         # Balanced (Dial 4-7): Auto-act immediately when REFLECT says we have enough facts!
         return ready_to_act
@@ -250,14 +250,23 @@ async def _auto_generate_report(state: dict, store: KnowledgeStore):
     outputs = store.ledger.get("outputs_written", [])
     output_text = "\n\n".join(o.get("text", "") for o in outputs)
 
-    # Build facts context with source attribution
+    # Build facts context with source attribution and DEEP EVIDENCE
     all_facts = []
     for topic in store.get_all_topics():
         facts = store.get_facts_by_topic(topic["label"])
         for f in facts:
             src = f["sources"][0]["url"] if f["sources"] else "unknown"
-            all_facts.append(f"- {f['content']} (source: {src})")
-    facts_context = "\n".join(all_facts)
+            ev = f.get("context_or_evidence", "")
+            
+            # Format it so the LLM clearly sees the Claim vs. the Evidence
+            fact_text = f"- CLAIM: {f['content']}"
+            if ev:
+                fact_text += f"\n  EVIDENCE: {ev}"
+            fact_text += f"\n  SOURCE: {src}"
+            
+            all_facts.append(fact_text)
+            
+    facts_context = "\n\n".join(all_facts)
 
     # Build an explicit, clean sources list so the PDF generator can cite them
     seen_urls = set()
@@ -527,6 +536,7 @@ async def _phase_store(state: dict, store: KnowledgeStore):
             source_id=source_id,
             topic_tags=fact.get("topic_tags", []),
             confidence=fact.get("confidence", 0.7),
+            context_or_evidence=fact.get("context_or_evidence", ""),
         )
 
     # Clear scratchpad
