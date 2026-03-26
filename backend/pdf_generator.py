@@ -1,4 +1,5 @@
 import os
+import re
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
@@ -10,6 +11,11 @@ from reportlab.pdfbase.ttfonts import TTFont
 # Use standard Times-Roman which is built-in to ReportLab
 FONT_NAME = 'Times-Roman'
 FONT_SIZE = 11
+
+def convert_citations_to_superscript(text):
+    """Convert [1], [2], etc. citations to superscript format for ReportLab."""
+    # Replace [1], [2], [3] with <super>1</super>, <super>2</super>, etc.
+    return re.sub(r'\[(\d+)\]', r'<super>\1</super>', text)
 
 class ReportPDFGenerator:
     def __init__(self, filename, title):
@@ -111,13 +117,15 @@ class ReportPDFGenerator:
         # Summary/Introduction
         if content_data.get("summary"):
             story.append(Paragraph("Executive Summary", self.styles['SectionHeader']))
-            story.append(Paragraph(content_data["summary"], self.styles['NormalText']))
+            summary_text = convert_citations_to_superscript(content_data["summary"])
+            story.append(Paragraph(summary_text, self.styles['NormalText']))
             story.append(Spacer(1, 0.2*inch))
-            
+
         # Main Sections
         for section in content_data.get("sections", []):
             story.append(Paragraph(section["title"], self.styles['SectionHeader']))
-            story.append(Paragraph(section["content"], self.styles['NormalText']))
+            section_content = convert_citations_to_superscript(section["content"])
+            story.append(Paragraph(section_content, self.styles['NormalText']))
             story.append(Spacer(1, 0.1*inch))
             
         # Sources Page

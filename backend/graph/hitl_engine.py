@@ -59,17 +59,13 @@ def should_checkpoint(dial: int, gather_count: int, phase: str) -> bool:
 
 
 def should_auto_act(dial: int, ready_to_act: bool, gather_count: int) -> bool:
-    """Determine if the engine should skip checkpoint and auto-produce output.
-
-    For low-dial (autonomous) mode, when REFLECT says ready_to_act=True
-    or we've gathered enough data, go straight to ACT without asking.
-    """
-    if dial <= 2:
-        # Autopilot: auto-act when ready, or after 3+ gather cycles
-        return ready_to_act or gather_count >= 3
-    if dial <= 4:
-        # Balanced: auto-act only when explicitly ready
-        return ready_to_act and gather_count >= 2
+    """Determine if the engine should skip checkpoint and auto-produce output."""
+    if dial <= 3:
+        # Autopilot: auto-act when ready, or after 2+ gather cycles
+        return ready_to_act or gather_count >= 2
+    if dial <= 7:
+        # Balanced (Dial 4-7): Auto-act immediately when REFLECT says we have enough facts!
+        return ready_to_act
     return False
 
 
@@ -253,7 +249,7 @@ async def _auto_generate_report(state: dict, store: KnowledgeStore):
     outputs = store.ledger.get("outputs_written", [])
     output_text = "\n\n".join(o.get("text", "") for o in outputs)
 
-    # Also include all facts as additional context
+    # Build facts context with source attribution
     all_facts = []
     for topic in store.get_all_topics():
         facts = store.get_facts_by_topic(topic["label"])
@@ -262,8 +258,24 @@ async def _auto_generate_report(state: dict, store: KnowledgeStore):
             all_facts.append(f"- {f['content']} (source: {src})")
     facts_context = "\n".join(all_facts)
 
-    # Combine written sections + raw facts as rich context
-    full_context = f"WRITTEN ANALYSIS:\n{output_text}\n\nALL RESEARCH FACTS:\n{facts_context}"
+    # Build an explicit, clean sources list so the PDF generator can cite them
+    seen_urls = set()
+    sources_list = []
+    for nid, attrs in store.graph.nodes(data=True):
+        if attrs.get("node_type") == "source":
+            url = attrs.get("url", "")
+            title = attrs.get("title", "")
+            if url and url != "unknown" and url not in seen_urls:
+                seen_urls.add(url)
+                sources_list.append(f"- Title: {title or 'Untitled'}\n  URL: {url}")
+    sources_section = "\n".join(sources_list) if sources_list else "No sources available."
+
+    # Combine everything — sources are clearly separated so the PDF generator finds them
+    full_context = (
+        f"WRITTEN ANALYSIS:\n{output_text}\n\n"
+        f"ALL RESEARCH FACTS:\n{facts_context}\n\n"
+        f"SOURCES (use these EXACTLY in the report's sources section):\n{sources_section}"
+    )
 
     if not working_dir:
         # No working dir — fall back to presenting text

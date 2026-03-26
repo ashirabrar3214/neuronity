@@ -70,9 +70,9 @@ Return ONLY a JSON object:
 }}
 
 RULES:
-- Return exactly {batch_size} tool calls (or fewer if the goal is nearly complete).
+- Return exactly {batch_size} tool calls.
+- CRITICAL: Your tool calls MUST strictly follow the most recent USER DIRECTION. If the user says "focus on X", your queries MUST be specifically about X. Do not search for old, irrelevant gaps.
 - Use web_search to discover URLs, then scrape_website to read them in detail.
-- If gaps mention specific missing topics, search for those topics.
 - Return ONLY the JSON. No markdown."""
 
 
@@ -139,17 +139,18 @@ Analyze the research and respond with a JSON object:
 }}
 
 RULES:
-- options MUST be derived from actual facts found — not generic suggestions.
-- Each option should represent a specific angle or focus area that the data supports.
-- ready_to_act = true if there's enough data to write at least one output unit on any topic.
-- gaps should be specific, not vague (e.g., "No data on economic sanctions impact" not "More research needed").
-- Generate 2-4 options, not more.
+- options MUST be derived from actual facts found.
+- AMNESIA PREVENTION: Do NOT suggest options that the user has already rejected, skipped, or complained about in the USER STEERS.
+- DIRECT COMMANDS: If the USER STEERS indicate a direct command (e.g., "focus on strikes", "told you to look for X"), your analysis MUST acknowledge this, and your options MUST be specific sub-topics of that command. Do not revert to old topics.
+- ready_to_act = true if there's enough data to write at least one output unit on the user's requested topic.
+- gaps should be specific.
+- Generate 2-3 options, not more.
 - Return ONLY the JSON. No markdown."""
 
 
 def act_synthesis_prompt(goal: str, steer: str, relevant_facts: str,
                          outputs_so_far: str) -> str:
-    """Write ONE unit of output with citations. Used with planner model (Gemini 3)."""
+    """Write ONE unit of output with numbered citations. Used with planner model (Gemini 3)."""
     existing = f"\nALREADY WRITTEN:\n{outputs_so_far}\n" if outputs_so_far else ""
 
     return f"""You are an expert analyst writing one focused section of a deliverable.
@@ -158,18 +159,19 @@ GOAL: {goal}
 
 CURRENT FOCUS: {steer}
 {existing}
-FACTS TO USE (cite these by their ID):
+FACTS TO USE (cite these using numbers in brackets):
 {relevant_facts}
 
 Write ONE focused paragraph (or code block, or analysis section) that:
 1. Directly addresses the current focus
 2. Uses SPECIFIC data from the facts provided
-3. Cites sources inline (e.g., "according to Reuters [src_001]" or "500 casualties were reported [fact_003]")
+3. Cites sources using numbered citations: [1], [2], [3], etc. (e.g., "According to recent analysis, the conflict intensified significantly[1] with multiple strikes reported[2].")
 4. Provides analysis — don't just list facts, synthesize them into insight
 
 RULES:
 - Write EXACTLY ONE unit of output — one paragraph, one function, one section. Not more.
 - Every claim must be backed by a fact from the list above.
+- Use numbered citations [1], [2], [3] etc. in the text (cite at the end of sentences/clauses)
 - Use professional, authoritative language.
 - Do NOT write introductions, conclusions, or meta-commentary. Just the content.
 - Return ONLY the written content. No JSON, no markdown headers wrapping it."""

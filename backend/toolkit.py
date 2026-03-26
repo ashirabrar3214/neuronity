@@ -201,7 +201,7 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
         
         # 1. Synthesis Phase
         prompt = f"""You are a senior report writer. Create a comprehensive, formal research report on the following topic.
-        
+
 TOPIC: {topic}
 
 RESEARCH DATA / CONTEXT:
@@ -229,7 +229,8 @@ FORMATTING RULES:
 }}
 - Use authoritative, professional language.
 - Ensure sections are informative and flow logically.
-- Return ONLY the JSON object.
+- CRITICAL FOR JSON: Within string values, escape newlines as \\n and backslashes as \\\\ so the JSON is valid.
+- Return ONLY the JSON object. No markdown wrapper.
 """
 
         model = FAST_MODEL
@@ -253,17 +254,34 @@ FORMATTING RULES:
             report_data_json = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
             # Remove markdown backticks if Gemini added them
             report_data_json = re.sub(r'```json\s*|\s*```', '', report_data_json).strip()
-            report_data = json.loads(report_data_json)
+
+            # Repair JSON: escape unescaped newlines in string values
+            try:
+                report_data = json.loads(report_data_json)
+            except json.JSONDecodeError as e:
+                # Try to repair common JSON issues (unescaped newlines, etc)
+                safe_log(f"[STATUS:{agent_id}] JSON parse error, attempting repair: {e}")
+                # Replace literal newlines with escaped newlines in the raw string
+                report_data_json = report_data_json.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+                try:
+                    report_data = json.loads(report_data_json)
+                except json.JSONDecodeError as e2:
+                    safe_log(f"[STATUS:{agent_id}] JSON repair failed: {e2}")
+                    # Last resort: return a minimal valid report
+                    return f"Report generation failed: Could not parse LLM output as JSON. Error: {str(e)[:100]}"
         
         # Get dynamic title from LLM or fallback to topic
         display_title = report_data.get("title", topic)
         
-        # 2. PDF Generation Phase
+        # 2. The PDF generator will automatically create a bibliography from sources
+        # (No need to manually add it here)
+
+        # 3. PDF Generation Phase
         # Sanitize filename using the dynamic title
         clean_title_for_file = re.sub(r'[^a-zA-Z0-9\s_-]', '', display_title[:50].strip().replace('"', ''))
         safe_filename = f"Report_{clean_title_for_file.replace(' ', '_')}.pdf"
         report_path = os.path.join(working_dir, safe_filename)
-        
+
         pdf_gen = ReportPDFGenerator(report_path, display_title)
         pdf_gen.generate(report_data, agent_name=agent_name, agent_id=agent_id)
         
