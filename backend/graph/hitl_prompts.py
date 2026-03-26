@@ -210,6 +210,41 @@ RULES:
 - Return ONLY the JSON. No markdown."""
 
 
+def checkpoint_prompt(goal: str, sources_count: int, facts_count: int,
+                      topics: list, recent_facts: list, options: list,
+                      gaps: list) -> str:
+    """Generate a short, conversational checkpoint message. Used with fast model (Flash)."""
+    topics_str = ", ".join(t["label"] for t in topics[:8]) if topics else "various topics"
+    recent_str = "; ".join(f["content"][:80] for f in recent_facts[:4]) if recent_facts else "no facts yet"
+    options_str = "\n".join(
+        f"{o.get('id', i+1)}. {o.get('text', '')}"
+        for i, o in enumerate(options)
+    )
+    gaps_str = "; ".join(gaps[:3]) if gaps else "none identified yet"
+
+    return f"""You are summarizing research progress in a friendly, conversational way for a user.
+
+RESEARCH GOAL: {goal}
+SOURCES READ: {sources_count}
+FACTS EXTRACTED: {facts_count}
+TOPICS COVERED: {topics_str}
+SAMPLE RECENT FACTS: {recent_str}
+GAPS STILL OPEN: {gaps_str}
+OPTIONS TO PRESENT:
+{options_str}
+
+Write a SHORT message (2-4 sentences max) that:
+1. Briefly says what you've found so far in plain English — mention 1-2 specific things you learned, or a source read.
+2. Naturally asks where the user wants to go next, listing the numbered options inline or as a short list.
+
+RULES:
+- Sound like a knowledgeable researcher talking to a colleague — warm, concise, no jargon.
+- Do NOT mention "Knowledge Graph", "facts", "sources", "gaps", "topics", or any internal system terms.
+- Do NOT use headers, bullet points for findings, or technical formatting.
+- The options CAN be a short numbered list at the end, but keep their text tight.
+- Return ONLY the final message text. No JSON, no markdown wrapper."""
+
+
 def parse_steer_prompt(user_message: str, options_presented: list,
                        ledger_summary: str) -> str:
     """Interpret user's checkpoint response. Used with fast model (Flash)."""

@@ -1,9 +1,9 @@
 
-class agent_bot_1774462690815:
+class agent_bot_1774488264268:
     def __init__(self):
-        self.id = "agent-bot-1774462690815"
+        self.id = "agent-bot-1774488264268"
         self.name = "Deep Web Researcher"
-        self.working_dir = r""
+        self.working_dir = r"D:\New folder"
         self.permissions = ['scrape website', 'report generation']
         self.tools = "Custom"
 
@@ -17,5 +17,5 @@ class agent_bot_1774462690815:
             return {}
 
 if __name__ == "__main__":
-    agent = agent_bot_1774462690815()
+    agent = agent_bot_1774488264268()
     print(f"Agent {agent.name} initialized.")

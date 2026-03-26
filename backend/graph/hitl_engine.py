@@ -41,12 +41,35 @@ def _log(msg: str):
 # ---------------------------------------------------------------------------
 
 def should_checkpoint(dial: int, gather_count: int, phase: str) -> bool:
-    """Determine if we should halt for human input."""
+    """Determine if we should halt for human input.
+
+    Dial 1-2 (autopilot): NEVER checkpoint during REFLECT — only at PRESENT.
+    Dial 3-5 (balanced):  Checkpoint every 3-4 REFLECT cycles.
+    Dial 6-8 (guided):    Checkpoint every 2-3 REFLECT cycles.
+    Dial 9-10 (surgical): Checkpoint EVERY REFLECT cycle.
+    """
     if phase == "PRESENT":
         return True
     if phase == "REFLECT":
-        interval = max(1, 6 - (dial // 2))  # H=10→1, H=1→5
+        if dial <= 2:
+            return False  # Autopilot: never halt during research
+        interval = max(1, 6 - (dial // 2))  # H=10→1, H=3→4
         return gather_count % interval == 0
+    return False
+
+
+def should_auto_act(dial: int, ready_to_act: bool, gather_count: int) -> bool:
+    """Determine if the engine should skip checkpoint and auto-produce output.
+
+    For low-dial (autonomous) mode, when REFLECT says ready_to_act=True
+    or we've gathered enough data, go straight to ACT without asking.
+    """
+    if dial <= 2:
+        # Autopilot: auto-act when ready, or after 3+ gather cycles
+        return ready_to_act or gather_count >= 3
+    if dial <= 4:
+        # Balanced: auto-act only when explicitly ready
+        return ready_to_act and gather_count >= 2
     return False
 
 
@@ -66,7 +89,7 @@ async def hitl_loop(state: dict):
     """
     agent_id = state["agent_id"]
     api_key = state["api_key"]
-    dial = state.get("user_effort", 5)
+    dial = max(1, min(10, state.get("user_effort", 5)))  # Clamp 1-10
 
     store = KnowledgeStore(agent_id)
     store.load()
@@ -93,33 +116,8 @@ async def hitl_loop(state: dict):
     if store.ledger["current_phase"] == "CHECKPOINT":
         return
 
-    # Phase loop: GATHER → STORE → REFLECT → CHECKPOINT
-    max_gathers = store.ledger.get("max_gather_cycles", 10)
-    gather_count = 0
-
-    while gather_count < max_gathers:
-        async for chunk in _phase_gather(state, store, dial):
-            yield chunk
-
-        async for chunk in _phase_store(state, store):
-            yield chunk
-
-        gather_count += 1
-        store.ledger["gather_cycles_completed"] = gather_count
-        store.save()
-
-        async for chunk in _phase_reflect(state, store):
-            yield chunk
-
-        if should_checkpoint(dial, gather_count, "REFLECT"):
-            async for chunk in _phase_checkpoint(state, store):
-                yield chunk
-            return  # Halt — user resumes via next /chat
-
-    # Exhausted gathers without checkpoint → produce output
-    async for chunk in _phase_act(state, store):
-        yield chunk
-    async for chunk in _phase_present(state, store):
+    # Phase loop: GATHER → STORE → REFLECT → (checkpoint or auto-act)
+    async for chunk in _gather_loop(state, store, dial):
         yield chunk
 
 
@@ -158,24 +156,139 @@ async def _resume_from_checkpoint(state: dict, store: KnowledgeStore, dial: int)
     _log(f"    [HITL:RESUME] next_phase={next_phase}")
 
     if next_phase == "GATHER":
-        async for chunk in _phase_gather(state, store, dial):
+        # Run dial-controlled gather loop (same logic as main loop)
+        async for chunk in _gather_loop(state, store, dial):
             yield chunk
-        async for chunk in _phase_store(state, store):
-            yield chunk
-        async for chunk in _phase_reflect(state, store):
-            yield chunk
-        async for chunk in _phase_checkpoint(state, store):
-            yield chunk
+        return
 
     elif next_phase == "ACT":
         async for chunk in _phase_act(state, store):
             yield chunk
-        async for chunk in _phase_present(state, store):
+        # Generate PDF report after writing
+        async for chunk in _auto_generate_report(state, store):
             yield chunk
 
     elif next_phase == "DONE":
-        yield _sse({"type": "response", "content": "Session complete. Knowledge store saved."})
-        store.update_phase("DONE", "User ended session")
+        # Generate final PDF report from all accumulated outputs + facts
+        outputs = store.ledger.get("outputs_written", [])
+        if outputs or store.get_all_topics():
+            async for chunk in _phase_act(state, store):
+                yield chunk
+            async for chunk in _auto_generate_report(state, store):
+                yield chunk
+        else:
+            yield _sse({"type": "response", "content": "Session complete. Knowledge store saved."})
+            store.update_phase("DONE", "User ended session")
+            store.save()
+
+
+# ---------------------------------------------------------------------------
+# Shared gather loop — used by both fresh sessions and resume
+# ---------------------------------------------------------------------------
+
+async def _gather_loop(state: dict, store: KnowledgeStore, dial: int):
+    """Run GATHER → STORE → REFLECT cycles, controlled by the dial.
+
+    Low dial (1-2):  Many autonomous cycles, auto-ACT when ready, auto-PDF.
+    Mid dial (3-5):  A few cycles then checkpoint.
+    High dial (6-10): Checkpoint frequently, user steers each step.
+    """
+    max_gathers = store.ledger.get("max_gather_cycles", 10)
+    gather_count = store.ledger.get("gather_cycles_completed", 0)
+
+    while gather_count < max_gathers:
+        async for chunk in _phase_gather(state, store, dial):
+            yield chunk
+
+        async for chunk in _phase_store(state, store):
+            yield chunk
+
+        gather_count += 1
+        store.ledger["gather_cycles_completed"] = gather_count
+        store.save()
+
+        async for chunk in _phase_reflect(state, store):
+            yield chunk
+
+        # --- Decision: auto-act, checkpoint, or keep gathering? ---
+        ready = store.ledger.get("ready_to_act", False)
+
+        if should_auto_act(dial, ready, gather_count):
+            # Autopilot: skip checkpoint, produce output automatically
+            _log(f"    [HITL] Auto-ACT triggered: dial={dial} ready={ready} cycles={gather_count}")
+            async for chunk in _phase_act(state, store):
+                yield chunk
+            async for chunk in _auto_generate_report(state, store):
+                yield chunk
+            return
+
+        if should_checkpoint(dial, gather_count, "REFLECT"):
+            async for chunk in _phase_checkpoint(state, store):
+                yield chunk
+            return  # Halt — user resumes via next /chat
+
+    # Exhausted max gathers → produce output
+    _log(f"    [HITL] Max gathers reached ({max_gathers}), forcing ACT")
+    async for chunk in _phase_act(state, store):
+        yield chunk
+    async for chunk in _auto_generate_report(state, store):
+        yield chunk
+
+
+async def _auto_generate_report(state: dict, store: KnowledgeStore):
+    """Autopilot: compile all written outputs into a PDF report automatically."""
+    import toolkit as tk
+
+    agent_id = state["agent_id"]
+    api_key = state["api_key"]
+    working_dir = state.get("working_dir", "")
+    agent_name = state.get("agent_name", "Agent")
+    goal = store.ledger.get("goal", state.get("goal", "Report"))
+
+    _log(f">>> [HITL:AUTO_REPORT] Generating PDF for goal={goal[:60]!r}")
+    yield _sse({"type": "phase", "content": "REPORT"})
+    yield _sse({"type": "thought", "content": "Compiling final report..."})
+
+    # Gather all written outputs + all facts from graph for context
+    outputs = store.ledger.get("outputs_written", [])
+    output_text = "\n\n".join(o.get("text", "") for o in outputs)
+
+    # Also include all facts as additional context
+    all_facts = []
+    for topic in store.get_all_topics():
+        facts = store.get_facts_by_topic(topic["label"])
+        for f in facts:
+            src = f["sources"][0]["url"] if f["sources"] else "unknown"
+            all_facts.append(f"- {f['content']} (source: {src})")
+    facts_context = "\n".join(all_facts)
+
+    # Combine written sections + raw facts as rich context
+    full_context = f"WRITTEN ANALYSIS:\n{output_text}\n\nALL RESEARCH FACTS:\n{facts_context}"
+
+    if not working_dir:
+        # No working dir — fall back to presenting text
+        yield _sse({"type": "response", "content": output_text or "No output generated."})
+        store.update_phase("DONE", "No working dir for PDF")
+        store.save()
+        return
+
+    try:
+        result = await tk.report_generation(
+            agent_id, f"{goal}|{full_context}", working_dir, api_key, agent_name
+        )
+        _log(f"+++ [HITL:AUTO_REPORT] {result}")
+
+        # Show written analysis + PDF confirmation
+        parts = [output_text, "", f"---", f"**{result}**"]
+        yield _sse({"type": "response", "content": "\n".join(parts)})
+        store.update_phase("DONE", f"Auto-report generated: {result[:60]}")
+        store.save()
+
+    except Exception as e:
+        _log(f"!!! [HITL:AUTO_REPORT] Error: {e}")
+        # Fallback: show text output without PDF
+        yield _sse({"type": "response", "content": output_text or f"Report generation failed: {e}"})
+        store.update_phase("DONE", f"Report error: {str(e)[:60]}")
         store.save()
 
 
@@ -402,7 +515,8 @@ async def _phase_reflect(state: dict, store: KnowledgeStore):
         options = parsed.get("options", [])
         analysis = parsed.get("analysis", "")
 
-        _log(f"+++ [HITL:REFLECT] gaps={len(gaps)} options={len(options)} ready={parsed.get('ready_to_act')}")
+        ready_to_act = parsed.get("ready_to_act", False)
+        _log(f"+++ [HITL:REFLECT] gaps={len(gaps)} options={len(options)} ready={ready_to_act}")
 
         # Update store
         store.set_gaps(gaps)
@@ -410,6 +524,7 @@ async def _phase_reflect(state: dict, store: KnowledgeStore):
             {"id": o.get("id", i+1), "text": o.get("text", ""), "status": "pending"}
             for i, o in enumerate(options)
         ])
+        store.ledger["ready_to_act"] = ready_to_act
         store.update_phase("REFLECT", analysis[:200])
         store.save()
 
@@ -428,31 +543,53 @@ async def _phase_reflect(state: dict, store: KnowledgeStore):
 # ---------------------------------------------------------------------------
 
 async def _phase_checkpoint(state: dict, store: KnowledgeStore):
-    """Format and emit checkpoint output. No model call — pure logic."""
+    """Format and emit checkpoint output. Calls fast model for conversational message."""
     _log(f">>> [HITL:CHECKPOINT]")
     yield _sse({"type": "phase", "content": "CHECKPOINT"})
 
-    graph_summary = store.get_graph_summary()
     gaps = store.ledger.get("gaps", [])
     options = store.ledger.get("options_presented", [])
+    topics = store.get_all_topics()
 
-    # Build checkpoint message
-    parts = []
-    parts.append(f"**{graph_summary.split(chr(10))[0]}**")  # First line: counts
-    parts.append("")
+    # Collect a few recent facts for the LLM to reference naturally
+    all_fact_nodes = [
+        (nid, attrs) for nid, attrs in store.graph.nodes(data=True)
+        if attrs.get("node_type") == "fact"
+    ]
+    recent_facts = [
+        {"content": attrs.get("content", "")}
+        for _, attrs in all_fact_nodes[-4:]
+    ]
 
-    if options:
-        parts.append("**What would you like to focus on?**")
-        for opt in options:
-            parts.append(f"{opt.get('id', '?')}. {opt.get('text', '')}")
-        parts.append("")
+    # Count sources for the prompt
+    sources_count = sum(
+        1 for _, d in store.graph.nodes(data=True) if d.get("node_type") == "source"
+    )
+    facts_count = len(all_fact_nodes)
 
-    if gaps:
-        parts.append("**Gaps identified:**")
-        for gap in gaps[:5]:
-            parts.append(f"- {gap}")
+    goal = store.ledger.get("goal", state.get("goal", ""))
 
-    checkpoint_msg = "\n".join(parts)
+    prompt = prompts.checkpoint_prompt(
+        goal=goal,
+        sources_count=sources_count,
+        facts_count=facts_count,
+        topics=topics,
+        recent_facts=recent_facts,
+        options=options,
+        gaps=gaps,
+    )
+
+    try:
+        checkpoint_msg = await _call_model("fast", prompt, state["api_key"])
+        checkpoint_msg = checkpoint_msg.strip()
+        _log(f"+++ [HITL:CHECKPOINT] generated {len(checkpoint_msg)} char message")
+    except Exception as e:
+        _log(f"!!! [HITL:CHECKPOINT] LLM error, falling back to simple format: {e}")
+        # Fallback: simple plain-English message
+        option_lines = "\n".join(
+            f"{o.get('id', i+1)}. {o.get('text', '')}" for i, o in enumerate(options)
+        )
+        checkpoint_msg = f"I've been digging into this and here's where things stand. Where would you like to go next?\n\n{option_lines}"
 
     yield _sse({"type": "response", "content": checkpoint_msg})
     store.update_phase("CHECKPOINT", f"Presented {len(options)} options")
