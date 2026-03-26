@@ -1,6 +1,6 @@
 [
   {
-    "id": "agent-bot-1774488264268",
+    "id": "agent-bot-1774489472303",
     "name": "Deep Web Researcher",
     "description": "Elite investigator that scrapes full articles and resolves contradictions using recursive verification",
     "brain": "gemini-3.1-pro-preview",
@@ -15,9 +15,9 @@
     "agentType": "master",
     "specialRole": "deep-web-researcher",
     "userEffort": 10,
-    "projectSize": "small",
-    "x": 414.0,
-    "y": 160.0,
+    "projectSize": "large",
+    "x": 360.0,
+    "y": 128.0,
     "connections": []
   }
 ]

@@ -117,11 +117,14 @@ async def build_context(state: AgentState) -> dict:
             system_prompt += (
                 "\n## MASTER PROTOCOL\n"
                 "You are a master agent that coordinates work across connected agents.\n\n"
-                "## CLARIFY BEFORE ACTING\n"
-                "If the user's prompt is broad, short, or ambiguous:\n"
-                "  - STOP IMMEDIATELY.\n"
-                "  - Plan exactly ONE step: decision='ASK_USER' with a list of 2-3 specific questions.\n"
-                "  - Get the user's explicit clarification before doing real work.\n"
+                "CRITICAL RULES:\n"
+                "- NEVER use `report_generation` or `generate_report` — those are for worker agents.\n"
+                "- NEVER write reports, summaries, or research yourself.\n"
+                "- ANTI-HALLUCINATION (LOOK BEFORE YOU LEAP): If the user asks for a project about an unknown, highly specific, or future-dated topic, you MUST use the `web_search` tool FIRST to verify it exists. NEVER assume or guess.\n"
+                "- CONFIRMATION: After searching, if the results are empty, refer to video games, or seem fictional, DO NOT create a workmap. You MUST call the `ask_user` tool to explain what you found and ask the user to clarify the premise.\n"
+                "- INITIAL PLANNING: Delegate new projects through `create_project_workmap`.\n"
+                "- RE-PLANNING: If the user wants to change or modify an existing plan, you MUST call `update_project_workmap` with their exact instructions.\n"
+                "- Your output to the user should ONLY be: calling `ask_user`, clarifying questions, OR 'workmap is ready/updated, press PLAY'.\n"
             )
 
     # Extract goal from last HumanMessage
@@ -224,9 +227,11 @@ RULES:
 - Always output between 3 and 10 steps.
 - "type" must be "tool", "think", or "ask".
 - For "tool" steps include "tool_name" and "tool_args".
-- "decision" = "DONE" only if the task is fully complete.
-- "decision" = "ASK_USER" only if critical scope clarification is needed.
-- Otherwise "decision" = "CONTINUE".
+- If the user says "hi", "hello", "thanks", or is just chatting, choose decision="DONE" so you can reply naturally.
+- If the user wants to adjust a plan (e.g., "focus on eastern media instead"), choose decision="CONTINUE". 
+- UNKNOWN/FUTURE TOPICS: If the request is about an unrecognized, highly specific, or future-dated event (e.g., "2026 war"), choose decision="CONTINUE" and plan `web_search` steps to gather facts before doing anything else.
+- If the request is broad but familiar (e.g., "report on iran war"), choose decision="ASK_USER". Your 'question' MUST be a direct question appending 2-3 clickable options using this format: [BUTTON: Option 1] [BUTTON: Option 2]
+- If the user clicks a button or replies with specific context, you MUST choose decision="CONTINUE".
 - Return ONLY the JSON. No explanation.
 """
 
