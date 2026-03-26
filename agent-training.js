@@ -356,12 +356,11 @@ window.openTrainingPanel = async (agentId, agentName) => {
     activeAgentData = agentData;
 
     // Populate UI with the most up-to-date data
-    document.getElementById('detail-name').value = agentData.name || '';
-    document.getElementById('detail-description').value = agentData.description || '';
-    document.getElementById('detail-responsibility').value = agentData.responsibility || '';
-    document.getElementById('detail-responsibility').value = agentData.responsibility || '';
-    document.getElementById('detail-channel').value = agentData.channel || 'Gmail';
-    document.getElementById('detail-workdir').value = agentData.workingDir || '';
+    if (document.getElementById('detail-name')) document.getElementById('detail-name').value = agentData.name || '';
+    if (document.getElementById('detail-description')) document.getElementById('detail-description').value = agentData.description || '';
+    if (document.getElementById('detail-responsibility')) document.getElementById('detail-responsibility').value = agentData.responsibility || '';
+    if (document.getElementById('detail-channel')) document.getElementById('detail-channel').value = agentData.channel || 'Gmail';
+    if (document.getElementById('detail-workdir')) document.getElementById('detail-workdir').value = agentData.workingDir || '';
     const effortSlider = document.getElementById('detail-user-effort');
     if (effortSlider) {
         effortSlider.value = agentData.userEffort || 1;
@@ -370,7 +369,8 @@ window.openTrainingPanel = async (agentId, agentName) => {
     }
     // Project Size toggle
     const savedSize = agentData.projectSize || 'small';
-    document.getElementById('detail-project-size').value = savedSize;
+    const projectSizeEl = document.getElementById('detail-project-size');
+    if (projectSizeEl) projectSizeEl.value = savedSize;
     document.querySelectorAll('.size-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.size === savedSize);
     });
@@ -537,13 +537,13 @@ async function triggerSave() {
     const updatedData = {
         ...activeAgentData,
         id: activeAgentId, // CRITICAL: Enforce ID match to prevent accidental renames/duplications
-        name: document.getElementById('detail-name').value,
-        description: document.getElementById('detail-description').value,
-        responsibility: document.getElementById('detail-responsibility').value,
-        channel: document.getElementById('detail-channel').value,
-        workingDir: document.getElementById('detail-workdir').value,
-        userEffort: parseInt(document.getElementById('detail-user-effort')?.value || '1', 10),
-        projectSize: document.getElementById('detail-project-size')?.value || 'small',
+        name: document.getElementById('detail-name')?.value || activeAgentData.name || '',
+        description: document.getElementById('detail-description')?.value || activeAgentData.description || '',
+        responsibility: document.getElementById('detail-responsibility')?.value || activeAgentData.responsibility || '',
+        channel: document.getElementById('detail-channel')?.value || activeAgentData.channel || 'Gmail',
+        workingDir: document.getElementById('detail-workdir')?.value || activeAgentData.workingDir || '',
+        userEffort: parseInt(document.getElementById('detail-user-effort')?.value || activeAgentData.userEffort || '1', 10),
+        projectSize: document.getElementById('detail-project-size')?.value || activeAgentData.projectSize || 'small',
         connectedTools: Array.from(connectedToolsSet),
         agentType: document.getElementById('detail-agent-type')?.value || activeAgentData.agentType || 'worker',
         permissions: activeAgentData.permissions || [],
@@ -586,7 +586,7 @@ function queueAutoSave() {
     saveTimeout = setTimeout(triggerSave, 1000); // 1 second debounce
 }
 
-function initTrainingUI() {
+window.initTrainingUI = function() {
     if (isTrainingUIInitialized) return;
     isTrainingUIInitialized = true;
 

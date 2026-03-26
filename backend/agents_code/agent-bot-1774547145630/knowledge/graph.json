@@ -1,0 +1,407 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "node_type": "source",
+      "url": "https://ai100.stanford.edu/2016-report/appendix-i-short-history-ai",
+      "title": "Appendix I: A Short History of AI | One Hundred Year Study on Artificial Intelligence (AI100)",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T12:46:47Z",
+      "id": "src_011"
+    },
+    {
+      "node_type": "fact",
+      "content": "The field of Artificial Intelligence (AI) was officially born in 1956 at a workshop organized by John McCarthy at the Dartmouth Summer Research Project.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T12:46:47Z",
+      "id": "fact_012"
+    },
+    {
+      "node_type": "topic",
+      "label": "AI History",
+      "summary": "",
+      "id": "topic_ai_history"
+    },
+    {
+      "node_type": "topic",
+      "label": "Dartmouth Workshop",
+      "summary": "",
+      "id": "topic_dartmouth_workshop"
+    },
+    {
+      "node_type": "source",
+      "url": "https://www.tableau.com/data-insights/ai/history",
+      "title": "What is the history of artificial intelligence (AI)? | Tableau",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T12:46:47Z",
+      "id": "src_012"
+    },
+    {
+      "node_type": "fact",
+      "content": "Alan Turing published \u201cComputer Machinery and Intelligence\u201d in 1950, proposing the Turing test.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T12:46:47Z",
+      "id": "fact_013"
+    },
+    {
+      "node_type": "topic",
+      "label": "Turing Test",
+      "summary": "",
+      "id": "topic_turing_test"
+    },
+    {
+      "node_type": "fact",
+      "content": "In 1952, Arthur Samuel developed a checkers-playing program, the first of its kind.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T12:46:47Z",
+      "id": "fact_014"
+    },
+    {
+      "node_type": "topic",
+      "label": "Game AI",
+      "summary": "",
+      "id": "topic_game_ai"
+    },
+    {
+      "node_type": "source",
+      "url": "https://www.ibm.com/think/topics/history-of-artificial-intelligence",
+      "title": "The History of Artificial Intelligence | IBM",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T12:46:47Z",
+      "id": "src_013"
+    },
+    {
+      "node_type": "fact",
+      "content": "Allen Newell and Herbert A. Simon developed the Logic Theorist and General Problem Solver, among the first programs to mimic human problem-solving.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T12:46:47Z",
+      "id": "fact_015"
+    },
+    {
+      "node_type": "topic",
+      "label": "Problem Solving",
+      "summary": "",
+      "id": "topic_problem_solving"
+    },
+    {
+      "node_type": "source",
+      "url": "https://en.wikipedia.org/wiki/Artificial_general_intelligence",
+      "title": "Artificial general intelligence - Wikipedia",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T12:46:47Z",
+      "id": "src_014"
+    },
+    {
+      "node_type": "fact",
+      "content": "Creating Artificial General Intelligence (AGI) is a stated goal of AI technology companies such as OpenAI, Google, xAI, and Meta.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T12:46:47Z",
+      "id": "fact_016"
+    },
+    {
+      "node_type": "topic",
+      "label": "AGI",
+      "summary": "",
+      "id": "topic_agi"
+    },
+    {
+      "node_type": "topic",
+      "label": "AI Companies",
+      "summary": "",
+      "id": "topic_ai_companies"
+    },
+    {
+      "node_type": "fact",
+      "content": "A 2020 survey identified 72 active AGI research and development projects across 37 countries.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T12:46:47Z",
+      "id": "fact_017"
+    },
+    {
+      "node_type": "topic",
+      "label": "Research",
+      "summary": "",
+      "id": "topic_research"
+    },
+    {
+      "node_type": "source",
+      "url": "https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai",
+      "title": "TheStateofAI: Global Survey 2025 | McKinsey",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T12:46:47Z",
+      "id": "src_015"
+    },
+    {
+      "node_type": "fact",
+      "content": "The latest McKinsey Global Survey on the state of AI reveals wider use, including growing proliferation of agentic AI.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T12:46:47Z",
+      "id": "fact_018"
+    },
+    {
+      "node_type": "topic",
+      "label": "AI Adoption",
+      "summary": "",
+      "id": "topic_ai_adoption"
+    },
+    {
+      "node_type": "topic",
+      "label": "Agentic AI",
+      "summary": "",
+      "id": "topic_agentic_ai"
+    },
+    {
+      "node_type": "source",
+      "url": "https://medium.com/@alyourblog/airesearch-unleashed-pioneering-the-future-of-intelligent-innovation-73f03506f937",
+      "title": "AIResearchUnleashed: Pioneering the Future of Intelligent... | Medium",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T12:46:47Z",
+      "id": "src_016"
+    },
+    {
+      "node_type": "fact",
+      "content": "AI will create 97 million jobs.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T12:46:47Z",
+      "id": "fact_019"
+    },
+    {
+      "node_type": "topic",
+      "label": "AI",
+      "summary": "",
+      "id": "topic_ai"
+    },
+    {
+      "node_type": "topic",
+      "label": "Job Creation",
+      "summary": "",
+      "id": "topic_job_creation"
+    },
+    {
+      "node_type": "source",
+      "url": "https://aimojo.io/generative-ai-state/",
+      "title": "GenerativeAIin 2026: Key Metrics, Usage & Investment Data",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T12:46:47Z",
+      "id": "src_017"
+    },
+    {
+      "node_type": "fact",
+      "content": "Generative AI is a $140B market.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T12:46:47Z",
+      "id": "fact_020"
+    },
+    {
+      "node_type": "topic",
+      "label": "Generative AI",
+      "summary": "",
+      "id": "topic_generative_ai"
+    },
+    {
+      "node_type": "topic",
+      "label": "Market Size",
+      "summary": "",
+      "id": "topic_market_size"
+    },
+    {
+      "node_type": "source",
+      "url": "https://grokipedia.com/page/Economic_impact_of_artificial_intelligence",
+      "title": "Economic impact of artificial intelligence",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T12:46:47Z",
+      "id": "src_018"
+    },
+    {
+      "node_type": "fact",
+      "content": "AI revolution could bring a labor share decline of 5-15%.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T12:46:47Z",
+      "id": "fact_021"
+    },
+    {
+      "node_type": "topic",
+      "label": "Economic Impact",
+      "summary": "",
+      "id": "topic_economic_impact"
+    }
+  ],
+  "links": [
+    {
+      "edge_type": "extracted_from",
+      "source": "src_011",
+      "target": "fact_012"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_012",
+      "target": "topic_ai_history"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_012",
+      "target": "topic_dartmouth_workshop"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_012",
+      "target": "fact_013"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_012",
+      "target": "fact_014"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_013",
+      "target": "topic_ai_history"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_013",
+      "target": "topic_turing_test"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_014",
+      "target": "topic_ai_history"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_014",
+      "target": "topic_game_ai"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_013",
+      "target": "fact_015"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_015",
+      "target": "topic_ai_history"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_015",
+      "target": "topic_problem_solving"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_014",
+      "target": "fact_016"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_014",
+      "target": "fact_017"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_016",
+      "target": "topic_agi"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_016",
+      "target": "topic_ai_companies"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_017",
+      "target": "topic_agi"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_017",
+      "target": "topic_research"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_015",
+      "target": "fact_018"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_018",
+      "target": "topic_ai_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_018",
+      "target": "topic_agentic_ai"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_016",
+      "target": "fact_019"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_019",
+      "target": "topic_ai"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_019",
+      "target": "topic_job_creation"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_017",
+      "target": "fact_020"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_020",
+      "target": "topic_generative_ai"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_020",
+      "target": "topic_market_size"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_018",
+      "target": "fact_021"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_021",
+      "target": "topic_ai"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_021",
+      "target": "topic_economic_impact"
+    }
+  ]
+}

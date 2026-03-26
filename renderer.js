@@ -21,7 +21,9 @@ const providerNameSpan = document.getElementById('provider-name');
 
 // Function to show a specific step
 function showStep(stepNumber) {
-    Object.values(steps).forEach(stepEl => stepEl.classList.add('hidden'));
+    Object.values(steps).forEach(stepEl => {
+        if (stepEl) stepEl.classList.add('hidden');
+    });
     if (steps[stepNumber]) {
         steps[stepNumber].classList.remove('hidden');
     }
@@ -64,6 +66,7 @@ function initAgentCanvas() {
     // 3. Initialize the canvas only if it hasn't been already
     if (!window.agentCanvasInstance) {
         window.agentCanvasInstance = new window.AgentCanvas('agent-canvas');
+        if (window.initTrainingUI) window.initTrainingUI();
     }
 }
 

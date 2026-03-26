@@ -64,7 +64,7 @@ async def _ddgs_search_raw(query, agent_id):
     """
     Internal helper to fetch raw DuckDuckGo results.
     """
-    safe_log(f"[STATUS:{agent_id}] DuckDuckGo: Searching '{query[:40]}...'")
+    safe_log(f"[STATUS:{agent_id}] DuckDuckGo: Searching '{query[:40]}...'", agent_id=agent_id)
     try:
         from ddgs import DDGS
         def do_search():
@@ -80,10 +80,10 @@ async def _ddgs_search_raw(query, agent_id):
             return results
 
         results = await asyncio.to_thread(do_search)
-        safe_log(f"+++ [INTERNAL:search] Got {len(results)} results")
+        safe_log(f"+++ [INTERNAL:search] Got {len(results)} results", agent_id=agent_id)
         return results
     except Exception as e:
-        safe_log(f"!!! [INTERNAL:search] Error: {e}")
+        safe_log(f"!!! [INTERNAL:search] Error: {e}", agent_id=agent_id)
         # Surface the actual error so the planner knows search is broken, not just empty
         return f"__SEARCH_ERROR__: {str(e)}"
 
@@ -195,7 +195,10 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
             return "Error: No working directory assigned. Cannot save report."
             
         # 1. Setup & Graph Retrieval
-        topic = tool_input.split("|")[0].strip()
+        parts = tool_input.split("|", 1)
+        topic = parts[0].strip()
+        provided_context = parts[1].strip() if len(parts) > 1 else ""
+
         # Support hallucinations like topic="..."
         if "=" in topic and (topic.lower().startswith("topic=") or topic.lower().startswith("subject=")):
             topic = topic.split("=", 1)[-1].strip()
@@ -204,15 +207,21 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
         store = KnowledgeStore(agent_id)
         store.load()
         
-        # Get the "Map of Facts" instead of relying on memory
+        # Get the "Map of Facts" instead of relying on memory. If topic is not found, get all or rely on provided context.
         graph_data = store.get_full_report_context(topic)
+
+        # If graph_data is empty and we have provided_context, we can inject it into graph_data or prompt
+        if not graph_data.get("facts") and not graph_data.get("sources"):
+            graph_data = {"provided_context": provided_context}
+        elif provided_context:
+            graph_data["provided_context"] = provided_context
         
         # 2. Craft the 'Senior Analyst' Prompt
         prompt = f"""You are a Senior Strategic Analyst. Write a comprehensive, formal research report based on the provided Knowledge Graph data.
         
         TOPIC: {topic}
         
-        RESEARCH DATA (The Knowledge Graph):
+        RESEARCH DATA (The Knowledge Graph & Context):
         {json.dumps(graph_data, indent=2)}
         
         STRICT INSTRUCTIONS:
