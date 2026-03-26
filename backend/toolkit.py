@@ -61,16 +61,23 @@ def safe_log(message, agent_id=None):
             pass
 
 async def _ddgs_search_raw(query, agent_id):
-    """
-    Internal helper to fetch raw DuckDuckGo results.
-    """
+    """Internal helper to fetch raw DuckDuckGo results."""
     safe_log(f"[STATUS:{agent_id}] DuckDuckGo: Searching '{query[:40]}...'", agent_id=agent_id)
+    
+    # JUNK DOMAIN FILTER: Skip these to avoid bot-blocks and automated tickers
+    junk_domains = ['yahoo.com', 'yimg.com', 'linkedin.com', 'investing.com', 'facebook.com', 'twitter.com', 'youtube.com']
+    
     try:
         from ddgs import DDGS
         def do_search():
             results = []
             search_results = DDGS().text(query, max_results=20)
             for result in search_results:
+                href = result.get("href", "").lower()
+                # Skip the link if it contains any of the junk domains
+                if any(junk in href for junk in junk_domains):
+                    continue
+                    
                 body = result.get("body", "")
                 results.append({
                     "title": result.get("title", ""),
@@ -80,11 +87,10 @@ async def _ddgs_search_raw(query, agent_id):
             return results
 
         results = await asyncio.to_thread(do_search)
-        safe_log(f"+++ [INTERNAL:search] Got {len(results)} results", agent_id=agent_id)
+        safe_log(f"+++ [INTERNAL:search] Got {len(results)} clean results", agent_id=agent_id)
         return results
     except Exception as e:
         safe_log(f"!!! [INTERNAL:search] Error: {e}", agent_id=agent_id)
-        # Surface the actual error so the planner knows search is broken, not just empty
         return f"__SEARCH_ERROR__: {str(e)}"
 
 

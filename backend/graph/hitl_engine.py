@@ -215,8 +215,8 @@ async def _gather_loop(state: dict, store: KnowledgeStore, dial: int):
         # --- Decision: auto-act, checkpoint, or keep gathering? ---
         ready = store.ledger.get("ready_to_act", False)
 
-        if should_auto_act(dial, ready, gather_count):
-            # Autopilot: skip checkpoint, produce output automatically
+        # THE FIX: Force it to write the report after 3 cycles, no matter what!
+        if should_auto_act(dial, ready, gather_count) or gather_count >= 3:
             _log(f"    [HITL] Auto-ACT triggered: dial={dial} ready={ready} cycles={gather_count}")
             async for chunk in _phase_act(state, store):
                 yield chunk
@@ -422,25 +422,6 @@ async def _phase_gather(state: dict, store: KnowledgeStore, dial: int):
         web_search_calls = [tc for tc in tool_calls if tc.get("tool_name") == "web_search"]
         if len(web_search_calls) > 1:
             tool_calls = [tc for tc in tool_calls if tc.get("tool_name") != "web_search"] + [web_search_calls[0]]
-
-        # Anti-laziness AND Anti-Spam: Auto-expand scrape_website calls using known URLs
-        # Extract URLs directly from the knowledge graph sources
-        known_urls = []
-        for nid, attrs in store.graph.nodes(data=True):
-            if attrs.get("node_type") == "source" and attrs.get("url"):
-                url = attrs["url"]
-                if url != "unknown" and url not in known_urls:
-                    known_urls.append(url)
-        
-        if known_urls:
-            planned_urls = {tc.get("tool_args", {}).get("url") for tc in tool_calls if tc.get("tool_name") == "scrape_website"}
-            
-            # Prioritize inserting scrapes at the front so they execute first
-            for url in known_urls:
-                if len(tool_calls) >= batch_size: break
-                if url not in planned_urls and not url.endswith(('.jpg', '.png', '.pdf')):
-                    tool_calls.insert(0, {"tool_name": "scrape_website", "tool_args": {"url": url}})
-                    planned_urls.add(url)
                     
         _log(f"+++ [HITL:GATHER] planned {len(tool_calls)} tool calls")
     except Exception as e:
