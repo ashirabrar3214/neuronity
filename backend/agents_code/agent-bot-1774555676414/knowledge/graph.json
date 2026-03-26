@@ -1,0 +1,1627 @@
+{
+  "directed": true,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "node_type": "source",
+      "url": "https://toloka.ai/blog/history-of-llms/",
+      "title": "History of LLMs: Complete Timeline & Evolution (1950-2026)",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T15:12:47Z",
+      "id": "src_001"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models (LLMs) are a type of deep learning system trained on massive datasets of text to understand and generate human language.",
+      "context_or_evidence": "This is a core definition of LLMs based on their training methodology and purpose.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:12:47Z",
+      "id": "fact_001"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_definition",
+      "summary": "",
+      "id": "topic_llm_definition"
+    },
+    {
+      "node_type": "topic",
+      "label": "deep_learning",
+      "summary": "",
+      "id": "topic_deep_learning"
+    },
+    {
+      "node_type": "topic",
+      "label": "natural_language_generation",
+      "summary": "",
+      "id": "topic_natural_language_generation"
+    },
+    {
+      "node_type": "source",
+      "url": "https://arxiv.org/abs/2402.06853",
+      "title": "History, Development, and Principles of Large Language Models-An ...",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T15:12:47Z",
+      "id": "src_002"
+    },
+    {
+      "node_type": "fact",
+      "content": "Language models serve as a cornerstone in natural language processing (NLP), utilizing mathematical methods to generalize language laws and knowledge for prediction and generation.",
+      "context_or_evidence": "This highlights the fundamental role of language models in NLP and their mathematical basis for language understanding.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:12:47Z",
+      "id": "fact_002"
+    },
+    {
+      "node_type": "topic",
+      "label": "language_modeling",
+      "summary": "",
+      "id": "topic_language_modeling"
+    },
+    {
+      "node_type": "topic",
+      "label": "natural_language_processing",
+      "summary": "",
+      "id": "topic_natural_language_processing"
+    },
+    {
+      "node_type": "topic",
+      "label": "mathematical_methods",
+      "summary": "",
+      "id": "topic_mathematical_methods"
+    },
+    {
+      "node_type": "source",
+      "url": "https://en.wikipedia.org/wiki/History_of_natural_language_processing",
+      "title": "History of natural language processing - Wikipedia",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T15:12:47Z",
+      "id": "src_003"
+    },
+    {
+      "node_type": "fact",
+      "content": "Advancements in deep learning and large language models have significantly enhanced the capabilities of natural language processing.",
+      "context_or_evidence": "This is a general observation about the impact of deep learning and LLMs on NLP capabilities.",
+      "confidence": 0.85,
+      "extracted_at": "2026-03-26T15:12:47Z",
+      "id": "fact_003"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_impact",
+      "summary": "",
+      "id": "topic_llm_impact"
+    },
+    {
+      "node_type": "source",
+      "url": "https://en.wikipedia.org/wiki/Large_language_model",
+      "title": "Largelanguagemodel- Wikipedia",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T15:12:47Z",
+      "id": "src_004"
+    },
+    {
+      "node_type": "fact",
+      "content": "Before 2017, some language models were considered large relative to the computational and data constraints of their time.",
+      "context_or_evidence": "This provides a historical perspective on the definition of 'large' in the context of language models, highlighting the importance of computational resources.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:12:47Z",
+      "id": "fact_004"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_history",
+      "summary": "",
+      "id": "topic_llm_history"
+    },
+    {
+      "node_type": "topic",
+      "label": "computational_constraints",
+      "summary": "",
+      "id": "topic_computational_constraints"
+    },
+    {
+      "node_type": "topic",
+      "label": "data_limitations",
+      "summary": "",
+      "id": "topic_data_limitations"
+    },
+    {
+      "node_type": "source",
+      "url": "https://www.geeksforgeeks.org/blogs/history-and-evolution-of-llms/",
+      "title": "History and Evolution of LLMs - GeeksforGeeks",
+      "snippet": "",
+      "full_text": "",
+      "tables": [],
+      "published_date": null,
+      "scraped_at": "2026-03-26T15:12:47Z",
+      "id": "src_005"
+    },
+    {
+      "node_type": "fact",
+      "content": "The evolution of LLMs has progressed from older rule-based systems to today's powerful AI-driven models.",
+      "context_or_evidence": "This summarizes the overall trend in LLM development, moving away from rule-based approaches.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:12:47Z",
+      "id": "fact_005"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_evolution",
+      "summary": "",
+      "id": "topic_llm_evolution"
+    },
+    {
+      "node_type": "topic",
+      "label": "rule_based_systems",
+      "summary": "",
+      "id": "topic_rule_based_systems"
+    },
+    {
+      "node_type": "topic",
+      "label": "ai_driven_models",
+      "summary": "",
+      "id": "topic_ai_driven_models"
+    },
+    {
+      "node_type": "fact",
+      "content": "AI-generated code now accounts for nearly 46% of new software.",
+      "context_or_evidence": "Based on GitHub's 2024 report.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:13:12Z",
+      "id": "fact_154"
+    },
+    {
+      "node_type": "topic",
+      "label": "software_development",
+      "summary": "",
+      "id": "topic_software_development"
+    },
+    {
+      "node_type": "topic",
+      "label": "ai_impact",
+      "summary": "",
+      "id": "topic_ai_impact"
+    },
+    {
+      "node_type": "topic",
+      "label": "code_generation",
+      "summary": "",
+      "id": "topic_code_generation"
+    },
+    {
+      "node_type": "fact",
+      "content": "LLMs have evolved into sophisticated reasoning systems, autonomous agents, and specialized models.",
+      "context_or_evidence": "Observed transformation since ChatGPT's initial focus on conversational AI.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:13:12Z",
+      "id": "fact_155"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_capabilities",
+      "summary": "",
+      "id": "topic_llm_capabilities"
+    },
+    {
+      "node_type": "topic",
+      "label": "autonomous_agents",
+      "summary": "",
+      "id": "topic_autonomous_agents"
+    },
+    {
+      "node_type": "topic",
+      "label": "reasoning",
+      "summary": "",
+      "id": "topic_reasoning"
+    },
+    {
+      "node_type": "fact",
+      "content": "Over 200 million active users worldwide are engaging with LLMs.",
+      "context_or_evidence": "Observed user base across various LLM applications.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:13:12Z",
+      "id": "fact_156"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_adoption",
+      "summary": "",
+      "id": "topic_llm_adoption"
+    },
+    {
+      "node_type": "topic",
+      "label": "user_growth",
+      "summary": "",
+      "id": "topic_user_growth"
+    },
+    {
+      "node_type": "fact",
+      "content": "The fundamental task of an LLM is to predict the next word in a sequence.",
+      "context_or_evidence": "This basic mechanism allows LLMs to perform complex tasks such as writing essays and translating languages.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:13:12Z",
+      "id": "fact_157"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_architecture",
+      "summary": "",
+      "id": "topic_llm_architecture"
+    },
+    {
+      "node_type": "topic",
+      "label": "next_token_prediction",
+      "summary": "",
+      "id": "topic_next_token_prediction"
+    },
+    {
+      "node_type": "fact",
+      "content": "AI-generated code now accounts for nearly 46% of new software.",
+      "context_or_evidence": "Based on GitHub's 2024 report.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:13:39Z",
+      "id": "fact_306"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models have become an integral part of modern technology infrastructure.",
+      "context_or_evidence": "Observed through the lens of over 200 million active users worldwide and the increasing prevalence of AI-generated code.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:13:39Z",
+      "id": "fact_307"
+    },
+    {
+      "node_type": "topic",
+      "label": "technology_adoption",
+      "summary": "",
+      "id": "topic_technology_adoption"
+    },
+    {
+      "node_type": "topic",
+      "label": "ai_infrastructure",
+      "summary": "",
+      "id": "topic_ai_infrastructure"
+    },
+    {
+      "node_type": "topic",
+      "label": "market_penetration",
+      "summary": "",
+      "id": "topic_market_penetration"
+    },
+    {
+      "node_type": "fact",
+      "content": "The fundamental task of a large language model is to predict the next word in a sequence.",
+      "context_or_evidence": "This basic mechanism enables LLMs to perform complex tasks like writing essays, translating languages, and answering questions.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:13:39Z",
+      "id": "fact_308"
+    },
+    {
+      "node_type": "fact",
+      "content": "The history of machine translation dates back to the seventeenth century.",
+      "context_or_evidence": "Philosophers such as Leibniz and Descartes proposed codes to relate words between languages.",
+      "confidence": 0.85,
+      "extracted_at": "2026-03-26T15:13:39Z",
+      "id": "fact_309"
+    },
+    {
+      "node_type": "topic",
+      "label": "machine_translation",
+      "summary": "",
+      "id": "topic_machine_translation"
+    },
+    {
+      "node_type": "topic",
+      "label": "historical_context",
+      "summary": "",
+      "id": "topic_historical_context"
+    },
+    {
+      "node_type": "fact",
+      "content": "The first patents for \"translating machines\" were applied for in the mid-1930s.",
+      "context_or_evidence": "Georges Artsrouni proposed an automatic bilingual dictionary using paper tape, and Peter Troyanskii proposed a machine for translating languages.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:13:39Z",
+      "id": "fact_310"
+    },
+    {
+      "node_type": "topic",
+      "label": "patent_history",
+      "summary": "",
+      "id": "topic_patent_history"
+    },
+    {
+      "node_type": "topic",
+      "label": "early_nlp",
+      "summary": "",
+      "id": "topic_early_nlp"
+    },
+    {
+      "node_type": "fact",
+      "content": "AI-generated code now accounts for nearly 46% of new software.",
+      "context_or_evidence": "According to GitHub's 2024 report.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:14:15Z",
+      "id": "fact_871"
+    },
+    {
+      "node_type": "topic",
+      "label": "ai_adoption",
+      "summary": "",
+      "id": "topic_ai_adoption"
+    },
+    {
+      "node_type": "topic",
+      "label": "github",
+      "summary": "",
+      "id": "topic_github"
+    },
+    {
+      "node_type": "fact",
+      "content": "LLMs have evolved from impressive conversational AI into sophisticated reasoning systems, autonomous agents, and specialized models.",
+      "context_or_evidence": "Observed transformation since ChatGPT's initial popularity in November 2022.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:14:15Z",
+      "id": "fact_872"
+    },
+    {
+      "node_type": "topic",
+      "label": "reasoning_systems",
+      "summary": "",
+      "id": "topic_reasoning_systems"
+    },
+    {
+      "node_type": "fact",
+      "content": "LLMs are trained to predict the next word in a sequence.",
+      "context_or_evidence": "This basic mechanism enables LLMs to write coherent essays, translate languages, answer complex questions, and reason through multi-step problems.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:14:15Z",
+      "id": "fact_873"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_training",
+      "summary": "",
+      "id": "topic_llm_training"
+    },
+    {
+      "node_type": "topic",
+      "label": "language_generation",
+      "summary": "",
+      "id": "topic_language_generation"
+    },
+    {
+      "node_type": "fact",
+      "content": "LLMs have become an integral part of modern technology infrastructure.",
+      "context_or_evidence": "LLMs have over 200 million active users worldwide.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:14:15Z",
+      "id": "fact_874"
+    },
+    {
+      "node_type": "topic",
+      "label": "user_base",
+      "summary": "",
+      "id": "topic_user_base"
+    },
+    {
+      "node_type": "fact",
+      "content": "AI-generated code now accounts for nearly 46% of new software.",
+      "context_or_evidence": "According to GitHub's 2024 report.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:14:46Z",
+      "id": "fact_1023"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models have become an integral part of modern technology infrastructure.",
+      "context_or_evidence": "Observed through the lens of over 200 million active users worldwide and the significant contribution of AI-generated code to new software.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:14:46Z",
+      "id": "fact_1024"
+    },
+    {
+      "node_type": "fact",
+      "content": "The fundamental task of a large language model is to predict the next word in a sequence.",
+      "context_or_evidence": "This simple mechanism allows LLMs to write coherent essays, translate languages, answer complex questions, and reason through multi-step problems.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:14:46Z",
+      "id": "fact_1025"
+    },
+    {
+      "node_type": "topic",
+      "label": "predictive_modeling",
+      "summary": "",
+      "id": "topic_predictive_modeling"
+    },
+    {
+      "node_type": "fact",
+      "content": "Early proposals for machine translation involved automatic bilingual dictionaries using paper tape.",
+      "context_or_evidence": "Georges Artsrouni proposed such a system in the mid-1930s.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:14:46Z",
+      "id": "fact_1026"
+    },
+    {
+      "node_type": "topic",
+      "label": "historical_nlp",
+      "summary": "",
+      "id": "topic_historical_nlp"
+    },
+    {
+      "node_type": "topic",
+      "label": "paper_tape_technology",
+      "summary": "",
+      "id": "topic_paper_tape_technology"
+    },
+    {
+      "node_type": "fact",
+      "content": "AI-generated code now accounts for nearly 46% of new software.",
+      "context_or_evidence": "Based on GitHub's 2024 report.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:15:14Z",
+      "id": "fact_1175"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models have become an integral part of modern technology infrastructure.",
+      "context_or_evidence": "Observed through the lens of over 200 million active users worldwide and the increasing prevalence of AI-generated code.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:15:14Z",
+      "id": "fact_1176"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_applications",
+      "summary": "",
+      "id": "topic_llm_applications"
+    },
+    {
+      "node_type": "topic",
+      "label": "digital_transformation",
+      "summary": "",
+      "id": "topic_digital_transformation"
+    },
+    {
+      "node_type": "fact",
+      "content": "The fundamental task of a large language model is to predict the next word in a sequence.",
+      "context_or_evidence": "This simple mechanism enables LLMs to perform complex tasks like writing essays, translating languages, and answering complex questions.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:15:14Z",
+      "id": "fact_1177"
+    },
+    {
+      "node_type": "fact",
+      "content": "The history of natural language processing overlaps with the history of machine translation, speech recognition, and artificial intelligence.",
+      "context_or_evidence": "NLP's development is intertwined with advancements in these related fields.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:15:14Z",
+      "id": "fact_1178"
+    },
+    {
+      "node_type": "topic",
+      "label": "speech_recognition",
+      "summary": "",
+      "id": "topic_speech_recognition"
+    },
+    {
+      "node_type": "topic",
+      "label": "artificial_intelligence",
+      "summary": "",
+      "id": "topic_artificial_intelligence"
+    },
+    {
+      "node_type": "fact",
+      "content": "Proposals for machine translation date back to the seventeenth century.",
+      "context_or_evidence": "Philosophers like Leibniz and Descartes proposed codes to relate words between languages, though these remained theoretical.",
+      "confidence": 0.85,
+      "extracted_at": "2026-03-26T15:15:14Z",
+      "id": "fact_1179"
+    },
+    {
+      "node_type": "topic",
+      "label": "nlp_origins",
+      "summary": "",
+      "id": "topic_nlp_origins"
+    },
+    {
+      "node_type": "fact",
+      "content": "AI-generated code accounts for nearly 46% of new software.",
+      "context_or_evidence": "Based on GitHub's 2024 report.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:15:42Z",
+      "id": "fact_1328"
+    },
+    {
+      "node_type": "topic",
+      "label": "ai_code_generation",
+      "summary": "",
+      "id": "topic_ai_code_generation"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models have evolved into sophisticated reasoning systems, autonomous agents, and specialized models.",
+      "context_or_evidence": "Observed transformation since ChatGPT's initial release, indicating progression beyond simple conversational AI.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:15:42Z",
+      "id": "fact_1329"
+    },
+    {
+      "node_type": "fact",
+      "content": "Over 200 million active users worldwide are engaging with LLMs.",
+      "context_or_evidence": "Implied user base reflecting the widespread adoption of LLMs.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:15:42Z",
+      "id": "fact_1330"
+    },
+    {
+      "node_type": "fact",
+      "content": "The fundamental task of an LLM is to predict the next word in a sequence.",
+      "context_or_evidence": "This basic mechanism enables LLMs to perform complex tasks such as writing essays, translating languages, and answering questions.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:15:42Z",
+      "id": "fact_1331"
+    },
+    {
+      "node_type": "fact",
+      "content": "Early proposals for machine translation involved automatic bilingual dictionaries using paper tape.",
+      "context_or_evidence": "Georges Artsrouni's proposal in the mid-1930s.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:15:42Z",
+      "id": "fact_1332"
+    },
+    {
+      "node_type": "topic",
+      "label": "paper_tape",
+      "summary": "",
+      "id": "topic_paper_tape"
+    },
+    {
+      "node_type": "fact",
+      "content": "AI-generated code now accounts for nearly 46% of new software.",
+      "context_or_evidence": "Based on GitHub's 2024 report.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:16:08Z",
+      "id": "fact_1481"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models have become an integral part of modern technology infrastructure.",
+      "context_or_evidence": "Over 200 million active users worldwide are using LLMs.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:16:08Z",
+      "id": "fact_1482"
+    },
+    {
+      "node_type": "topic",
+      "label": "technology_infrastructure",
+      "summary": "",
+      "id": "topic_technology_infrastructure"
+    },
+    {
+      "node_type": "fact",
+      "content": "The fundamental task of a large language model is to predict the next word in a sequence.",
+      "context_or_evidence": "This basic mechanism enables LLMs to write coherent essays, translate languages, answer complex questions, and even reason through multi-step problems.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:16:08Z",
+      "id": "fact_1483"
+    },
+    {
+      "node_type": "topic",
+      "label": "llm_functionality",
+      "summary": "",
+      "id": "topic_llm_functionality"
+    },
+    {
+      "node_type": "fact",
+      "content": "The history of machine translation dates back to the seventeenth century.",
+      "context_or_evidence": "Philosophers such as Leibniz and Descartes proposed codes to relate words between languages.",
+      "confidence": 0.7,
+      "extracted_at": "2026-03-26T15:16:08Z",
+      "id": "fact_1484"
+    },
+    {
+      "node_type": "fact",
+      "content": "The first patents for \"translating machines\" were applied for in the mid-1930s.",
+      "context_or_evidence": "Georges Artsrouni proposed an automatic bilingual dictionary using paper tape.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:16:08Z",
+      "id": "fact_1485"
+    },
+    {
+      "node_type": "fact",
+      "content": "AI-generated code now accounts for nearly 46% of new software.",
+      "context_or_evidence": "According to GitHub's 2024 report, nearly half of new software is generated by AI.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:16:33Z",
+      "id": "fact_1634"
+    },
+    {
+      "node_type": "fact",
+      "content": "Large language models have become an integral part of modern technology infrastructure.",
+      "context_or_evidence": "With over 200 million active users worldwide, LLMs are now deeply embedded in technology.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:16:33Z",
+      "id": "fact_1635"
+    },
+    {
+      "node_type": "fact",
+      "content": "The fundamental task of a large language model is to predict the next word in a sequence.",
+      "context_or_evidence": "LLMs are trained on massive datasets of text to understand and generate human language by predicting the next word.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:16:33Z",
+      "id": "fact_1636"
+    },
+    {
+      "node_type": "fact",
+      "content": "Early proposals for machine translation involved automatic bilingual dictionaries using paper tape.",
+      "context_or_evidence": "Georges Artsrouni proposed a 'translating machine' in the mid-1930s that functioned as an automatic bilingual dictionary using paper tape.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:16:33Z",
+      "id": "fact_1637"
+    },
+    {
+      "node_type": "fact",
+      "content": "AI-generated code accounts for nearly 46% of new software.",
+      "context_or_evidence": "Based on GitHub's 2024 report, indicating the increasing integration of LLMs in software development workflows.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:17:03Z",
+      "id": "fact_1786"
+    },
+    {
+      "node_type": "fact",
+      "content": "LLMs have evolved from impressive conversational AI to sophisticated reasoning systems, autonomous agents, and specialized models.",
+      "context_or_evidence": "Observed transformation in AI capabilities since the emergence of ChatGPT in November 2022.",
+      "confidence": 0.9,
+      "extracted_at": "2026-03-26T15:17:03Z",
+      "id": "fact_1787"
+    },
+    {
+      "node_type": "fact",
+      "content": "LLMs have over 200 million active users worldwide.",
+      "context_or_evidence": "Indicates the widespread adoption and integration of LLMs into various applications and user experiences.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:17:03Z",
+      "id": "fact_1788"
+    },
+    {
+      "node_type": "topic",
+      "label": "user_adoption",
+      "summary": "",
+      "id": "topic_user_adoption"
+    },
+    {
+      "node_type": "fact",
+      "content": "The fundamental task of an LLM is to predict the next word in a sequence.",
+      "context_or_evidence": "This seemingly simple mechanism enables LLMs to perform complex tasks such as writing, translation, and question answering.",
+      "confidence": 0.95,
+      "extracted_at": "2026-03-26T15:17:03Z",
+      "id": "fact_1789"
+    },
+    {
+      "node_type": "fact",
+      "content": "Early proposals for machine translation involved automatic bilingual dictionaries using paper tape.",
+      "context_or_evidence": "Georges Artsrouni's proposal in the mid-1930s exemplifies early attempts at machine translation.",
+      "confidence": 0.8,
+      "extracted_at": "2026-03-26T15:17:03Z",
+      "id": "fact_1790"
+    },
+    {
+      "node_type": "topic",
+      "label": "nlp_early_stages",
+      "summary": "",
+      "id": "topic_nlp_early_stages"
+    }
+  ],
+  "links": [
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_001"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_154"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_155"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_156"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_157"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_306"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_307"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_308"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_871"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_872"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_873"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_874"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1023"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1024"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1025"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1175"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1176"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1177"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1328"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1329"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1330"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1331"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1481"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1482"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1483"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1634"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1635"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1636"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1786"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1787"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1788"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_001",
+      "target": "fact_1789"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_001",
+      "target": "topic_llm_definition"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_001",
+      "target": "topic_deep_learning"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_001",
+      "target": "topic_natural_language_generation"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_002",
+      "target": "fact_002"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_002",
+      "target": "topic_language_modeling"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_002",
+      "target": "topic_natural_language_processing"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_002",
+      "target": "topic_mathematical_methods"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_003"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_309"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_310"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_1026"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_1178"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_1179"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_1332"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_1484"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_1485"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_1637"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_003",
+      "target": "fact_1790"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_003",
+      "target": "topic_deep_learning"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_003",
+      "target": "topic_llm_impact"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_003",
+      "target": "topic_natural_language_processing"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_004",
+      "target": "fact_004"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_004",
+      "target": "topic_llm_history"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_004",
+      "target": "topic_computational_constraints"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_004",
+      "target": "topic_data_limitations"
+    },
+    {
+      "edge_type": "extracted_from",
+      "source": "src_005",
+      "target": "fact_005"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_005",
+      "target": "topic_llm_evolution"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_005",
+      "target": "topic_rule_based_systems"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_005",
+      "target": "topic_ai_driven_models"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_154",
+      "target": "topic_software_development"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_154",
+      "target": "topic_ai_impact"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_154",
+      "target": "topic_code_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_155",
+      "target": "topic_llm_capabilities"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_155",
+      "target": "topic_autonomous_agents"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_155",
+      "target": "topic_reasoning"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_156",
+      "target": "topic_llm_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_156",
+      "target": "topic_user_growth"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_157",
+      "target": "topic_llm_architecture"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_157",
+      "target": "topic_next_token_prediction"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_306",
+      "target": "topic_software_development"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_306",
+      "target": "topic_ai_impact"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_306",
+      "target": "topic_code_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_307",
+      "target": "topic_technology_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_307",
+      "target": "topic_ai_infrastructure"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_307",
+      "target": "topic_market_penetration"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_308",
+      "target": "topic_natural_language_processing"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_308",
+      "target": "topic_deep_learning"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_308",
+      "target": "topic_language_modeling"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_309",
+      "target": "topic_machine_translation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_309",
+      "target": "topic_natural_language_processing"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_309",
+      "target": "topic_historical_context"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_310",
+      "target": "topic_machine_translation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_310",
+      "target": "topic_patent_history"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_310",
+      "target": "topic_early_nlp"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_871",
+      "target": "topic_software_development"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_871",
+      "target": "topic_ai_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_871",
+      "target": "topic_github"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_872",
+      "target": "topic_llm_capabilities"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_872",
+      "target": "topic_autonomous_agents"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_872",
+      "target": "topic_reasoning_systems"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_873",
+      "target": "topic_llm_training"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_873",
+      "target": "topic_next_token_prediction"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_873",
+      "target": "topic_language_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_874",
+      "target": "topic_technology_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_874",
+      "target": "topic_user_base"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_874",
+      "target": "topic_market_penetration"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1023",
+      "target": "topic_software_development"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1023",
+      "target": "topic_ai_impact"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1023",
+      "target": "topic_github"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1024",
+      "target": "topic_technology_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1024",
+      "target": "topic_ai_infrastructure"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1024",
+      "target": "topic_market_penetration"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1025",
+      "target": "topic_llm_architecture"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1025",
+      "target": "topic_natural_language_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1025",
+      "target": "topic_predictive_modeling"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1026",
+      "target": "topic_machine_translation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1026",
+      "target": "topic_historical_nlp"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1026",
+      "target": "topic_paper_tape_technology"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1175",
+      "target": "topic_software_development"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1175",
+      "target": "topic_ai_impact"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1175",
+      "target": "topic_code_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1176",
+      "target": "topic_technology_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1176",
+      "target": "topic_llm_applications"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1176",
+      "target": "topic_digital_transformation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1177",
+      "target": "topic_llm_architecture"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1177",
+      "target": "topic_next_token_prediction"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1177",
+      "target": "topic_deep_learning"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1178",
+      "target": "topic_natural_language_processing"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1178",
+      "target": "topic_machine_translation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1178",
+      "target": "topic_speech_recognition"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1178",
+      "target": "topic_artificial_intelligence"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1179",
+      "target": "topic_machine_translation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1179",
+      "target": "topic_historical_context"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1179",
+      "target": "topic_nlp_origins"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1328",
+      "target": "topic_software_development"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1328",
+      "target": "topic_ai_code_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1328",
+      "target": "topic_github"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1329",
+      "target": "topic_llm_capabilities"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1329",
+      "target": "topic_autonomous_agents"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1329",
+      "target": "topic_reasoning_systems"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1330",
+      "target": "topic_llm_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1330",
+      "target": "topic_user_base"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1330",
+      "target": "topic_market_penetration"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1331",
+      "target": "topic_llm_architecture"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1331",
+      "target": "topic_next_token_prediction"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1331",
+      "target": "topic_deep_learning"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1332",
+      "target": "topic_machine_translation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1332",
+      "target": "topic_historical_nlp"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1332",
+      "target": "topic_paper_tape"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1481",
+      "target": "topic_software_development"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1481",
+      "target": "topic_ai_code_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1481",
+      "target": "topic_github"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1482",
+      "target": "topic_llm_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1482",
+      "target": "topic_technology_infrastructure"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1483",
+      "target": "topic_llm_functionality"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1483",
+      "target": "topic_next_token_prediction"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1484",
+      "target": "topic_machine_translation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1484",
+      "target": "topic_historical_context"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1485",
+      "target": "topic_machine_translation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1485",
+      "target": "topic_patent_history"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1634",
+      "target": "topic_software_development"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1634",
+      "target": "topic_ai_code_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1634",
+      "target": "topic_github"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1635",
+      "target": "topic_technology_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1635",
+      "target": "topic_llm_impact"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1635",
+      "target": "topic_user_growth"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1636",
+      "target": "topic_llm_architecture"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1636",
+      "target": "topic_next_token_prediction"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1636",
+      "target": "topic_deep_learning"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1637",
+      "target": "topic_machine_translation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1637",
+      "target": "topic_historical_nlp"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1637",
+      "target": "topic_paper_tape"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1786",
+      "target": "topic_software_development"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1786",
+      "target": "topic_ai_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1786",
+      "target": "topic_code_generation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1787",
+      "target": "topic_llm_capabilities"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1787",
+      "target": "topic_autonomous_agents"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1787",
+      "target": "topic_reasoning_systems"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1788",
+      "target": "topic_user_adoption"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1788",
+      "target": "topic_market_penetration"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1788",
+      "target": "topic_llm_applications"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1789",
+      "target": "topic_llm_architecture"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1789",
+      "target": "topic_next_token_prediction"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1789",
+      "target": "topic_deep_learning"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1790",
+      "target": "topic_machine_translation"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1790",
+      "target": "topic_historical_context"
+    },
+    {
+      "edge_type": "belongs_to",
+      "source": "fact_1790",
+      "target": "topic_nlp_early_stages"
+    }
+  ]
+}

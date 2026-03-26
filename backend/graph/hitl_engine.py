@@ -147,6 +147,11 @@ async def _resume_from_checkpoint(state: dict, store: KnowledgeStore, dial: int)
         store.init_session(user_msg)
         async for chunk in _phase_understand(state, store):
             yield chunk
+        
+        # CONTINUITY FIX: If the new session isn't done or clarifying, start gathering!
+        if store.ledger.get("current_phase") not in ["DONE", "CHECKPOINT"]:
+            async for chunk in _gather_loop(state, store, dial):
+                yield chunk
         return
 
     next_phase = steer_result.get("next_phase", "GATHER")
@@ -681,7 +686,15 @@ async def _phase_act(state: dict, store: KnowledgeStore):
         facts = store.get_facts_by_topic(topic["label"])
         for f in facts:
             src_str = f["sources"][0]["url"] if f["sources"] else "unknown"
-            all_facts.append(f"[{f['id']}] {f['content']} (source: {src_str})")
+            ev = f.get("context_or_evidence", "")
+            
+            # Format to include deep evidence
+            fact_text = f"[{f['id']}] CLAIM: {f['content']}"
+            if ev:
+                fact_text += f"\n    EVIDENCE: {ev}"
+            fact_text += f"\n    SOURCE: {src_str}"
+            
+            all_facts.append(fact_text)
 
     relevant_facts_str = "\n".join(all_facts[-20:]) if all_facts else "No facts available."
 

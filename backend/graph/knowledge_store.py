@@ -220,15 +220,17 @@ class KnowledgeStore:
         """Gathers all facts, tables, and source info for a final report."""
         facts = self.get_facts_by_topic(topic_label)
         
-        # Also find every Source node connected to this topic to grab their Tables
-        sources = {}
-        norm = topic_label.strip().lower().replace(" ", "_")
-        topic_id = f"topic_{norm}"
+        # FIX: If the exact topic isn't found, grab facts from ALL topics
+        if not facts:
+            for topic in self.get_all_topics():
+                facts.extend(self.get_facts_by_topic(topic["label"]))
         
-        if self.graph.has_node(topic_id):
-            # Path: Topic <- Fact <- Source
-            for fact_pred in self.graph.predecessors(topic_id):
-                for src_pred in self.graph.predecessors(fact_pred):
+        # Also find every Source node connected to these facts to grab their Tables
+        sources = {}
+        for fact in facts:
+            fact_id = fact["id"]
+            if self.graph.has_node(fact_id):
+                for src_pred in self.graph.predecessors(fact_id):
                     attrs = self.graph.nodes[src_pred]
                     if attrs.get("node_type") == "source":
                         sources[src_pred] = {
