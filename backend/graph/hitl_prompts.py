@@ -72,33 +72,41 @@ Return ONLY the JSON. No markdown."""
 
 def extract_facts_prompt(raw_results: str, goal: str) -> str:
     """Extract relational facts from raw tool results."""
-    return f"""You are an expert intelligence analyst. Extract high-value strategic claims, methodologies, and data points from the raw research data.
-
-RESEARCH GOAL: {goal}
-
-RAW DATA:
-{raw_results[:6000]}
-
-Extract findings as a JSON object using this strict structure:
-{{
-  "facts": [
+    return f"""# ROLE: STRATEGIC INTELLIGENCE ANALYST
+    TASK: Extract high-value, evidence-backed strategic claims and granular data points.
+    
+    RESEARCH GOAL: {goal}
+    
+    # RAW RESEARCH DATA:
+    {raw_results[:8000]}
+    
+    # EXTRACTION PROTOCOL:
+    1. EXTRACT DEEP CONTEXT: For every claim, you MUST fill the 'context_or_evidence' field with the specific methodology, reasoning, or data-source mentioned in the text. 
+       - POOR: "The market is growing."
+       - ELITE: "The market is projected to reach $50B by 2030, driven by a 15% CAGR in enterprise cloud adoption according to the Gartner 2024 report."
+    2. NUMERICAL RIGOR: If you see a percentage, dollar amount, or date, you MUST extract it as a fact and explain its significance.
+    3. STRATEGIC DYNAMICS: Identify 'how' and 'why' something is happening, not just 'what'. Look for tensions, competitive advantages, and technical bottlenecks.
+    4. ENTITIES: Identify the key companies, leaders, and technologies involved in each fact.
+    
+    # OUTPUT STRUCTURE (JSON):
     {{
-      "content": "The core claim or data point (e.g., 'Generative AI is a $140B market')",
-      "context_or_evidence": "The underlying reasoning, methodology, or condition for this claim (e.g., 'Based on 2025 VC funding metrics and projected enterprise adoption rates')",
-      "source_url": "URL where this was found",
-      "source_title": "Title of the source",
-      "topic_tags": ["tag1", "tag2"],
-      "confidence": 0.9
+      "facts": [
+        {{
+          "content": "The core claim or data point",
+          "context_or_evidence": "The detailed proof, methodology, or reasoning behind this specific claim",
+          "source_url": "URL where this was found",
+          "source_title": "Title of the source",
+          "topic_tags": ["specific_tag1", "specific_tag2"],
+          "confidence": 0.9
+        }}
+      ]
     }}
-  ]
-}}
+    
+    # RULES:
+    - NO GENERIC DEFINITIONS: Skip "AI is a tool". Find the specific model names, version numbers, and performance metrics.
+    - MAXIMUM YIELD: Extract 5-15 highly detailed facts per batch.
+    - Return ONLY the JSON object. No markdown."""
 
-RULES:
-- Do NOT just extract basic dates or definitions. Look for market dynamics, technical specifications, expert quotes, and forward-looking projections.
-- If a source provides a number, you MUST extract the 'context_or_evidence' explaining how they got that number.
-- topic_tags should be specific (e.g., "labor_market_disruption", "llm_scaling_laws").
-- Extract 3-10 highly detailed facts per batch. Quality over quantity.
-- Return ONLY the JSON. No markdown."""
 
 
 def reflect_prompt(goal: str, graph_summary: str, ledger_summary: str,

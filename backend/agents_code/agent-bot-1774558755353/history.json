@@ -1,0 +1,10 @@
+[
+  {
+    "role": "user",
+    "content": "write the report now"
+  },
+  {
+    "role": "assistant",
+    "content": "What topic or subject should the report cover? Please provide the details or context needed to write it."
+  }
+]

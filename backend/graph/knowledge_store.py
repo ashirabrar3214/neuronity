@@ -218,12 +218,22 @@ class KnowledgeStore:
 
     def get_full_report_context(self, topic_label: str) -> dict:
         """Gathers all facts, tables, and source info for a final report."""
+        # GREEDY FETCH: Get facts for the specific topic...
         facts = self.get_facts_by_topic(topic_label)
         
-        # FIX: If the exact topic isn't found, grab facts from ALL topics
-        if not facts:
-            for topic in self.get_all_topics():
-                facts.extend(self.get_facts_by_topic(topic["label"]))
+        # ...AND also grab every fact in the graph to ensure maximum length and source count.
+        # This prevents the report from being too narrow if the topic tagging was slightly off.
+        all_fact_ids = {f["id"] for f in facts}
+        for nid, attrs in self.graph.nodes(data=True):
+            if attrs.get("node_type") == "fact" and nid not in all_fact_ids:
+                sources = self.get_sources_for_fact(nid)
+                facts.append({
+                    "id": nid,
+                    "content": attrs.get("content", ""),
+                    "context_or_evidence": attrs.get("context_or_evidence", ""),
+                    "confidence": attrs.get("confidence", 0),
+                    "sources": sources,
+                })
         
         # Also find every Source node connected to these facts to grab their Tables
         sources = {}

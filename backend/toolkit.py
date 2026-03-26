@@ -217,41 +217,45 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
             graph_data["provided_context"] = provided_context
         
         # 2. Craft the 'Senior Analyst' Prompt
-        prompt = f"""You are a Senior Strategic Analyst. Write a comprehensive, formal research report based on the provided Knowledge Graph data.
+        prompt = f"""# ROLE: SENIOR STRATEGIC ANALYST ($500/hr Consultant)
+        TASK: Synthesize a high-stakes, comprehensive research report from the provided data.
         
         TOPIC: {topic}
         
-        RESEARCH DATA (The Knowledge Graph & Context):
+        # RESEARCH DATA (The Knowledge Graph & Deep Context):
         {json.dumps(graph_data, indent=2)}
         
-        STRICT INSTRUCTIONS:
-        - Use the provided 'tables' exactly as they appear for your data sections.
-        - Compare facts across different sources using the provided timestamps.
-        - Analyze trends, identify consensus/conflicts, and provide strategic insights.
+        # STRICT ANTI-LAZINESS PROTOCOL:
+        1. NO FLUFF: Skip "As an AI..." or "In conclusion...". Start with the data immediately.
+        2. EXTREME DEPTH IS MANDATORY: This must be a master-class research report. Each section MUST be at least 5-6 dense, information-rich paragraphs.
+        3. EVIDENCE-DRIVEN: For Every. Single. Claim. you make, you MUST weave in the specific 'context_or_evidence' provided in the facts. (e.g., "Market growth is projected at 20%, driven by [Methodology/Evidence From Graph]"). 
+        4. CITATIONS: Use numbered citations like [1], [2], [3] for EVERY technical claim or data point. These numbers must correspond to the sources list provided.
+        5. EXPLOIT ALL SOURCES: You are provided with a large list of sources. You MUST attempt to reference as many unique sources as possible throughout the report to maximize authority.
+        6. ANALYTICAL RIGOR: Connect facts across sources, identify strategic tensions, analyze second-order effects, and project 5-10 year implications based on the data.
+        7. TABLES: If the graph contains 'tables', you MUST format them as Markdown tables within relevant sections. Use the provided data to build custom comparison tables.
         
-        STRICT REPORT STRUCTURE:
-        1. Title: A professional, catchy, and descriptive title for the report.
-        2. Executive Summary: 1-2 powerful paragraphs.
-        3. Sections: Multiple detailed sections. Each section must have a clear 'Title' and several paragraphs of information. Use the tables where relevant.
-        4. Sources: Extract ALL URLs and titles found in the graph data provided. Do NOT hallucinate links.
+        # STRICT REPORT STRUCTURE:
+        1. Title: A formal, impactful, and descriptive title.
+        2. Executive Summary: 3-4 powerful paragraphs summarizing core discoveries, strategic headwinds, and actionable takeaways.
+        3. Deep-Dive Sections: At least 6-8 comprehensive sections covering technical evolution, market impacts, strategic pivots, competitive landscape, and future projections.
+           - Each section must have a clear, descriptive 'title'.
+           - Every section must have at least 500 words of analysis.
+        4. Sources: Extract ALL URLs and titles found in the graph data provided into the separate JSON list.
         
-        FORMATTING RULES:
-        - The output MUST be a JSON object with this structure:
+        # OUTPUT FORMAT:
+        The output MUST be a PURE JSON object (no markdown code blocks) with this structure:
         {{
-          "title": "Professional Report Title",
-          "summary": "Full summary text...",
+          "title": "...",
+          "summary": "...",
           "sections": [
-            {{ "title": "Section Title", "content": "Detailed paragraph text..." }},
-            ...
+            {{ "title": "Section Title", "content": "Full section markdown text here..." }}
           ],
           "sources": [
-            {{ "title": "Source Label", "url": "http://..." }},
-            ...
+            {{ "title": "...", "url": "..." }}
           ]
         }}
-        - Use authoritative, professional, and insightful language.
-        - Escape newlines as \\n and backslashes as \\\\ within JSON string values.
-        - Return ONLY the JSON object. No markdown wrapper.
+        
+        Return ONLY the JSON. Verify it is valid JSON with escaped newlines and quotes.
         """
 
         # 3. Use Gemini 3.1 Pro for the final heavy lifting
@@ -264,54 +268,51 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
         }
         
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=data, timeout=60)
+            # Increase timeout to 300s for long comprehensive reports
+            response = await client.post(url, headers=headers, json=data, timeout=300)
             if response.status_code != 200:
-                return f"Synthesis failed: {response.text}"
+                safe_log(f"!!! [CAPABILITY:report_generation] LLM API Error: {response.status_code} - {response.text}")
+                return f"Synthesis failed: API Error {response.status_code}"
             
             res_json = response.json()
             candidates = res_json.get("candidates", [])
             if not candidates:
-                return f"Synthesis failed: No candidates in response. {json.dumps(res_json)}"
+                safe_log(f"!!! [CAPABILITY:report_generation] No candidates in response: {res_json}")
+                return f"Synthesis failed: No response from model."
             
             report_data_json = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
             # Remove markdown backticks if Gemini added them
             report_data_json = re.sub(r'```json\s*|\s*```', '', report_data_json).strip()
 
-            # Repair JSON: escape unescaped newlines in string values
+            # Attempt to parse
             try:
                 report_data = json.loads(report_data_json)
             except json.JSONDecodeError as e:
-                # Try to repair common JSON issues (unescaped newlines, etc)
-                safe_log(f"[STATUS:{agent_id}] JSON parse error, attempting repair: {e}")
-                # Replace literal newlines with escaped newlines in the raw string
-                report_data_json = report_data_json.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+                safe_log(f"!!! [CAPABILITY:report_generation] JSON parse error: {e}")
+                # Try repair
+                report_data_json_rep = report_data_json.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
                 try:
-                    report_data = json.loads(report_data_json)
-                except json.JSONDecodeError as e2:
-                    safe_log(f"[STATUS:{agent_id}] JSON repair failed: {e2}")
-                    # Last resort: return a minimal valid report
-                    return f"Report generation failed: Could not parse LLM output as JSON. Error: {str(e)[:100]}"
+                    report_data = json.loads(report_data_json_rep)
+                except:
+                    return f"Synthesis failed: Output was not valid JSON."
         
-        # Get dynamic title from LLM or fallback to topic
+        # 4. PDF Generation Phase
         display_title = report_data.get("title", topic)
-        
-        # 2. The PDF generator will automatically create a bibliography from sources
-        # (No need to manually add it here)
-
-        # 3. PDF Generation Phase
-        # Sanitize filename using the dynamic title
         clean_title_for_file = re.sub(r'[^a-zA-Z0-9\s_-]', '', display_title[:50].strip().replace('"', ''))
         safe_filename = f"Report_{clean_title_for_file.replace(' ', '_')}.pdf"
         report_path = os.path.join(working_dir, safe_filename)
 
-        pdf_gen = ReportPDFGenerator(report_path, display_title)
-        pdf_gen.generate(report_data, agent_name=agent_name, agent_id=agent_id)
-        
-        safe_log(f"+++ [CAPABILITY:report_generation] Saved PDF to: {report_path}", agent_id=agent_id)
-        return f"Report generated: {safe_filename}. (Saved in {working_dir})"
+        try:
+            pdf_gen = ReportPDFGenerator(report_path, display_title)
+            pdf_gen.generate(report_data, agent_name=agent_name, agent_id=agent_id)
+            safe_log(f"+++ [CAPABILITY:report_generation] Saved PDF to: {report_path}", agent_id=agent_id)
+            return f"Report generated: {safe_filename}. (Saved in {working_dir})"
+        except Exception as pdf_err:
+            safe_log(f"!!! [CAPABILITY:report_generation] PDF Gen Error: {pdf_err}")
+            return f"Failed to generate PDF: {str(pdf_err)}"
 
     except Exception as e:
-        safe_log(f"!!! [CAPABILITY:report_generation] Error: {e}", agent_id=agent_id)
+        safe_log(f"!!! [CAPABILITY:report_generation] Overall Error: {e}", agent_id=agent_id)
         return f"Failed to generate report: {str(e)}"
 
 # ─────────────────────────────────────────────────

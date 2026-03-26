@@ -1,6 +1,6 @@
 ## PROJECT AGENT DIRECTORY
 Below are all agents currently in this project. Use this to identify who to delegate tasks to.
 
-- **Deep Web Researcher** (ID: `agent-bot-1774555676414`): Perform deep, multi-source investigative research and verify facts.
+- **Deep Web Researcher** (ID: `agent-bot-1774558755353`): Perform deep, multi-source investigative research and verify facts.
   Capabilities: scrape website, report generation
 

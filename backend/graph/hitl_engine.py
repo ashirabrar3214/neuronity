@@ -61,11 +61,11 @@ def should_checkpoint(dial: int, gather_count: int, phase: str) -> bool:
 def should_auto_act(dial: int, ready_to_act: bool, gather_count: int) -> bool:
     """Determine if the engine should skip checkpoint and auto-produce output."""
     if dial <= 3:
-        # THE FIX: Only auto-act if the Planner confirms we have deeply scraped data
-        return ready_to_act and gather_count >= 2 
+        # THE FIX: Force at least 5 gather cycles for a truly comprehensive report
+        return ready_to_act and gather_count >= 5 
     if dial <= 7:
-        # Balanced (Dial 4-7): Auto-act immediately when REFLECT says we have enough facts!
-        return ready_to_act
+        # Balanced (Dial 4-7): Forced minimum depth
+        return ready_to_act and gather_count >= 3
     return False
 
 
@@ -506,7 +506,22 @@ async def _phase_store(state: dict, store: KnowledgeStore):
     yield _sse({"type": "phase", "content": "STORE"})
     yield _sse({"type": "thought", "content": "Extracting and storing findings..."})
 
-    # Build raw results string for fact extraction
+    # 1. Discover ALL URLs in the raw results (even if no facts extracted yet)
+    # This ensures the GATHER phase can auto-scrape them later.
+    discovered_urls = set()
+    for entry in pending:
+        raw = entry.get("raw_result", "")
+        # Find anything that looks like a URL
+        urls = re.findall(r'https?://[^\s\)\]\"\'\>]+', raw)
+        for u in urls:
+            u = u.strip()
+            if not u.endswith(('.jpg', '.png', '.pdf', '.css', '.js', 'favicon.ico')):
+                discovered_urls.add(u)
+    
+    for url in discovered_urls:
+        store.add_source(url, "Discovered Source", "Pending deep extraction", "")
+
+    # 2. Build raw results string for fact extraction
     raw_str_parts = []
     for entry in pending:
         tool_name = entry.get("tool_name", "")
@@ -527,12 +542,12 @@ async def _phase_store(state: dict, store: KnowledgeStore):
         _log(f"!!! [HITL:STORE] Extraction error: {e}")
         facts_data = []
 
-    # Add facts to graph
+    # 3. Add facts to graph
     for fact in facts_data:
         source_url = fact.get("source_url", "unknown")
         source_title = fact.get("source_title", "")
 
-        # Add or get source node
+        # Add or get source node (this will update the dummy one if discovered above)
         source_id = store.add_source(source_url, source_title, "", "")
 
         # Add fact node with edges
