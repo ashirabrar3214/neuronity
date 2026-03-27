@@ -29,7 +29,8 @@ body.canvas-mode {
 
 #agent-canvas {
     width: 100%;
-    height: 100vh;
+    height: calc(100vh - 30px);
+    margin-top: 30px;
     position: relative;
     overflow: hidden;
     cursor: grab;
@@ -871,33 +872,205 @@ body.training-panel-active #agent-canvas {
     z-index: 2000;
 }
 
-/* ── Add Agent Button ── */
-.add-agent-btn {
+/* ── Top Menu Bar (VS Code / Figma style) ── */
+.menu-bar {
     position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    display: flex;
+    align-items: stretch;
+    background: #181818;
+    border-bottom: 1px solid #2a2a2a;
+    z-index: 9000;
+    -webkit-app-region: drag;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.menu-bar-item {
+    position: relative;
+    -webkit-app-region: no-drag;
+    display: flex;
+    align-items: stretch;
+}
+
+.menu-bar-label {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 22px;
-    background: var(--accent-color);
-    color: #fff;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 400;
+    color: #cccccc;
+    cursor: default;
+    user-select: none;
+    letter-spacing: 0.01em;
+}
+
+.menu-bar-item:hover .menu-bar-label,
+.menu-bar-item.open .menu-bar-label {
+    background: rgba(255, 255, 255, 0.07);
+    color: #e0e0e0;
+}
+
+.menu-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 200px;
+    background: #252526;
+    border: 1px solid #454545;
+    border-radius: 4px;
+    padding: 4px 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    z-index: 9001;
+}
+
+.menu-bar-item.open .menu-dropdown {
+    display: block;
+}
+
+.menu-dropdown-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 0 24px 0 8px;
+    height: 28px;
+    background: none;
     border: none;
-    border-radius: 12px;
+    color: #cccccc;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 400;
+    cursor: default;
+    text-align: left;
+    gap: 0;
+}
+
+.menu-dropdown-item:hover {
+    background: #094771;
+    color: #ffffff;
+}
+
+.menu-dropdown-item:hover .menu-shortcut {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.menu-item-icon {
+    display: none;
+}
+
+.menu-dropdown-item > span:not(.menu-shortcut):not(.menu-item-icon) {
+    flex: 1;
+}
+
+.menu-shortcut {
+    margin-left: auto;
+    padding-left: 32px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.35);
+    font-weight: 400;
+}
+
+.menu-divider {
+    height: 1px;
+    background: #454545;
+    margin: 4px 0;
+}
+
+/* Hide the old floating button — keep ID for JS binding */
+.add-agent-btn {
+    display: none;
+}
+
+/* ── Canvas Picker Modal ── */
+.canvas-picker-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.canvas-picker-modal {
+    background: #252526;
+    border: 1px solid #454545;
+    border-radius: 6px;
+    width: 360px;
+    max-height: 420px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.canvas-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #454545;
     font-family: 'Inter', sans-serif;
     font-size: 13px;
     font-weight: 600;
-    cursor: pointer;
-    z-index: 900;
-    box-shadow: 0 4px 20px rgba(108, 92, 231, 0.35);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #e0e0e0;
 }
 
-.add-agent-btn:hover {
-    background: #7c6ef0;
-    box-shadow: 0 6px 28px rgba(108, 92, 231, 0.5);
-    transform: translateX(-50%) translateY(-2px);
+.canvas-picker-close {
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.canvas-picker-close:hover {
+    color: #fff;
+}
+
+.canvas-picker-list {
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.canvas-picker-item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: background 0.1s;
+}
+
+.canvas-picker-item:hover {
+    background: #094771;
+}
+
+.canvas-picker-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #e0e0e0;
+}
+
+.canvas-picker-item:hover .canvas-picker-name {
+    color: #fff;
+}
+
+.canvas-picker-meta {
+    font-size: 11px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.canvas-picker-item:hover .canvas-picker-meta {
+    color: rgba(255, 255, 255, 0.5);
 }
 
 /* ── Agent Gallery Modal ── */

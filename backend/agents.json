@@ -17,8 +17,8 @@
     "specialRole": "deep-web-researcher",
     "userEffort": 1,
     "projectSize": "small",
-    "x": 180.0,
-    "y": 601.0,
+    "x": 276.0,
+    "y": 600.0,
     "connections": [
       "agent-bot-1774631740545",
       "agent-bot-1774631740546"
@@ -93,6 +93,8 @@
     "projectSize": "small",
     "x": 1021.0,
     "y": 615.0,
-    "connections": []
+    "connections": [
+      "agent-bot-1774646815811"
+    ]
   }
 ]

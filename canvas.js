@@ -91,7 +91,6 @@ class AgentCanvas {
                     <span class="workdir-display" title="${data.workingDir || ''}">${data.workingDir || 'Not set'}</span>
                 </div>
                 <button class="train-btn">Configure & Train</button>
-                ${data.agentType === 'master' ? '<button class="run-workflow-btn" style="background-color: #4CAF50; color: white; margin-top: 8px; width: 100%;">▶ Run Workflow</button>' : ''}
                 <button class="delete-btn">Delete Agent</button>
             </div>
             <div class="node-body">${content}</div>
@@ -206,16 +205,6 @@ class AgentCanvas {
             }
         });
         trainBtn.addEventListener('mousedown', (e) => e.stopPropagation());
-
-        // Run Workflow Button (for master agents only)
-        const runBtn = nodeEl.querySelector('.run-workflow-btn');
-        if (runBtn) {
-            runBtn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                await this.runWorkflow(id, data);
-            });
-            runBtn.addEventListener('mousedown', (e) => e.stopPropagation());
-        }
 
         // Delete Button (with dynamic text based on agent type)
         const deleteBtn = nodeEl.querySelector('.delete-btn');
@@ -613,6 +602,8 @@ class AgentCanvas {
         };
 
         addBtn.addEventListener('click', () => {
+            // Close the menu bar dropdown if open
+            document.querySelectorAll('.menu-bar-item').forEach(m => m.classList.remove('open'));
             renderGalleryCards();
             overlay.classList.add('open');
         });
@@ -670,19 +661,18 @@ class AgentCanvas {
     }
 
     addWorkflowAgents(workflow) {
-        // Add 3 agents in linear orchestration layout
+        // Add 3 agents in linear pipeline layout
         const centerX = (window.innerWidth / 2) - this.pan.x;
         const centerY = (window.innerHeight / 2) - this.pan.y;
 
         // Generate unique workflow ID
         const workflowId = `workflow-${Date.now()}`;
 
-        // Linear pipeline layout:
-        // Research (left) → Analyst (center) → PDF Generator (right)
+        // Linear pipeline: Research (left) → Synthesis (center) → PDF Generator (right)
         const positions = [
-            { x: centerX - 300, y: centerY, label: "Research Agent" },          // 0: Left (MASTER)
-            { x: centerX, y: centerY, label: "Analyst Agent" },                 // 1: Center
-            { x: centerX + 300, y: centerY, label: "PDF Generator" }            // 2: Right
+            { x: centerX - 350, y: centerY, label: "Research Agent" },      // 0: Left (MASTER)
+            { x: centerX, y: centerY, label: "Synthesis Agent" },           // 1: Center
+            { x: centerX + 350, y: centerY, label: "PDF Generator" }       // 2: Right
         ];
 
         const createdAgentIds = [];
@@ -720,10 +710,13 @@ class AgentCanvas {
             }).catch(err => console.error("Error creating agent:", err));
         });
 
-        // Auto-connect agents in linear pipeline: Research → Analyst → PDF
+        // Auto-connect agents in linear chain: Research → Synthesis → PDF
         if (createdAgentIds.length >= 3) {
-            this.connectNodes(createdAgentIds[0], createdAgentIds[1]); // Research → Analyst
-            this.connectNodes(createdAgentIds[1], createdAgentIds[2]); // Analyst → PDF
+            this.connectNodes(createdAgentIds[0], createdAgentIds[1]);
+            this.connectNodes(createdAgentIds[1], createdAgentIds[2]);
+
+            // Persist connections to backend
+            createdAgentIds.forEach(id => this.saveAgentData(id));
         }
     }
 
@@ -761,42 +754,6 @@ class AgentCanvas {
             });
         } catch (error) {
             console.error("Error saving agent data:", error);
-        }
-    }
-
-    async runWorkflow(masterId, masterData) {
-        try {
-            const workflowId = masterData.workflowId;
-            const query = window.prompt('Enter research query:', 'Research latest AI developments');
-            if (!query) return;
-
-            // Find all agents in this workflow
-            const workflowAgents = this.nodes.filter(n => n.data && n.data.workflowId === workflowId);
-            const researchAgent = workflowAgents.find(n => n.data.specialRole === 'deep-web-researcher');
-            const analystAgent = workflowAgents.find(n => n.data.specialRole === 'analyst');
-            const pdfAgent = workflowAgents.find(n => n.data.specialRole === 'pdf-generator');
-
-            if (!researchAgent || !analystAgent || !pdfAgent) {
-                alert('Workflow incomplete: missing one or more agents');
-                return;
-            }
-
-            // Initialize WorkflowExecutor if not already done
-            if (!window.workflowExecutor) {
-                window.workflowExecutor = new WorkflowExecutor(this);
-            }
-
-            // Execute the workflow via the backend
-            await window.workflowExecutor.executeWorkflow(
-                workflowId,
-                researchAgent.id,
-                analystAgent.id,
-                pdfAgent.id,
-                query
-            );
-        } catch (error) {
-            console.error('Workflow execution error:', error);
-            alert(`Failed to run workflow: ${error.message}`);
         }
     }
 
@@ -1032,7 +989,7 @@ class AgentCanvas {
 
         // Add animated dots if we are performing an action
         const lowerMsg = cleanMessage.toLowerCase();
-        const keywords = ['training', 'searching', 'thinking', 'generating', 'processing', 'talking', 'message received', 'incoming', 'contacting'];
+        const keywords = ['training', 'searching', 'thinking', 'generating', 'processing', 'talking', 'message received', 'incoming', 'contacting', 'gathering', 'scraping', 'building', 'analyzing', 'reading', 'writing', 'compiling', 'receiving', 'sending'];
         if (keywords.some(kw => lowerMsg.includes(kw))) {
             const dots = document.createElement('span');
             dots.className = 'loading-dots';

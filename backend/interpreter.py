@@ -13,12 +13,12 @@ import threading
 import sys
 import io
 import shutil
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
 
 import toolkit
-from workflow_api import router as workflow_router
 
 # Ensure UTF-8 for standard output on Windows
 if sys.stdout.encoding != 'utf-8':
@@ -150,9 +150,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include workflow router for 3-agent orchestration
-app.include_router(workflow_router)
-
 # Data Storage
 DATA_FILE = os.path.join(os.path.dirname(__file__), "agents.json")
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(__file__), "agents_code")
@@ -270,6 +267,10 @@ def save_data(data):
         update_agent_directory_md(data)
     except Exception as e:
         print(f"!!! [BACKEND ERROR] An unexpected error occurred in save_data: {e}")
+
+
+CANVASES_DIR = os.path.join(os.path.dirname(__file__), "canvases")
+os.makedirs(CANVASES_DIR, exist_ok=True)
 
 
 def generate_agent_structure(agent_data):
@@ -405,6 +406,53 @@ def get_connected_agents(agent_id, agents):
     return result
 
 
+def _build_workflow_agents(master_agent_id: str, agents: list) -> dict:
+    """Build a role→agent_id mapping from the master agent's workflow.
+    Walks the full connection graph (BFS) so agents 2+ hops away
+    (e.g. Research → Synthesis → PDF) are still discovered."""
+    mapping = {"research": master_agent_id}  # master IS the research agent
+
+    master = next((a for a in agents if a["id"] == master_agent_id), None)
+    if not master or not master.get("workflowId"):
+        # No workflowId — BFS through connections to find all reachable agents
+        if master:
+            agents_by_id = {a["id"]: a for a in agents}
+            visited = {master_agent_id}
+            queue = list(master.get("connections", []))
+            while queue:
+                aid = queue.pop(0)
+                if aid in visited:
+                    continue
+                visited.add(aid)
+                a = agents_by_id.get(aid)
+                if not a:
+                    continue
+                role = a.get("specialRole", "")
+                if role == "synthesis":
+                    mapping["synthesis"] = a["id"]
+                elif role == "pdf-generation":
+                    mapping["pdf"] = a["id"]
+                # Walk this agent's connections too
+                for cid in a.get("connections", []):
+                    if cid not in visited:
+                        queue.append(cid)
+        return mapping
+
+    # Walk all agents in the same workflow
+    workflow_id = master.get("workflowId")
+    for a in agents:
+        if a["id"] == master_agent_id:
+            continue
+        if a.get("workflowId") == workflow_id:
+            role = a.get("specialRole", "")
+            if role == "synthesis":
+                mapping["synthesis"] = a["id"]
+            elif role == "pdf-generation":
+                mapping["pdf"] = a["id"]
+
+    return mapping
+
+
 # ---------------------------------------------------------------------------
 # Agent CRUD Endpoints
 # ---------------------------------------------------------------------------
@@ -474,6 +522,75 @@ def delete_agent(agent_id: str):
         safe_log(f"--- [BACKEND] Deleted agent: '{agent_to_delete.get('name')}' (ID: {agent_id})")
         return {"status": "success", "message": "Agent deleted"}
     raise HTTPException(status_code=404, detail="Agent not found")
+
+
+# ---------------------------------------------------------------------------
+# Canvas Save / Load Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/canvases")
+def list_canvases():
+    """Return list of saved canvas files."""
+    saves = []
+    for fname in sorted(os.listdir(CANVASES_DIR), reverse=True):
+        if fname.endswith(".json"):
+            fpath = os.path.join(CANVASES_DIR, fname)
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                saves.append({
+                    "filename": fname,
+                    "name": data.get("name", fname.replace(".json", "")),
+                    "agent_count": len(data.get("agents", [])),
+                    "saved_at": data.get("saved_at", ""),
+                })
+            except Exception:
+                pass
+    return saves
+
+
+class CanvasSaveRequest(BaseModel):
+    name: str
+
+
+@app.post("/canvases/save")
+def save_canvas(req: CanvasSaveRequest):
+    """Snapshot current agents.json into a named canvas save."""
+    agents = load_data() or []
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    safe_name = re.sub(r'[^a-zA-Z0-9_\- ]', '', req.name).strip() or "Untitled"
+    filename = f"{safe_name.replace(' ', '_')}.json"
+    fpath = os.path.join(CANVASES_DIR, filename)
+    save_obj = {
+        "name": req.name,
+        "saved_at": timestamp,
+        "agents": agents,
+    }
+    with open(fpath, "w", encoding="utf-8") as f:
+        json.dump(save_obj, f, indent=2)
+    return {"status": "ok", "filename": filename, "saved_at": timestamp}
+
+
+@app.post("/canvases/load/{filename}")
+def load_canvas(filename: str):
+    """Load a saved canvas — replaces current agents.json."""
+    fpath = os.path.join(CANVASES_DIR, filename)
+    if not os.path.exists(fpath):
+        raise HTTPException(status_code=404, detail="Canvas save not found.")
+    with open(fpath, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    agents = data.get("agents", [])
+    save_data(agents)
+    return {"status": "ok", "agent_count": len(agents), "name": data.get("name", "")}
+
+
+@app.delete("/canvases/{filename}")
+def delete_canvas(filename: str):
+    fpath = os.path.join(CANVASES_DIR, filename)
+    if os.path.exists(fpath):
+        os.remove(fpath)
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------
@@ -573,6 +690,8 @@ async def chat_with_agent(request: ChatRequest):
         # HITL engine fields
         "hitl_phase": "",
         "hitl_session_id": "",
+        # Workflow agent mapping — routes STATUS logs to correct agent terminals
+        "workflow_agents": _build_workflow_agents(request.agent_id, agents),
     }
 
     config = {

@@ -139,9 +139,9 @@ OUTPUT RULES (STRICT):
 
 EXAMPLE OUTPUT:
 [
-  {{"id": "task_1", "label": "Military Analysis", "agent": "agent-geopolitics-001", "task": "Search for current military positions.", "dependencies": []}},
-  {{"id": "task_2", "label": "Economic Impact", "agent": "agent-economics-002", "task": "Research economic sanctions.", "dependencies": []}},
-  {{"id": "task_3", "label": "Final Report", "agent": "self", "task": "Generate final PDF report.", "dependencies": ["task_1", "task_2"]}}
+  {{"id": "task_1", "label": "Research Phase", "agent": "self", "task": "Search for primary sources on the topic.", "dependencies": []}},
+  {{"id": "task_2", "label": "Deep Analysis", "agent": "self", "task": "Analyze and cross-reference findings.", "dependencies": ["task_1"]}},
+  {{"id": "task_3", "label": "Final Report", "agent": "self", "task": "Generate final PDF report.", "dependencies": ["task_2"]}}
 ]
 
 YOUR DAG (JSON array only):"""

@@ -21,7 +21,9 @@ let mainWindow;
 
 function startPythonBackend() {
   const scriptPath = path.join(__dirname, 'backend', 'interpreter.py');
-  pythonProcess = spawn('python', [scriptPath]);
+  pythonProcess = spawn('python', [scriptPath], {
+    env: { ...process.env, PYTHONUTF8: '1' }
+  });
 
   function sendToRenderer(data) {
     if (mainWindow && mainWindow.webContents) {

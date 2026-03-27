@@ -32,6 +32,9 @@ echo Starting server on http://localhost:8000...
 echo Press Ctrl+C to stop the server
 echo.
 
+REM Force UTF-8 output so crawl4ai/Rich don't crash on Windows cp1252
+set PYTHONUTF8=1
+
 REM Start the backend
 .venv\Scripts\python.exe backend\interpreter.py
 

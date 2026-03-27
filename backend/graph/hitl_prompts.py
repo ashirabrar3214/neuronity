@@ -81,9 +81,9 @@ def extract_facts_prompt(raw_results: str, goal: str) -> str:
     {raw_results[:8000]}
     
     # EXTRACTION PROTOCOL:
-    1. EXTRACT DEEP CONTEXT: For every claim, you MUST fill the 'context_or_evidence' field with the specific methodology, reasoning, or data-source mentioned in the text. 
+    1. EXTRACT DEEP CONTEXT: For every claim, you MUST fill the 'context_or_evidence' field with the specific methodology, reasoning, or data-source mentioned in the text.
        - POOR: "The market is growing."
-       - ELITE: "The market is projected to reach $50B by 2030, driven by a 15% CAGR in enterprise cloud adoption according to the Gartner 2024 report."
+       - ELITE: Include the exact numbers, timeframes, growth rates, and the name of the report or institution that published the data.
     2. NUMERICAL RIGOR: If you see a percentage, dollar amount, or date, you MUST extract it as a fact and explain its significance.
     3. STRATEGIC DYNAMICS: Identify 'how' and 'why' something is happening, not just 'what'. Look for tensions, competitive advantages, and technical bottlenecks.
     4. ENTITIES: Identify the key companies, leaders, and technologies involved in each fact.

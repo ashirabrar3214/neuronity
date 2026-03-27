@@ -221,7 +221,7 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
     Advanced tool that synthesizes a PDF research report using GraphRAG data and Gemini 3.1 Pro.
     Usage: [TOOL: report_generation(Topic)]
     """
-    safe_log(f"[STATUS:{agent_id}] PDF: Synthesis for '{tool_input[:40]}...'", agent_id=agent_id)
+    safe_log(f"+++ [CAPABILITY:report_generation] Starting synthesis for '{tool_input[:40]}...'", agent_id=agent_id)
     
     try:
         if not working_dir:
@@ -250,8 +250,8 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
             graph_data["provided_context"] = provided_context
         
         # 2. Craft the 'Senior Analyst' Prompt
-        prompt = f"""# ROLE: SENIOR STRATEGIC ANALYST ($500/hr Consultant)
-        TASK: Synthesize a high-stakes, comprehensive research report from the provided data.
+        prompt = f"""# ROLE: SENIOR STRATEGIC ANALYST
+        TASK: Synthesize a comprehensive, evidence-driven research report from the provided data.
         
         TOPIC: {topic}
         
@@ -265,7 +265,7 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
         4. Use the provided 'tables' exactly as they appear for your data sections.
         5. Compare facts across different sources using the provided timestamps.
         6. Analyze trends, identify consensus/conflicts, and provide strategic insights.
-        7. IN-TEXT CITATIONS (CRITICAL): You MUST cite your claims in the text by placing the exact URL in brackets, e.g., "Nvidia reached a $5T valuation [https://finance.yahoo.com/nvda]". DO NOT use numbers like [1] or [2]. The system will automatically convert the URLs to numbered citations. If citing multiple sources, use separate brackets: [https://url1.com] [https://url2.com].
+        7. IN-TEXT CITATIONS (CRITICAL): You MUST cite your claims in the text by placing the exact source URL in brackets immediately after the claim. DO NOT use numbered references like [1] or [2]. The system will automatically convert URLs to numbered citations. If citing multiple sources for one claim, use separate brackets for each URL.
         
         # STRICT REPORT STRUCTURE:
         1. Title: A formal, impactful, and descriptive title.
@@ -281,22 +281,16 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
           "title": "Professional Report Title",
           "summary": "Full summary text...",
           "sections": [
-            {{ 
-              "title": "Section Title", 
-              "content": "Detailed paragraph text...",
-              "chart": {{
-                "type": "bar",
-                "title": "Chart Title (e.g., Nvidia Market Cap Growth)",
-                "labels": ["2023", "2024", "2025", "2026"],
-                "values": [1.2, 2.0, 3.4, 5.0]
-              }} 
+            {{
+              "title": "Section Title",
+              "content": "Detailed paragraph text..."
             }}
           ],
           "sources": [
             {{ "title": "Source Label", "url": "http://..." }}
           ]
         }}
-        - IMPORTANT CHART RULES: ONLY include the "chart" key inside a section if you have quantitative, comparative data (like percentages, dollars, or market share). If there is no hard data to chart in that section, omit the "chart" key entirely. Supported types are "bar" and "pie".
+        - DO NOT include any charts, graphs, visualizations, or "chart" keys. This report is TEXT ONLY. A separate Visual Analyst agent will handle data visualization later.
         - Use authoritative, professional, and insightful language.
         - Return ONLY the JSON object. No markdown wrapper.
         """

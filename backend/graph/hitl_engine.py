@@ -37,6 +37,32 @@ def _log(msg: str):
         pass
 
 
+def _workflow_status(state: dict, role: str, message: str):
+    """Log [STATUS:agent-id] to the correct workflow agent's terminal.
+    role: 'research' | 'synthesis' | 'pdf'
+    Falls back to the master agent_id if no workflow mapping exists."""
+    workflow = state.get("workflow_agents", {})
+    agent_id = workflow.get(role, state.get("agent_id", ""))
+    if agent_id:
+        try:
+            print(f"[STATUS:{agent_id}] {message}", flush=True)
+        except Exception:
+            pass
+
+
+def _workflow_handoff(state: dict, from_role: str, to_role: str, message: str = ""):
+    """Log [AGENT_MSG:sender->target] for inter-agent handoff on canvas."""
+    workflow = state.get("workflow_agents", {})
+    sender = workflow.get(from_role, "")
+    target = workflow.get(to_role, "")
+    if sender and target:
+        try:
+            print(f"[AGENT_MSG:{sender}->{target}] {message or 'Handing off'}", flush=True)
+            print(f"[STATUS:{target}] Receiving data from {from_role}...", flush=True)
+        except Exception:
+            pass
+
+
 # ---------------------------------------------------------------------------
 # Intervention dial helpers
 # ---------------------------------------------------------------------------
@@ -249,6 +275,9 @@ async def _auto_generate_report(state: dict, store: KnowledgeStore):
     goal = store.ledger.get("goal", state.get("goal", "Report"))
 
     _log(f">>> [HITL:AUTO_REPORT] Generating PDF for goal={goal[:60]!r}")
+    _workflow_handoff(state, "synthesis", "pdf", "Sending analysis for PDF generation")
+    _workflow_status(state, "pdf", "Receiving analysis and knowledge map...")
+    _workflow_status(state, "pdf", "Compiling final PDF report...")
     yield _sse({"type": "phase", "content": "REPORT"})
     yield _sse({"type": "thought", "content": "Compiling final report..."})
 
@@ -305,6 +334,7 @@ async def _auto_generate_report(state: dict, store: KnowledgeStore):
             agent_id, f"{goal}|{full_context}", working_dir, api_key, agent_name
         )
         _log(f"+++ [HITL:AUTO_REPORT] {result}")
+        _workflow_status(state, "pdf", f"PDF generated: {result[:60]}")
 
         # Show written analysis + PDF confirmation
         parts = [output_text, "", f"---", f"**{result}**"]
@@ -392,6 +422,7 @@ async def _phase_understand(state: dict, store: KnowledgeStore):
 async def _phase_gather(state: dict, store: KnowledgeStore, dial: int):
     """Execute tool calls in a batch. Uses fast model (Flash)."""
     _log(f">>> [HITL:GATHER] dial={dial}")
+    _workflow_status(state, "research", "Gathering resources...")
     yield _sse({"type": "phase", "content": "GATHER"})
     yield _sse({"type": "thought", "content": "Researching..."})
 
@@ -459,6 +490,7 @@ async def _phase_gather(state: dict, store: KnowledgeStore, dial: int):
         preview = str(result)[:150]
         yield _sse({"type": "action_result", "content": preview})
         _log(f"    [HITL:GATHER] {tool_name} -> {len(str(result))} chars")
+        _workflow_status(state, "research", f"Scraped: {str(tool_args.get('url', tool_args.get('query', '')))[:50]}")
 
         raw_results.append({
             "tool_name": tool_name,
@@ -485,6 +517,7 @@ async def _phase_store(state: dict, store: KnowledgeStore):
         return
 
     _log(f">>> [HITL:STORE] processing {len(pending)} raw results")
+    _workflow_status(state, "research", f"Building knowledge map from {len(pending)} results...")
     yield _sse({"type": "phase", "content": "STORE"})
     yield _sse({"type": "thought", "content": "Extracting and storing findings..."})
 
@@ -546,7 +579,9 @@ async def _phase_store(state: dict, store: KnowledgeStore):
     store.update_phase("REFLECT", f"Stored {len(facts_data)} facts")
     store.save()
 
-    yield _sse({"type": "thought", "content": f"Stored {len(facts_data)} facts across {len(set(t for f in facts_data for t in f.get('topic_tags', [])))} topics"})
+    topics_count = len(set(t for f in facts_data for t in f.get('topic_tags', [])))
+    _workflow_status(state, "research", f"Knowledge map updated: {len(facts_data)} facts, {topics_count} topics")
+    yield _sse({"type": "thought", "content": f"Stored {len(facts_data)} facts across {topics_count} topics"})
 
 
 # ---------------------------------------------------------------------------
@@ -556,6 +591,9 @@ async def _phase_store(state: dict, store: KnowledgeStore):
 async def _phase_reflect(state: dict, store: KnowledgeStore):
     """Analyze graph, identify gaps, generate options. Uses planner model (Gemini 3)."""
     _log(f">>> [HITL:REFLECT]")
+    _workflow_handoff(state, "research", "synthesis", "Sending knowledge map for analysis")
+    _workflow_status(state, "synthesis", "Reading knowledge map...")
+    _workflow_status(state, "synthesis", "Analyzing findings...")
     yield _sse({"type": "phase", "content": "REFLECT"})
     yield _sse({"type": "thought", "content": "Analyzing findings..."})
 
@@ -578,6 +616,9 @@ async def _phase_reflect(state: dict, store: KnowledgeStore):
 
         ready_to_act = parsed.get("ready_to_act", False)
         _log(f"+++ [HITL:REFLECT] gaps={len(gaps)} options={len(options)} ready={ready_to_act}")
+        _workflow_status(state, "synthesis", f"Found {len(gaps)} knowledge gaps, {len(options)} options")
+        if gaps:
+            _workflow_handoff(state, "synthesis", "research", f"Need more data: {gaps[0][:50]}")
 
         # Update store
         store.set_gaps(gaps)
@@ -665,6 +706,7 @@ async def _phase_checkpoint(state: dict, store: KnowledgeStore):
 async def _phase_act(state: dict, store: KnowledgeStore):
     """Produce ONE unit of output with citations. Uses planner model (Gemini 3)."""
     _log(f">>> [HITL:ACT]")
+    _workflow_status(state, "synthesis", "Writing analytical report...")
     yield _sse({"type": "phase", "content": "ACT"})
     yield _sse({"type": "thought", "content": "Writing..."})
 
@@ -706,6 +748,7 @@ async def _phase_act(state: dict, store: KnowledgeStore):
         # The response IS the written content (not JSON)
         output_text = text.strip()
         _log(f"+++ [HITL:ACT] wrote {len(output_text)} chars")
+        _workflow_status(state, "synthesis", f"Report drafted: {len(output_text)} chars with citations")
 
         # Track output
         fact_ids = re.findall(r'\[fact_\d+\]', output_text)
