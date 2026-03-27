@@ -1,0 +1,314 @@
+{
+  "metadata": {
+    "generated_at": "2026-03-27T17:14:42.185784Z",
+    "agent_id": "visual-analyst-001",
+    "agent_version": "v1"
+  },
+  "charts": [
+    {
+      "id": "chart_percentages",
+      "type": "bar",
+      "title": "Key Percentages",
+      "data": [
+        {
+          "label": "Between 50% and 70% of the structures of the human proteome are incomplete without covalently-attached",
+          "value": 50.0,
+          "fact_id": "fact_231"
+        }
+      ],
+      "source_facts": [
+        "fact_231"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "id": "chart_comparisons",
+      "type": "bar",
+      "title": "Key Comparisons",
+      "data": [
+        {
+          "comparison": "More than half of all human proteins are glycosylated, particularly those in sec",
+          "fact_id": "fact_001",
+          "confidence": 0.95
+        }
+      ],
+      "source_facts": [
+        "fact_001"
+      ],
+      "confidence": 0.85
+    }
+  ],
+  "timeline": {
+    "event_count": 0,
+    "events": [],
+    "earliest": null,
+    "latest": null
+  },
+  "metrics": {
+    "money": [],
+    "percentages": [
+      {
+        "value": 50.0,
+        "context": "Between 50% and 70% of the structures of the human proteome are incomplete without covalently-attach",
+        "fact_id": "fact_231"
+      },
+      {
+        "value": 70.0,
+        "context": "Between 50% and 70% of the structures of the human proteome are incomplete without covalently-attach",
+        "fact_id": "fact_231"
+      }
+    ],
+    "quantities": [],
+    "comparisons": []
+  },
+  "networks": [
+    {
+      "id": "network_topics",
+      "label": "Topic Relationships",
+      "node_count": 50,
+      "edge_count": 88,
+      "nodes": [
+        {
+          "id": "topic_glycans",
+          "label": "glycans"
+        },
+        {
+          "id": "topic_proteins",
+          "label": "proteins"
+        },
+        {
+          "id": "topic_glycosylation",
+          "label": "glycosylation"
+        },
+        {
+          "id": "topic_human_health",
+          "label": "human health"
+        },
+        {
+          "id": "topic_alphafold",
+          "label": "AlphaFold"
+        },
+        {
+          "id": "topic_protein_structure",
+          "label": "protein structure"
+        },
+        {
+          "id": "topic_3d_modeling",
+          "label": "3D modeling"
+        },
+        {
+          "id": "topic_molecular_interactions",
+          "label": "molecular interactions"
+        },
+        {
+          "id": "topic_protein_structure_prediction",
+          "label": "protein structure prediction"
+        },
+        {
+          "id": "topic_ai",
+          "label": "AI"
+        },
+        {
+          "id": "topic_alphafold3",
+          "label": "AlphaFold3"
+        },
+        {
+          "id": "topic_enzyme-substrate_complexes",
+          "label": "enzyme-substrate complexes"
+        },
+        {
+          "id": "topic_biological_systems",
+          "label": "biological systems"
+        },
+        {
+          "id": "topic_modeling",
+          "label": "modeling"
+        },
+        {
+          "id": "topic_alphafold2",
+          "label": "AlphaFold2"
+        },
+        {
+          "id": "topic_protein_interactions",
+          "label": "protein interactions"
+        },
+        {
+          "id": "topic_protein_modeling",
+          "label": "protein modeling"
+        },
+        {
+          "id": "topic_protein_design",
+          "label": "protein design"
+        },
+        {
+          "id": "topic_glycan-protein_interaction",
+          "label": "glycan-protein interaction"
+        },
+        {
+          "id": "topic_in_silico_modeling",
+          "label": "in silico modeling"
+        }
+      ],
+      "edges": [
+        {
+          "edge_type": "extracted_from",
+          "source": "src_001",
+          "target": "fact_001"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_002",
+          "target": "fact_005"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_002",
+          "target": "fact_228"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_002",
+          "target": "fact_229"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_003",
+          "target": "fact_004"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_004",
+          "target": "fact_003"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_004",
+          "target": "fact_233"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_005",
+          "target": "fact_006"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_005",
+          "target": "fact_234"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_006",
+          "target": "fact_002"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_007",
+          "target": "fact_007"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_007",
+          "target": "fact_602"
+        },
+        {
+          "edge_type": "extracted_from",
+          "source": "src_007",
+          "target": "fact_603"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_001",
+          "target": "topic_glycans"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_001",
+          "target": "topic_proteins"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_001",
+          "target": "topic_glycosylation"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_001",
+          "target": "topic_human_health"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_002",
+          "target": "topic_alphafold"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_002",
+          "target": "topic_protein_structure"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_002",
+          "target": "topic_3d_modeling"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_002",
+          "target": "topic_molecular_interactions"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_003",
+          "target": "topic_alphafold"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_003",
+          "target": "topic_protein_structure_prediction"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_003",
+          "target": "topic_ai"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_003",
+          "target": "topic_3d_modeling"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_004",
+          "target": "topic_alphafold3"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_004",
+          "target": "topic_enzyme-substrate_complexes"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_004",
+          "target": "topic_biological_systems"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_004",
+          "target": "topic_modeling"
+        },
+        {
+          "edge_type": "belongs_to",
+          "source": "fact_005",
+          "target": "topic_alphafold2"
+        }
+      ],
+      "description": "Network of interconnected topics and concepts"
+    }
+  ],
+  "summary": {
+    "total_nodes": 179,
+    "sources": 111,
+    "facts": 18,
+    "topics": 50,
+    "total_edges": 88
+  }
+}

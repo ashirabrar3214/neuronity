@@ -91,6 +91,7 @@ class AgentCanvas {
                     <span class="workdir-display" title="${data.workingDir || ''}">${data.workingDir || 'Not set'}</span>
                 </div>
                 <button class="train-btn">Configure & Train</button>
+                ${data.agentType === 'master' ? '<button class="run-workflow-btn" style="background-color: #4CAF50; color: white; margin-top: 8px; width: 100%;">▶ Run Workflow</button>' : ''}
                 <button class="delete-btn">Delete Agent</button>
             </div>
             <div class="node-body">${content}</div>
@@ -206,14 +207,35 @@ class AgentCanvas {
         });
         trainBtn.addEventListener('mousedown', (e) => e.stopPropagation());
 
-        // Delete Button
+        // Run Workflow Button (for master agents only)
+        const runBtn = nodeEl.querySelector('.run-workflow-btn');
+        if (runBtn) {
+            runBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await this.runWorkflow(id, data);
+            });
+            runBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+        }
+
+        // Delete Button (with dynamic text based on agent type)
         const deleteBtn = nodeEl.querySelector('.delete-btn');
+        const updateDeleteButtonText = () => {
+            const agentType = data.agentType || 'worker';
+            const btnText = agentType === 'master' ? 'Delete Workflow' : 'Delete Agent';
+            deleteBtn.textContent = btnText;
+            deleteBtn.title = agentType === 'master' ? 'Delete entire workflow (all 4 agents)' : 'Delete this agent only';
+        };
+        updateDeleteButtonText();
+
         deleteBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const agentName = nodeEl.querySelector('.node-title').innerText;
-            const confirmed = await window.customConfirm(`Are you sure you want to delete "${agentName}"?`);
+            const agentType = data.agentType || 'worker';
+            const isMaster = agentType === 'master';
+            const actionText = isMaster ? 'delete the entire workflow' : `delete "${agentName}"`;
+            const confirmed = await window.customConfirm(`Are you sure you want to ${actionText}? This cannot be undone.`);
             if (confirmed) {
-                this.deleteAgent(id);
+                this.deleteAgent(id, data);
             }
         });
         deleteBtn.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -486,7 +508,8 @@ class AgentCanvas {
                     const toDelete = Array.from(this.selectedNodes);
                     this.selectedNodes.clear();
                     for (const id of toDelete) {
-                        await this.deleteAgent(id);
+                        const nodeObj = this.nodes.find(n => n.id === id);
+                        await this.deleteAgent(id, nodeObj ? nodeObj.data : null);
                     }
                 }
             }
@@ -604,6 +627,13 @@ class AgentCanvas {
     }
 
     addAgentFromTemplate(template) {
+        // Handle workflow templates (multiple agents)
+        if (template && template.isWorkflow && template.agents && template.agents.length > 0) {
+            this.addWorkflowAgents(template);
+            return;
+        }
+
+        // Handle single agent templates
         this.nodeIdCounter++;
         const id = `agent-bot-${Date.now()}`;
 
@@ -637,6 +667,64 @@ class AgentCanvas {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newAgent)
         }).catch(err => console.error("Error creating agent:", err));
+    }
+
+    addWorkflowAgents(workflow) {
+        // Add 3 agents in linear orchestration layout
+        const centerX = (window.innerWidth / 2) - this.pan.x;
+        const centerY = (window.innerHeight / 2) - this.pan.y;
+
+        // Generate unique workflow ID
+        const workflowId = `workflow-${Date.now()}`;
+
+        // Linear pipeline layout:
+        // Research (left) → Analyst (center) → PDF Generator (right)
+        const positions = [
+            { x: centerX - 300, y: centerY, label: "Research Agent" },          // 0: Left (MASTER)
+            { x: centerX, y: centerY, label: "Analyst Agent" },                 // 1: Center
+            { x: centerX + 300, y: centerY, label: "PDF Generator" }            // 2: Right
+        ];
+
+        const createdAgentIds = [];
+
+        workflow.agents.forEach((agentTemplate, index) => {
+            this.nodeIdCounter++;
+            const id = `agent-bot-${Date.now() + index}`;
+            const pos = positions[index] || { x: centerX, y: centerY };
+
+            const newAgent = {
+                id,
+                name: agentTemplate.name || '',
+                description: agentTemplate.description || '',
+                x: pos.x,
+                y: pos.y,
+                brain: agentTemplate.brain || 'gemini-3.0-pro',
+                channel: 'Direct',
+                role: 'Assistant',
+                workingDir: '',
+                permissions: agentTemplate.permissions ? [...agentTemplate.permissions] : [],
+                specialRole: agentTemplate.specialRole || 'custom',
+                agentType: agentTemplate.agentType || 'worker',
+                responsibility: agentTemplate.responsibility || '',
+                workflowId: workflowId,  // Track which workflow this agent belongs to
+            };
+
+            this.createNode(id, newAgent.name, newAgent.description, pos.x, pos.y, newAgent);
+            createdAgentIds.push(id);
+
+            // Send to backend
+            fetch('http://localhost:8000/agents', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newAgent)
+            }).catch(err => console.error("Error creating agent:", err));
+        });
+
+        // Auto-connect agents in linear pipeline: Research → Analyst → PDF
+        if (createdAgentIds.length >= 3) {
+            this.connectNodes(createdAgentIds[0], createdAgentIds[1]); // Research → Analyst
+            this.connectNodes(createdAgentIds[1], createdAgentIds[2]); // Analyst → PDF
+        }
     }
 
     async saveAgentData(id) {
@@ -676,31 +764,83 @@ class AgentCanvas {
         }
     }
 
-    async deleteAgent(agentId) {
+    async runWorkflow(masterId, masterData) {
         try {
-            const response = await fetch(`http://localhost:8000/agents/${agentId}`, {
-                method: 'DELETE'
-            });
+            const workflowId = masterData.workflowId;
+            const query = window.prompt('Enter research query:', 'Research latest AI developments');
+            if (!query) return;
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to delete agent on backend');
+            // Find all agents in this workflow
+            const workflowAgents = this.nodes.filter(n => n.data && n.data.workflowId === workflowId);
+            const researchAgent = workflowAgents.find(n => n.data.specialRole === 'deep-web-researcher');
+            const analystAgent = workflowAgents.find(n => n.data.specialRole === 'analyst');
+            const pdfAgent = workflowAgents.find(n => n.data.specialRole === 'pdf-generator');
+
+            if (!researchAgent || !analystAgent || !pdfAgent) {
+                alert('Workflow incomplete: missing one or more agents');
+                return;
             }
 
-            const nodeToRemove = document.getElementById(agentId);
-            if (nodeToRemove) {
-                nodeToRemove.remove();
+            // Initialize WorkflowExecutor if not already done
+            if (!window.workflowExecutor) {
+                window.workflowExecutor = new WorkflowExecutor(this);
             }
 
-            // If the deleted agent was being trained, close the panel
-            if (window.activeTrainingAgentId === agentId && window.closeTrainingPanel) {
-                window.closeTrainingPanel();
+            // Execute the workflow via the backend
+            await window.workflowExecutor.executeWorkflow(
+                workflowId,
+                researchAgent.id,
+                analystAgent.id,
+                pdfAgent.id,
+                query
+            );
+        } catch (error) {
+            console.error('Workflow execution error:', error);
+            alert(`Failed to run workflow: ${error.message}`);
+        }
+    }
+
+    async deleteAgent(agentId, agentData) {
+        try {
+            // Check if this is a master agent - if so, delete entire workflow
+            const isMaster = agentData && agentData.agentType === 'master';
+            const workflowId = agentData && agentData.workflowId;
+
+            let agentsToDelete = [agentId];
+
+            // If master agent, find all agents in the same workflow
+            if (isMaster && workflowId) {
+                agentsToDelete = this.nodes
+                    .filter(n => n.data && n.data.workflowId === workflowId)
+                    .map(n => n.id);
+            }
+
+            // Delete all agents (usually just 1 unless it's a master agent deleting the workflow)
+            for (const id of agentsToDelete) {
+                const response = await fetch(`http://localhost:8000/agents/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to delete agent on backend');
+                }
+
+                const nodeToRemove = document.getElementById(id);
+                if (nodeToRemove) {
+                    nodeToRemove.remove();
+                }
+
+                // If the deleted agent was being trained, close the panel
+                if (window.activeTrainingAgentId === id && window.closeTrainingPanel) {
+                    window.closeTrainingPanel();
+                }
             }
 
             // Clean up internal state
-            this.nodes = this.nodes.filter(n => n.id !== agentId);
+            this.nodes = this.nodes.filter(n => !agentsToDelete.includes(n.id));
             this.connections = this.connections.filter(conn => {
-                if (conn.sourceId === agentId || conn.targetId === agentId) {
+                if (agentsToDelete.includes(conn.sourceId) || agentsToDelete.includes(conn.targetId)) {
                     conn.path.remove();
                     return false;
                 }
@@ -708,7 +848,7 @@ class AgentCanvas {
             });
 
             // Ensure we don't think we're dragging a deleted node
-            if (this.draggedNode && this.draggedNode.id === agentId) {
+            if (this.draggedNode && agentsToDelete.includes(this.draggedNode.id)) {
                 this.draggedNode = null;
             }
 
@@ -779,8 +919,7 @@ class AgentCanvas {
                 setTimeout(() => this.loadAgents(retries - 1), 1000);
             } else {
                 console.error("Failed to load agents from backend after retries:", error);
-                // Fallback only if backend is definitely unreachable
-                this.createNode('agent-MasterBot-001', 'MasterBot', 'Main orchestrator agent.', 100, 150);
+                // No fallback agent - user must create workflow explicitly
             }
         }
     }

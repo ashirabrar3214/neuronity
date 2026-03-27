@@ -1,0 +1,6 @@
+{
+  "name": "Synthesis Agent",
+  "description": "Transforms knowledge graph into analytical text with insights",
+  "responsibility": "Phase 2a: Write analytical text and structured report narrative",
+  "tools": "Custom"
+}

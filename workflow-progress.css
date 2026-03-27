@@ -1,0 +1,197 @@
+/* Workflow Agent Progress Visualization */
+
+/* Agent working state */
+.agent-node.agent-working {
+    animation: pulse 2s infinite;
+    box-shadow: 0 0 10px rgba(255, 165, 0, 0.5);
+}
+
+.agent-node.agent-complete {
+    box-shadow: 0 0 10px rgba(0, 170, 0, 0.5);
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+/* Progress bar in agent node */
+.agent-progress {
+    margin-top: 10px;
+    padding: 8px;
+    background: #2a2a2a;
+    border-radius: 4px;
+    font-size: 12px;
+    position: relative;
+}
+
+.progress-fill {
+    height: 4px;
+    background: linear-gradient(90deg, #FF9800, #FFC107);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.progress-text {
+    color: #FFA500;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 4px;
+    font-size: 11px;
+}
+
+/* Agent status badge */
+.agent-status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+    margin-left: 8px;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Agent terminal - scrollable log */
+.node-terminal {
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: 10px;
+    color: #00FF00;
+    font-family: 'Courier New', monospace;
+}
+
+.node-terminal > div {
+    line-height: 1.4;
+    padding: 2px 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Terminal scrollbar styling */
+.node-terminal::-webkit-scrollbar {
+    width: 6px;
+}
+
+.node-terminal::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+.node-terminal::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 3px;
+}
+
+.node-terminal::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+/* Data flow animation between agents */
+.connection-active {
+    animation: dataFlow 1.5s infinite;
+}
+
+@keyframes dataFlow {
+    0%, 100% {
+        stroke-opacity: 0.3;
+        stroke-width: 2;
+    }
+    50% {
+        stroke-opacity: 1;
+        stroke-width: 3;
+    }
+}
+
+/* Workflow status indicator */
+.workflow-status {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    padding: 12px 20px;
+    background: #1a1a1a;
+    border: 2px solid #FFA500;
+    border-radius: 4px;
+    color: #FFA500;
+    font-size: 13px;
+    font-weight: bold;
+    z-index: 1000;
+    animation: slideUp 0.3s ease;
+}
+
+.workflow-status.success {
+    border-color: #00AA00;
+    color: #00AA00;
+}
+
+.workflow-status.error {
+    border-color: #FF0000;
+    color: #FF0000;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Agent work indicator dot */
+.agent-node::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #666;
+    transition: all 0.3s ease;
+}
+
+.agent-node.agent-working::before {
+    background: #FFA500;
+    box-shadow: 0 0 8px #FFA500;
+    animation: blink 1s infinite;
+}
+
+.agent-node.agent-complete::before {
+    background: #00AA00;
+    box-shadow: 0 0 8px #00AA00;
+}
+
+@keyframes blink {
+    0%, 49%, 100% {
+        opacity: 1;
+    }
+    50%, 99% {
+        opacity: 0.3;
+    }
+}
+
+/* Data passing indicator */
+.connection-line {
+    transition: stroke 0.3s ease;
+}
+
+.connection-line.active-data-flow {
+    stroke: #FFA500;
+    filter: drop-shadow(0 0 4px #FFA500);
+}

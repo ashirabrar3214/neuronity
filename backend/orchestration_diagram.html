@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4-Agent Orchestration System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .phase {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 30px;
+            position: relative;
+        }
+
+        .phase.phase-1 {
+            border-left: 5px solid #FF6B6B;
+        }
+
+        .phase.phase-2 {
+            border-left: 5px solid #4ECDC4;
+        }
+
+        .phase.phase-3 {
+            border-left: 5px solid #95E1D3;
+        }
+
+        .phase-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .phase-number {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: white;
+        }
+
+        .phase-1 .phase-number {
+            background: #FF6B6B;
+        }
+
+        .phase-2 .phase-number {
+            background: #4ECDC4;
+        }
+
+        .phase-3 .phase-number {
+            background: #95E1D3;
+            color: #333;
+        }
+
+        .phase-title {
+            flex: 1;
+        }
+
+        .phase-title h2 {
+            font-size: 1.5em;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .phase-title p {
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .phase-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .badge-sequential {
+            background: #FFE5E5;
+            color: #FF6B6B;
+        }
+
+        .badge-parallel {
+            background: #E5F9F7;
+            color: #4ECDC4;
+        }
+
+        .agents {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .agent {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .agent:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .agent-name {
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .agent-model {
+            font-size: 0.85em;
+            color: #666;
+            background: #f0f0f0;
+            padding: 6px 12px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+
+        .agent-detail {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .agent-detail strong {
+            color: #333;
+        }
+
+        .agent-io {
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+            margin-top: 15px;
+            font-size: 0.85em;
+        }
+
+        .io-label {
+            color: #999;
+            font-weight: 600;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .io-value {
+            color: #667eea;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+
+        .flow-arrow {
+            text-align: center;
+            font-size: 2em;
+            color: #999;
+            margin: 20px 0;
+        }
+
+        .parallel-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+            color: #4ECDC4;
+        }
+
+        .parallel-indicator::before,
+        .parallel-indicator::after {
+            content: '';
+            flex: 1;
+            height: 2px;
+            background: #4ECDC4;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .timeline {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .timeline-item:last-child {
+            border-bottom: none;
+        }
+
+        .timeline-marker {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .timeline-content h4 {
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .timeline-content p {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-size: 0.9em;
+            color: #856404;
+        }
+
+        .code-block {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        footer {
+            background: #f8f9fa;
+            padding: 20px 40px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 4-Agent Orchestration System</h1>
+            <p>Deep Web Research Pipeline with Parallel Processing</p>
+        </div>
+
+        <div class="content">
+            <!-- Phase 1 -->
+            <div class="diagram">
+                <div class="phase phase-1">
+                    <div class="phase-header">
+                        <div class="phase-number">1</div>
+                        <div class="phase-title">
+                            <h2>Research Phase</h2>
+                            <p>Gather facts, sources, and build knowledge graph</p>
+                        </div>
+                        <span class="phase-badge badge-sequential">SEQUENTIAL</span>
+                    </div>
+
+                    <div class="agents">
+                        <div class="agent">
+                            <div class="agent-name">🔍 Deep Web Researcher</div>
+                            <div class="agent-model">Gemini 2.0 Flash</div>
+                            <div class="agent-detail">
+                                <strong>Role:</strong> Multi-source investigation
+                            </div>
+                            <div class="agent-detail">
+                                <strong>Process:</strong> Scrape → Extract → Verify → Build graph
+                            </div>
+                            <div class="agent-io">
+                                <div class="io-label">⬇ Input</div>
+                                <div class="io-value">User query, research goal</div>
+                                <div class="io-label" style="margin-top: 10px;">⬆ Output</div>
+                                <div class="io-value">graph.json</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats">
+                        <div class="stat-box">
+                            <div class="stat-value">5-15m</div>
+                            <div class="stat-label">Time (Variable)</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">50-100</div>
+                            <div class="stat-label">Graph Nodes</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">0.95</div>
+                            <div class="stat-label">Avg Confidence</div>
+                        </div>
+                    </div>
+
+                    <div class="note">
+                        ℹ️ Uses hitl_engine.py with UNDERSTAND→GATHER→STORE→REFLECT→ACT phases
+                    </div>
+                </div>
+
+                <div class="flow-arrow">⬇</div>
+
+                <!-- Phase 2 - Parallel -->
+                <div class="phase phase-2">
+                    <div class="phase-header">
+                        <div class="phase-number">2</div>
+                        <div class="phase-title">
+                            <h2>Parallel Analysis Phase</h2>
+                            <p>Run synthesis and visualization in parallel</p>
+                        </div>
+                        <span class="phase-badge badge-parallel">PARALLEL</span>
+                    </div>
+
+                    <div class="parallel-indicator">
+                        Runs Simultaneously
+                    </div>
+
+                    <div class="agents">
+                        <div class="agent">
+                            <div class="agent-name">📝 Synthesis Agent</div>
+                            <div class="agent-model">Gemini 3.0 Pro</div>
+                            <div class="agent-detail">
+                                <strong>Role:</strong> Analytical writing
+                            </div>
+                            <div class="agent-detail">
+                                <strong>Process:</strong> Analyze → Synthesize → Structure → Polish
+                            </div>
+                            <div class="agent-io">
+                                <div class="io-label">⬇ Input</div>
+                                <div class="io-value">graph.json</div>
+                                <div class="io-label" style="margin-top: 10px;">⬆ Output</div>
+                                <div class="io-value">report_text.md</div>
+                            </div>
+                        </div>
+
+                        <div class="agent">
+                            <div class="agent-name">📊 Visual Analyst</div>
+                            <div class="agent-model">Gemini 3.1 Pro</div>
+                            <div class="agent-detail">
+                                <strong>Role:</strong> Metric extraction
+                            </div>
+                            <div class="agent-detail">
+                                <strong>Process:</strong> Scan → Extract → Structure → Validate
+                            </div>
+                            <div class="agent-io">
+                                <div class="io-label">⬇ Input</div>
+                                <div class="io-value">graph.json</div>
+                                <div class="io-label" style="margin-top: 10px;">⬆ Output</div>
+                                <div class="io-value">visuals.json</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats">
+                        <div class="stat-box">
+                            <div class="stat-value">30-60s</div>
+                            <div class="stat-label">Synthesis Time</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">15-30s</div>
+                            <div class="stat-label">Visual Time</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">~50s</div>
+                            <div class="stat-label">Total (Parallel)</div>
+                        </div>
+                    </div>
+
+                    <div class="note">
+                        ✨ Parallel execution saves ~50-70 seconds vs sequential processing
+                    </div>
+                </div>
+
+                <div class="flow-arrow">⬇</div>
+
+                <!-- Phase 3 -->
+                <div class="phase phase-3">
+                    <div class="phase-header">
+                        <div class="phase-number">3</div>
+                        <div class="phase-title">
+                            <h2>PDF Generation Phase</h2>
+                            <p>Merge all outputs into final polished report</p>
+                        </div>
+                        <span class="phase-badge badge-sequential">SEQUENTIAL</span>
+                    </div>
+
+                    <div class="agents">
+                        <div class="agent">
+                            <div class="agent-name">🖨️ PDF Generator</div>
+                            <div class="agent-model">Gemini 2.0 Flash</div>
+                            <div class="agent-detail">
+                                <strong>Role:</strong> Final PDF compilation
+                            </div>
+                            <div class="agent-detail">
+                                <strong>Process:</strong> Merge → Format → Render → Output
+                            </div>
+                            <div class="agent-io">
+                                <div class="io-label">⬇ Inputs</div>
+                                <div class="io-value">
+                                    • report_text.md<br>
+                                    • visuals.json<br>
+                                    • graph.json
+                                </div>
+                                <div class="io-label" style="margin-top: 10px;">⬆ Output</div>
+                                <div class="io-value">final_report.pdf</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats">
+                        <div class="stat-box">
+                            <div class="stat-value">15-30s</div>
+                            <div class="stat-label">Generation Time</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">10-20</div>
+                            <div class="stat-label">PDF Pages</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">4-6</div>
+                            <div class="stat-label">Embedded Charts</div>
+                        </div>
+                    </div>
+
+                    <div class="note">
+                        📄 Produces professional, formatted PDF with integrated visualizations
+                    </div>
+                </div>
+
+                <div class="flow-arrow">⬇</div>
+
+                <!-- Final Output -->
+                <div style="text-align: center; padding: 40px; background: #f0f7ff; border-radius: 12px;">
+                    <h2 style="font-size: 2em; margin-bottom: 10px;">✅ Complete Report</h2>
+                    <p style="color: #666; font-size: 1.1em;">
+                        Professional PDF with integrated text, charts, timelines, and metrics
+                    </p>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <h2 style="margin-top: 50px; margin-bottom: 20px; color: #333;">Execution Timeline</h2>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-marker">1</div>
+                    <div class="timeline-content">
+                        <h4>Research Phase</h4>
+                        <p>Web scraping and knowledge graph construction. Duration: 5-15 minutes</p>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-marker">2a</div>
+                    <div class="timeline-content">
+                        <h4>Synthesis Agent (Parallel)</h4>
+                        <p>Analytical text generation from graph. Duration: 30-60 seconds</p>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-marker">2b</div>
+                    <div class="timeline-content">
+                        <h4>Visual Analyst Agent (Parallel)</h4>
+                        <p>Metric and visualization extraction. Duration: 15-30 seconds</p>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-marker">3</div>
+                    <div class="timeline-content">
+                        <h4>PDF Generation</h4>
+                        <p>Final document compilation and rendering. Duration: 15-30 seconds</p>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-marker">✓</div>
+                    <div class="timeline-content">
+                        <h4>Total Time</h4>
+                        <p><strong>5-16 minutes</strong> (Bottleneck: Research phase)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Structure -->
+            <h2 style="margin-top: 50px; margin-bottom: 20px; color: #333;">Key Data Structures</h2>
+
+            <div style="margin: 20px 0;">
+                <h3 style="color: #667eea; margin-bottom: 10px;">graph.json (Research Output)</h3>
+                <div class="code-block">{
+  "nodes": [
+    {"id": "src_001", "node_type": "source", "url": "...", "full_text": "..."},
+    {"id": "fact_001", "node_type": "fact", "content": "...", "confidence": 0.95},
+    {"id": "topic_xyz", "node_type": "topic", "label": "..."}
+  ],
+  "links": [
+    {"source": "fact_001", "target": "topic_xyz", "type": "mentions"}
+  ]
+}</div>
+            </div>
+
+            <div style="margin: 20px 0;">
+                <h3 style="color: #667eea; margin-bottom: 10px;">visuals.json (Visual Analyst Output)</h3>
+                <div class="code-block">{
+  "charts": [
+    {"id": "chart_001", "type": "bar", "title": "...", "data": [...]}
+  ],
+  "timeline": {"events": [...], "earliest": "2020-01-15", "latest": "2026-03-27"},
+  "metrics": {
+    "money": [...],
+    "percentages": [...],
+    "quantities": [...]
+  },
+  "networks": [...]
+}</div>
+            </div>
+        </div>
+
+        <footer>
+            <p>4-Agent Orchestration System | Easy Company Research Pipeline</p>
+            <p>Last Updated: March 2026</p>
+        </footer>
+    </div>
+</body>
+</html>

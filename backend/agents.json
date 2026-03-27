@@ -1,23 +1,98 @@
 [
   {
-    "id": "agent-bot-1774558755353",
-    "name": "Deep Web Researcher",
-    "description": "Elite investigator that scrapes full articles and resolves contradictions using recursive verification",
-    "brain": "gemini-3.1-pro-preview",
-    "channel": "Gmail",
+    "id": "agent-bot-1774631740543",
+    "name": "Research Agent",
+    "description": "Scrapes full articles, resolves contradictions, builds knowledge graph",
+    "brain": "gemini-2.0-flash",
+    "channel": "Discord",
     "workingDir": "D:\\New folder",
     "permissions": [
       "scrape website",
-      "report generation"
+      "recursive verification",
+      "knowledge graph construction"
     ],
     "tools": "Custom",
-    "responsibility": "Perform deep, multi-source investigative research and verify facts.",
+    "responsibility": "Phase 1: Perform deep, multi-source investigative research",
     "agentType": "master",
     "specialRole": "deep-web-researcher",
     "userEffort": 1,
     "projectSize": "small",
-    "x": 257.0,
-    "y": 263.0,
+    "x": 180.0,
+    "y": 601.0,
+    "connections": [
+      "agent-bot-1774631740545",
+      "agent-bot-1774631740546"
+    ]
+  },
+  {
+    "id": "agent-bot-1774631740545",
+    "name": "Synthesis Agent",
+    "description": "Transforms knowledge graph into analytical text with insights",
+    "brain": "gemini-3.0-pro",
+    "channel": "Direct",
+    "workingDir": "",
+    "permissions": [
+      "content synthesis",
+      "insight generation",
+      "narrative composition"
+    ],
+    "tools": "Custom",
+    "responsibility": "Phase 2a: Write analytical text and structured report narrative",
+    "agentType": "specialist",
+    "specialRole": "synthesis",
+    "userEffort": 1,
+    "projectSize": "small",
+    "x": 632.0,
+    "y": 502.0,
+    "connections": [
+      "agent-bot-1774631740548"
+    ]
+  },
+  {
+    "id": "agent-bot-1774631740546",
+    "name": "Visual Analyst",
+    "description": "Extracts metrics, timelines, and generates visualization specs",
+    "brain": "gemini-3.1-pro-preview",
+    "channel": "Direct",
+    "workingDir": "",
+    "permissions": [
+      "metric extraction",
+      "pattern detection",
+      "timeline reconstruction",
+      "network analysis"
+    ],
+    "tools": "Custom",
+    "responsibility": "Phase 2b: Extract visual data and generate visualization specifications",
+    "agentType": "specialist",
+    "specialRole": "visual-analysis",
+    "userEffort": 1,
+    "projectSize": "small",
+    "x": 633.0,
+    "y": 717.0,
+    "connections": [
+      "agent-bot-1774631740548"
+    ]
+  },
+  {
+    "id": "agent-bot-1774631740548",
+    "name": "PDF Generator",
+    "description": "Merges text and visuals into polished final PDF report",
+    "brain": "gemini-2.0-flash",
+    "channel": "Direct",
+    "workingDir": "",
+    "permissions": [
+      "pdf generation",
+      "content formatting",
+      "image embedding"
+    ],
+    "tools": "Custom",
+    "responsibility": "Phase 3: Generate final PDF from text and visuals",
+    "agentType": "specialist",
+    "specialRole": "pdf-generation",
+    "userEffort": 1,
+    "projectSize": "small",
+    "x": 1021.0,
+    "y": 615.0,
     "connections": []
   }
 ]

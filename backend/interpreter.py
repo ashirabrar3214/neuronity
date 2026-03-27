@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import toolkit
+from workflow_api import router as workflow_router
 
 # Ensure UTF-8 for standard output on Windows
 if sys.stdout.encoding != 'utf-8':
@@ -148,6 +149,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include workflow router for 3-agent orchestration
+app.include_router(workflow_router)
 
 # Data Storage
 DATA_FILE = os.path.join(os.path.dirname(__file__), "agents.json")

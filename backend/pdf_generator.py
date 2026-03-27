@@ -4,6 +4,11 @@ from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Frame, PageTemplate, Table, TableStyle
+# --- NEW IMPORTS FOR CHARTS ---
+from reportlab.graphics.shapes import Drawing, String
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.graphics.charts.piecharts import Pie
+# ------------------------------
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -14,21 +19,20 @@ FONT_SIZE = 11
 
 def convert_citations_to_superscript(text, url_map=None):
     """
-    Convert citations to superscript format for ReportLab.
-    Handles both [1] format and [http://...] format.
+    Convert [http...] citations to superscript format, strip hallucinated numbers,
+    and build a deterministic bibliography map.
     """
     if url_map is None:
         url_map = {}
         
-    # First, handle the [1] style
-    text = re.sub(r'\[(\d+)\]', r'<super>[\1]</super>', text)
+    # 1. Strip out any hallucinated number citations the LLM stubbornly generates (e.g., [1], [41])
+    text = re.sub(r'\[\d+(?:,\s*\d+)*\]', '', text)
     
-    # Second, handle the [http://...] style by converting them to numbers
+    # 2. Handle the [http://...] style by converting them to deterministic sequential numbers
     def url_replacer(match):
-        url = match.group(1)
+        url = match.group(1).strip()
         if url not in url_map:
-            # Assign a new number if we haven't seen this URL
-            url_map[url] = len(url_map) + 1
+            url_map[url] = len(url_map) + 1 # Assign the next available number
         num = url_map[url]
         return f'<super>[{num}]</super>'
         
@@ -204,25 +208,81 @@ class ReportPDFGenerator:
                     story.append(Spacer(1, 0.1*inch))
             # -------------------------------------------------
             
+            # --- NEW: Chart Rendering Logic ---
+            if "chart" in section and section["chart"]:
+                chart_data = section["chart"]
+                try:
+                    c_type = chart_data.get("type", "bar").lower()
+                    c_title = chart_data.get("title", "Data Chart")
+                    labels = chart_data.get("labels", [])
+                    values = chart_data.get("values", [])
+                    
+                    if labels and values:
+                        # Ensure values are numbers, not strings
+                        values = [float(v) for v in values]
+                        
+                        # Create a drawing canvas (400px wide, 200px high)
+                        drawing = Drawing(400, 200)
+                        
+                        # Add the chart title
+                        title_str = String(200, 180, c_title)
+                        title_str.fontName = 'Times-Bold'
+                        title_str.fontSize = 12
+                        title_str.textAnchor = 'middle'
+                        drawing.add(title_str)
+
+                        if c_type == "bar":
+                            bc = VerticalBarChart()
+                            bc.x = 50
+                            bc.y = 20
+                            bc.height = 140
+                            bc.width = 300
+                            bc.data = [values] # ReportLab expects a list of lists for series
+                            bc.categoryAxis.categoryNames = [str(l) for l in labels]
+                            bc.bars[0].fillColor = colors.HexColor('#2c3e50') # Sleek dark blue
+                            bc.valueAxis.valueMin = 0
+                            drawing.add(bc)
+                            
+                        elif c_type == "pie":
+                            pc = Pie()
+                            pc.x = 125
+                            pc.y = 20
+                            pc.width = 140
+                            pc.height = 140
+                            pc.data = values
+                            pc.labels = [str(l) for l in labels]
+                            pc.slices.strokeWidth = 0.5
+                            drawing.add(pc)
+                            
+                        # Append the drawn chart to the PDF story
+                        story.append(Spacer(1, 0.1*inch))
+                        story.append(drawing)
+                        story.append(Spacer(1, 0.2*inch))
+                except Exception as e:
+                    print(f"Warning: Failed to render chart: {e}")
+            # ----------------------------------
+            
         # Sources Page
         story.append(PageBreak())
         story.append(Paragraph("Sources and References", self.styles['SectionHeader']))
         story.append(Spacer(1, 0.1*inch))
         
-        # Fallback to the original list because the LLM is now correctly formatting [1], [2]
-        ordered_sources = content_data.get("sources", [])
-        
-        for i, source in enumerate(ordered_sources):
-            title = source.get("title", "Source")
-            url = source.get("url", "#")
+        # ONLY print sources that were actually cited in the text (stored in self.url_map)
+        if hasattr(self, 'url_map') and self.url_map:
+            # Reverse the map to order by citation number (1, 2, 3...)
+            reverse_map = {v: k for k, v in self.url_map.items()}
             
-            # THE FIX: Always number the bibliography (1, 2, 3...) instead of using bullet points
-            list_num = i + 1
-            prefix = f"<b>[{list_num}]</b> "
-            
-            link_html = f'<a href="{url}" color="blue">{title}</a>'
-            story.append(Paragraph(f"{prefix}{link_html}<br/><i>{url}</i>", self.styles['SourceItem']))
-            story.append(Spacer(1, 0.05*inch))
+            for i in range(1, len(self.url_map) + 1):
+                url = reverse_map[i]
+                # Look up the real title from the LLM's JSON array, fallback to "Reference" if not found
+                title = next((s.get("title", "Reference") for s in content_data.get("sources", []) if s.get("url") == url), "Reference")
+                
+                prefix = f"<b>[{i}]</b> "
+                link_html = f'<a href="{url}" color="blue">{title}</a>'
+                story.append(Paragraph(f"{prefix}{link_html}<br/><i>{url}</i>", self.styles['SourceItem']))
+                story.append(Spacer(1, 0.05*inch))
+        else:
+            story.append(Paragraph("No specific sources were cited in the text.", self.styles['NormalText']))
             
         # Build the PDF
         doc.build(story, onFirstPage=self.draw_fixed_elements, onLaterPages=self.draw_fixed_elements)

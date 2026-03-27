@@ -26,6 +26,43 @@ const AGENT_GALLERY = [
         responsibility: 'Perform deep, multi-source investigative research and verify facts.',
         brain: 'gemini-3.1-pro-preview',
     },
+    {
+        id: 'deep-web-research-workflow',
+        name: 'Deep Web Research Workflow',
+        icon: '🚀',
+        description: '3-agent pipeline: Research scrapes → Analyst analyzes → PDF generates report',
+        isWorkflow: true,
+        agents: [
+            {
+                name: 'Research Agent',
+                description: 'Scrapes web pages, builds knowledge graph with facts and sources',
+                brain: 'gemini-2.0-flash',
+                permissions: ['scrape website', 'recursive verification', 'knowledge graph construction'],
+                responsibility: 'Scrape resources, extract facts, build knowledge map',
+                specialRole: 'deep-web-researcher',
+                agentType: 'master',
+                workflowId: true,
+            },
+            {
+                name: 'Analyst Agent',
+                description: 'Reads knowledge graph, analyzes findings, generates insights',
+                brain: 'gemini-3.0-pro',
+                permissions: ['content analysis', 'insight generation', 'report writing'],
+                responsibility: 'Analyze knowledge graph, draw conclusions, write report',
+                specialRole: 'analyst',
+                agentType: 'worker',
+            },
+            {
+                name: 'PDF Generator',
+                description: 'Converts analyst findings into polished PDF report',
+                brain: 'gemini-2.0-flash',
+                permissions: ['pdf generation', 'content formatting', 'document creation'],
+                responsibility: 'Generate final PDF report from analysis',
+                specialRole: 'pdf-generator',
+                agentType: 'worker',
+            },
+        ],
+    },
 ];
 
 // ─── MCP TOOLS REGISTRY ────────────────────────────────────────────────────

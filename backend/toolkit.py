@@ -60,6 +60,33 @@ def safe_log(message, agent_id=None):
         except:
             pass
 
+def log_token_usage(agent_id, model_name, input_tokens, output_tokens):
+    """Logs token usage and estimates cost in USD."""
+    # Approximate pricing per 1 Million tokens (Standard Google AI Studio pricing)
+    prices = {
+        "flash": {"in": 0.10, "out": 0.40},  # Gemini 2.0 Flash
+        "pro": {"in": 1.25, "out": 5.00}     # Gemini Pro (1.5/3.1 Proxy)
+    }
+    
+    # Determine which pricing tier to use
+    tier = "pro" if "pro" in model_name.lower() else "flash"
+    
+    cost = ((input_tokens / 1000000) * prices[tier]["in"]) + \
+           ((output_tokens / 1000000) * prices[tier]["out"])
+
+    log_dir = os.path.join(os.path.dirname(__file__), "agents_code", agent_id)
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, "token_costs.csv")
+    
+    # Create header if file doesn't exist
+    if not os.path.exists(log_path):
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write("timestamp,model,input_tokens,output_tokens,estimated_cost_usd\n")
+            
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(f"{timestamp},{model_name},{input_tokens},{output_tokens},{cost:.6f}\n")
+
 async def _ddgs_search_raw(query, agent_id):
     """Internal helper to fetch raw DuckDuckGo results."""
     safe_log(f"[STATUS:{agent_id}] DuckDuckGo: Searching '{query[:40]}...'", agent_id=agent_id)
@@ -231,14 +258,14 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
         # RESEARCH DATA (The Knowledge Graph & Deep Context):
         {json.dumps(graph_data, indent=2)}
         
-        # STRICT ANTI-LAZINESS PROTOCOL:
+        # STRICT INSTRUCTIONS:
         1. NO FLUFF: Skip "As an AI..." or "In conclusion...". Start with the data immediately.
         2. EXTREME DEPTH IS MANDATORY: This must be a master-class research report. Each section MUST be at least 5-6 dense, information-rich paragraphs.
-        3. EVIDENCE-DRIVEN: For Every. Single. Claim. you make, you MUST weave in the specific 'context_or_evidence' provided in the facts. (e.g., "Market growth is projected at 20%, driven by [Methodology/Evidence From Graph]"). 
-        4. CITATIONS: Use numbered citations like [1], [2], [3] for EVERY technical claim or data point. These numbers must correspond to the sources list provided.
-        5. EXPLOIT ALL SOURCES: You are provided with a large list of sources. You MUST attempt to reference as many unique sources as possible throughout the report to maximize authority.
-        6. ANALYTICAL RIGOR: Connect facts across sources, identify strategic tensions, analyze second-order effects, and project 5-10 year implications based on the data.
-        7. TABLES: If the graph contains 'tables', you MUST format them as Markdown tables within relevant sections. Use the provided data to build custom comparison tables.
+        3. EVIDENCE-DRIVEN: For Every. Single. Claim. you make, you MUST weave in the specific evidence. 
+        4. Use the provided 'tables' exactly as they appear for your data sections.
+        5. Compare facts across different sources using the provided timestamps.
+        6. Analyze trends, identify consensus/conflicts, and provide strategic insights.
+        7. IN-TEXT CITATIONS (CRITICAL): You MUST cite your claims in the text by placing the exact URL in brackets, e.g., "Nvidia reached a $5T valuation [https://finance.yahoo.com/nvda]". DO NOT use numbers like [1] or [2]. The system will automatically convert the URLs to numbered citations. If citing multiple sources, use separate brackets: [https://url1.com] [https://url2.com].
         
         # STRICT REPORT STRUCTURE:
         1. Title: A formal, impactful, and descriptive title.
@@ -249,19 +276,29 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
         4. Sources: Extract ALL URLs found in the data. You MUST extract the actual title of the article. DO NOT use lazy placeholders like "Discovered Source" or "Reference".
         
         # OUTPUT FORMAT:
-        The output MUST be a PURE JSON object (no markdown code blocks) with this structure:
+        The output MUST be a JSON object with this strict structure:
         {{
-          "title": "...",
-          "summary": "...",
+          "title": "Professional Report Title",
+          "summary": "Full summary text...",
           "sections": [
-            {{ "title": "Section Title", "content": "Full section markdown text here..." }}
+            {{ 
+              "title": "Section Title", 
+              "content": "Detailed paragraph text...",
+              "chart": {{
+                "type": "bar",
+                "title": "Chart Title (e.g., Nvidia Market Cap Growth)",
+                "labels": ["2023", "2024", "2025", "2026"],
+                "values": [1.2, 2.0, 3.4, 5.0]
+              }} 
+            }}
           ],
           "sources": [
-            {{ "title": "...", "url": "..." }}
+            {{ "title": "Source Label", "url": "http://..." }}
           ]
         }}
-        
-        Return ONLY the JSON. Verify it is valid JSON with escaped newlines and quotes.
+        - IMPORTANT CHART RULES: ONLY include the "chart" key inside a section if you have quantitative, comparative data (like percentages, dollars, or market share). If there is no hard data to chart in that section, omit the "chart" key entirely. Supported types are "bar" and "pie".
+        - Use authoritative, professional, and insightful language.
+        - Return ONLY the JSON object. No markdown wrapper.
         """
 
         # 3. Use Gemini 3 Flash for the final heavy lifting
@@ -286,6 +323,14 @@ async def report_generation(agent_id, tool_input, working_dir, api_key, agent_na
                 safe_log(f"!!! [CAPABILITY:report_generation] No candidates in response: {res_json}")
                 return f"Synthesis failed: No response from model."
             
+            # --- NEW: Extract and log tokens ---
+            usage = res_json.get("usageMetadata", {})
+            in_tok = usage.get("promptTokenCount", 0)
+            out_tok = usage.get("candidatesTokenCount", 0)
+            log_token_usage(agent_id, model, in_tok, out_tok)
+            safe_log(f"💰 [COST] Synthesis used {in_tok} IN and {out_tok} OUT tokens.", agent_id)
+            # -----------------------------------
+
             report_data_json = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
             # Remove markdown backticks if Gemini added them
             report_data_json = re.sub(r'```json\s*|\s*```', '', report_data_json).strip()

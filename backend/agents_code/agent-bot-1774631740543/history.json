@@ -1,0 +1,10 @@
+[
+  {
+    "role": "user",
+    "content": "report of covid 19"
+  },
+  {
+    "role": "assistant",
+    "content": "To ensure the report meets your needs, could you specify which aspects of COVID-19 you would like to focus on? For example, are you interested in the timeline and origins, global health statistics, economic impacts, or vaccine development?"
+  }
+]

@@ -20,6 +20,7 @@ from langchain_core.messages import HumanMessage
 from graph.llm import get_llm
 from graph.knowledge_store import KnowledgeStore
 from graph import hitl_prompts as prompts
+import toolkit
 
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "agents_code")
 
@@ -818,6 +819,15 @@ async def _call_model(mode: str, prompt: str, api_key: str, streaming: bool = Fa
                 text = content.strip()
             if text:
                 _log(f"    [HITL:LLM] mode={m} response_len={len(text)}")
+                
+                # --- NEW: Extract LangChain Token Usage ---
+                usage = getattr(result, 'usage_metadata', {})
+                if usage:
+                    in_tok = usage.get('input_tokens', 0)
+                    out_tok = usage.get('output_tokens', 0)
+                    toolkit.log_token_usage("Aggregate_Tracker", m, in_tok, out_tok)
+                # ------------------------------------------
+                
                 return text
         except Exception as e:
             err_str = str(e).lower()

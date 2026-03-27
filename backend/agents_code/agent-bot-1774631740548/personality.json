@@ -1,0 +1,6 @@
+{
+  "name": "PDF Generator",
+  "description": "Merges text and visuals into polished final PDF report",
+  "responsibility": "Phase 3: Generate final PDF from text and visuals",
+  "tools": "Custom"
+}

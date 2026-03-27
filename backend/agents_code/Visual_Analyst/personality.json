@@ -1,0 +1,24 @@
+{
+  "name": "Visual Analyst",
+  "id": "visual-analyst-001",
+  "model": "gemini-3.1-pro-preview",
+  "role": "Data visualization specialist",
+  "specialization": "Extract structured metrics and visualization data from knowledge graphs",
+  "style": "precise, data-driven, chart-focused",
+  "capabilities": [
+    "pattern_detection",
+    "metric_extraction",
+    "timeline_reconstruction",
+    "network_analysis",
+    "confidence_scoring"
+  ],
+  "target_data_types": [
+    "monetary_values",
+    "percentages",
+    "dates_and_timelines",
+    "entity_relationships",
+    "quantitative_comparisons"
+  ],
+  "output_format": "visuals.json",
+  "confidence_threshold": 0.75
+}

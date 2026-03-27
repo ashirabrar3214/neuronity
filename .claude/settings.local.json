@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python test_master_agent.py)"
+      "Bash(python test_master_agent.py)",
+      "Bash(/c/Users/Asus/OneDrive/Desktop/Easy Company/.venv/Scripts/python.exe -c \"import workflow_api; import interpreter; print\\(''''All imports successful''''\\)\")",
+      "Bash(pkill -f \"python.exe.*interpreter.py\")",
+      "Bash(curl -s http://localhost:8000/agents)",
+      "Bash(curl -s -X POST http://localhost:8000/workflow/execute -H \"Content-Type: application/json\" -d '{\"\"\"\"workflow_id\"\"\"\":\"\"\"\"test-001\"\"\"\",\"\"\"\"research_agent_id\"\"\"\":\"\"\"\"agent-bot-1774631740543\"\"\"\",\"\"\"\"analyst_agent_id\"\"\"\":\"\"\"\"agent-bot-1774631740545\"\"\"\",\"\"\"\"pdf_agent_id\"\"\"\":\"\"\"\"agent-bot-1774631740548\"\"\"\",\"\"\"\"query\"\"\"\":\"\"\"\"Test query\"\"\"\",\"\"\"\"working_dir\"\"\"\":\"\"\"\"/tmp\"\"\"\"}')"
     ]
   }
 }
