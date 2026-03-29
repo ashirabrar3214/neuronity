@@ -272,20 +272,63 @@ class Agent4Orchestrator:
         Merges report text and visuals into final PDF.
         """
         try:
-            # TODO: Call actual PDF generation logic
-            # For now, use ReportPDFGenerator if available
-
-            # This is a placeholder
-            # generator = ReportPDFGenerator(...)
-            # generator.generate(output_path)
+            import re
+            from pdf_generator import ReportPDFGenerator
+            
+            # Read Text Report
+            report_md = ""
+            if os.path.exists(report_text_path):
+                with open(report_text_path, 'r', encoding='utf-8') as f:
+                    report_md = f.read()
+                    
+            # Read Visuals
+            visuals_data = {}
+            if os.path.exists(visuals_path):
+                with open(visuals_path, 'r', encoding='utf-8') as f:
+                    visuals_data = json.load(f)
+                    
+            # Basic markdown parser to split into Sections
+            blocks = re.split(r'(?m)^#{1,2}\s+(.+)$', report_md.strip())
+            sections = []
+            
+            summary = "Executive System Summary"
+            if len(blocks) > 0 and len(blocks[0].strip()) > 0 and not report_md.startswith('#'):
+                summary = blocks[0].strip()
+                
+            charts_pool = visuals_data.get("charts", [])
+            chart_idx = 0
+            
+            for i in range(1, len(blocks), 2):
+                title = blocks[i].strip()
+                content = blocks[i+1].strip() if i+1 < len(blocks) else ""
+                
+                chart_for_section = None
+                # Inject a chart into the section if there's enough text content
+                if chart_idx < len(charts_pool) and len(content) > 100:
+                    chart_for_section = charts_pool[chart_idx]
+                    chart_idx += 1
+                    
+                sections.append({
+                    "title": title,
+                    "content": content,
+                    "chart": chart_for_section
+                })
+                
+            content_data = {
+                "summary": summary,
+                "sections": sections,
+                "sources": []
+            }
+            
+            gen = ReportPDFGenerator(output_path, "Comprehensive Research Report")
+            gen.generate(content_data, agent_name="Agent4 Orchestrator", agent_id=self.agent_id)
 
             return {
                 "success": True,
                 "output_path": output_path,
                 "stats": {
-                    "pages": 15,
-                    "charts_embedded": 4,
-                    "file_size_kb": 2048
+                    "sections": len(sections),
+                    "charts_embedded": chart_idx
                 }
             }
         except Exception as e:

@@ -986,13 +986,28 @@ input:checked+.slider:before {
     margin-top: 5px;
 }
 
-/* ── HITL CONFIDENCE GATE ───────────────────────────────────────────── */
+/* ── HITL CHECKPOINT BUBBLES ────────────────────────────────────────── */
 .hitl-question {
     margin: 6px 0 2px 0;
     padding: 6px 10px;
     border-left: 2px solid #444;
     font-size: 12px;
     color: #ccc;
+}
+
+.hitl-checkpoint-bubble {
+    margin: 8px 0;
+    padding: 10px 14px;
+    background: #1e1e2e;
+    border-left: 3px solid #7c6fe0;
+    border-radius: 0 8px 8px 0;
+    font-size: 13px;
+    color: #e0e0e0;
+    line-height: 1.5;
+}
+
+.hitl-checkpoint-bubble + .hitl-checkpoint-bubble {
+    margin-top: 4px;
 }
 
 /* ── ReAct LOOP DISPLAY ─────────────────────────────────────────────── */

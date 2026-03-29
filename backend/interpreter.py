@@ -228,10 +228,10 @@ def load_data():
             return json.loads(content)
     except json.JSONDecodeError as e:
         print(f"!!! [BACKEND ERROR] Could not parse {DATA_FILE}: {e}")
-        return None
+        return []
     except Exception as e:
         print(f"!!! [BACKEND ERROR] An unexpected error occurred in load_data: {e}")
-        return None
+        return []
 
 
 def update_agent_directory_md(agents_data):

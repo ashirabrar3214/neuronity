@@ -232,6 +232,64 @@ class VisualAnalystAgent:
             "total_edges": len(graph.get('links', []))
         }
 
+    def export_to_pdf(self, visuals: Dict, pdf_path: str):
+        """Builds a formatted PDF report out of the extracted structured visual data."""
+        import sys
+        backend_dir = os.path.abspath(os.path.join(self.working_dir, "../.."))
+        if backend_dir not in sys.path:
+            sys.path.append(backend_dir)
+            
+        from pdf_generator import ReportPDFGenerator
+        
+        sections = []
+        
+        # Timeline Section
+        timeline = visuals.get("timeline", {})
+        if timeline.get("events"):
+            timeline_content = "### Event Timeline\n"
+            for event in timeline["events"]:
+                timeline_content += f"- **{event['date']}**: {event['event']}\n"
+            sections.append({
+                "title": "Timeline of Events",
+                "content": timeline_content
+            })
+            
+        # Metrics Section
+        metrics = visuals.get("metrics", {})
+        parts = []
+        for key in ["money", "percentages", "quantities"]:
+            if metrics.get(key):
+                parts.append(f"**{key.capitalize()} Extracted:**\n" + "\n".join([f"- {m['value']}: {m['context']}" for m in metrics[key][:5]]))
+        if parts:
+            sections.append({
+                "title": "Extracted Metrics & Measurements",
+                "content": "\n\n".join(parts)
+            })
+
+        # Charts Section
+        for i, chart in enumerate(visuals.get("charts", [])):
+            sections.append({
+                "title": chart.get("title", f"Chart {i+1}"),
+                "content": f"The following chart illustrates the extracted metric patterns for {chart.get('title', 'this topic')}. The data was extracted confidentially from the underlying knowledge graph.",
+                "chart": chart
+            })
+            
+        summary_counts = visuals.get("summary", {})
+        summary_text = (
+            f"This Visual Analysis Report summarizes information extracted from a knowledge graph containing "
+            f"{summary_counts.get('total_nodes', 0)} nodes and {summary_counts.get('total_edges', 0)} edges. "
+            f"We analyzed {summary_counts.get('facts', 0)} facts from {summary_counts.get('sources', 0)} sources."
+        )
+
+        content_data = {
+            "summary": summary_text,
+            "sections": sections,
+            "sources": []
+        }
+        
+        gen = ReportPDFGenerator(pdf_path, "Visual Analysis Report")
+        gen.generate(content_data, agent_name=self.name, agent_id=self.id)
+
 
 async def main():
     """Test the Visual Analyst Agent."""
@@ -254,6 +312,10 @@ async def main():
         print(f"✅ Visuals extracted and saved to {output_path}")
         print(f"📊 Generated {len(visuals.get('charts', []))} charts")
         print(f"📅 Found {visuals.get('timeline', {}).get('event_count', 0)} timeline events")
+        
+        pdf_out = os.path.join(os.path.dirname(__file__), 'visual_analysis.pdf')
+        agent.export_to_pdf(visuals, pdf_out)
+        print(f"📄 Standalone PDF generated and saved to {pdf_out}")
     else:
         print(f"❌ Graph file not found at {test_graph_path}")
 

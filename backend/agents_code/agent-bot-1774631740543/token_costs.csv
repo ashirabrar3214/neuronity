@@ -1,4 +1,0 @@
-timestamp,model,input_tokens,output_tokens,estimated_cost_usd
-2026-03-27 12:26:09,gemini-3-flash-preview,19339,5484,0.004128
-2026-03-27 16:19:14,gemini-3-flash-preview,56980,6211,0.008182
-2026-03-27 18:43:23,gemini-3-flash-preview,126353,6768,0.015343

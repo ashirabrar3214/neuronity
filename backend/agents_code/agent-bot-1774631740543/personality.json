@@ -1,6 +1,0 @@
-{
-  "name": "Research Agent",
-  "description": "Scrapes full articles, resolves contradictions, builds knowledge graph",
-  "responsibility": "Phase 1: Perform deep, multi-source investigative research",
-  "tools": "Custom"
-}

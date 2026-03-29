@@ -10,7 +10,14 @@
       "Bash(taskkill //PID 14564 //F)",
       "Bash(\"c:/Users/Asus/OneDrive/Desktop/Easy Company/.venv/Scripts/pip.exe\" install crawl4ai)",
       "Bash(python -c \"import py_compile; py_compile.compile\\(''backend/graph/hitl_engine.py'', doraise=True\\); py_compile.compile\\(''backend/graph/llm.py'', doraise=True\\); print\\(''All OK''\\)\")",
-      "Bash(python -c \"import py_compile; py_compile.compile\\(''backend/graph/hitl_engine.py'', doraise=True\\); py_compile.compile\\(''backend/graph/hitl_prompts.py'', doraise=True\\); print\\(''All OK''\\)\")"
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''backend/graph/hitl_engine.py'', doraise=True\\); py_compile.compile\\(''backend/graph/hitl_prompts.py'', doraise=True\\); print\\(''All OK''\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''backend/graph/hitl_engine.py'', doraise=True\\); py_compile.compile\\(''backend/graph/hitl_prompts.py'', doraise=True\\); py_compile.compile\\(''backend/graph/llm.py'', doraise=True\\); py_compile.compile\\(''backend/graph/streaming.py'', doraise=True\\); py_compile.compile\\(''backend/interpreter.py'', doraise=True\\); print\\(''All OK''\\)\")",
+      "Bash(python -c \":*)",
+      "Bash(python test_data_visuals.py)",
+      "Bash(start \"\" \"c:/Users/Asus/OneDrive/Desktop/Easy Company/backend/agents_code/Visual_Analyst/data_tools_demo.pdf\")",
+      "Bash(python -c \"import matplotlib; print\\(matplotlib.__version__\\)\")",
+      "Bash(\"c:/Users/Asus/OneDrive/Desktop/Easy Company/.venv/Scripts/pip\" install matplotlib)",
+      "Bash(python -c \"import json; data = json.load\\(open\\(''agents.json''\\)\\); print\\(f''Valid JSON: {len\\(data\\)} agents''\\); [print\\(f''  {a[\"\"id\"\"]}: {a[\"\"name\"\"]}''\\) for a in data]\")"
     ]
   }
 }

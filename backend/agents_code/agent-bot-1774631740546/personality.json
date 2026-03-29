@@ -1,6 +1,0 @@
-{
-  "name": "Visual Analyst",
-  "description": "Extracts metrics, timelines, and generates visualization specs",
-  "responsibility": "Phase 2b: Extract visual data and generate visualization specifications",
-  "tools": "Custom"
-}

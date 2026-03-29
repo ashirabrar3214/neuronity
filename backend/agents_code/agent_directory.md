@@ -1,15 +1,15 @@
 ## PROJECT AGENT DIRECTORY
 Below are all agents currently in this project. Use this to identify who to delegate tasks to.
 
-- **Research Agent** (ID: `agent-bot-1774631740543`): Phase 1: Perform deep, multi-source investigative research
+- **Research Agent** (ID: `agent-bot-1774825958592`): Phase 1: Deep web scraping, fact extraction, knowledge map construction
   Capabilities: scrape website, recursive verification, knowledge graph construction
 
-- **Synthesis Agent** (ID: `agent-bot-1774631740545`): Phase 2a: Write analytical text and structured report narrative
+- **Synthesis Agent** (ID: `agent-bot-1774825958594`): Phase 2: Analyze knowledge map, identify gaps, write report with citations
   Capabilities: content synthesis, insight generation, narrative composition
 
-- **Visual Analyst** (ID: `agent-bot-1774631740546`): Phase 2b: Extract visual data and generate visualization specifications
-  Capabilities: metric extraction, pattern detection, timeline reconstruction, network analysis
+- **Visual Analyst** (ID: `agent-bot-1774825958595`): Phase 3: Analyze graph for numerical events, timelines, and generate visual charts
+  Capabilities: data visualization, metric extraction, pattern detection
 
-- **PDF Generator** (ID: `agent-bot-1774631740548`): Phase 3: Generate final PDF from text and visuals
+- **PDF Generator** (ID: `agent-bot-1774825958597`): Phase 4: Generate final combined, formatted PDF from analysis components
   Capabilities: pdf generation, content formatting, image embedding
 

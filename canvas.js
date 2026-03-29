@@ -661,19 +661,32 @@ class AgentCanvas {
     }
 
     addWorkflowAgents(workflow) {
-        // Add 3 agents in linear pipeline layout
+        // Arrange agents in layout
         const centerX = (window.innerWidth / 2) - this.pan.x;
         const centerY = (window.innerHeight / 2) - this.pan.y;
 
         // Generate unique workflow ID
         const workflowId = `workflow-${Date.now()}`;
 
-        // Linear pipeline: Research (left) → Synthesis (center) → PDF Generator (right)
-        const positions = [
-            { x: centerX - 350, y: centerY, label: "Research Agent" },      // 0: Left (MASTER)
-            { x: centerX, y: centerY, label: "Synthesis Agent" },           // 1: Center
-            { x: centerX + 350, y: centerY, label: "PDF Generator" }       // 2: Right
-        ];
+        let positions;
+        const isFourAgent = workflow.agents.length === 4;
+        
+        if (isFourAgent) {
+            // Diamond pipeline: Research (left) → Synthesis (top) / Visual (bottom) → PDF (right)
+            positions = [
+                { x: centerX - 350, y: centerY, label: "Research Agent" },      // 0: Left
+                { x: centerX, y: centerY - 160, label: "Synthesis Agent" },     // 1: Center Top
+                { x: centerX, y: centerY + 160, label: "Visual Analyst" },      // 2: Center Bottom
+                { x: centerX + 350, y: centerY, label: "PDF Generator" }        // 3: Right
+            ];
+        } else {
+            // Linear pipeline fallback
+            positions = [
+                { x: centerX - 350, y: centerY, label: "Research Agent" },      // 0: Left (MASTER)
+                { x: centerX, y: centerY, label: "Synthesis Agent" },           // 1: Center
+                { x: centerX + 350, y: centerY, label: "PDF Generator" }        // 2: Right
+            ];
+        }
 
         const createdAgentIds = [];
 
@@ -710,12 +723,18 @@ class AgentCanvas {
             }).catch(err => console.error("Error creating agent:", err));
         });
 
-        // Auto-connect agents in linear chain: Research → Synthesis → PDF
-        if (createdAgentIds.length >= 3) {
+        // Auto-connect agents based on size
+        if (isFourAgent && createdAgentIds.length >= 4) {
+            // Diamond Connections
+            this.connectNodes(createdAgentIds[0], createdAgentIds[1]); // Research -> Synthesis
+            this.connectNodes(createdAgentIds[0], createdAgentIds[2]); // Research -> Visual
+            this.connectNodes(createdAgentIds[1], createdAgentIds[3]); // Synthesis -> PDF
+            this.connectNodes(createdAgentIds[2], createdAgentIds[3]); // Visual -> PDF
+            createdAgentIds.forEach(id => this.saveAgentData(id));
+        } else if (createdAgentIds.length >= 3) {
+            // Linear Connections
             this.connectNodes(createdAgentIds[0], createdAgentIds[1]);
             this.connectNodes(createdAgentIds[1], createdAgentIds[2]);
-
-            // Persist connections to backend
             createdAgentIds.forEach(id => this.saveAgentData(id));
         }
     }

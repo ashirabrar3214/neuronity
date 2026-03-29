@@ -169,6 +169,16 @@ def display_event(event):
             print(f"  {line}")
         print(f"{GREEN}  {'=' * 56}{RESET}\n")
 
+    elif etype == "hitl_checkpoint":
+        mode = event.get("checkpoint_mode", "")
+        idx = event.get("message_index", 0)
+        total = event.get("total_messages", 1)
+        if idx == 0:
+            print(f"\n{YELLOW}  -- checkpoint [{mode}] --{RESET}")
+        print(f"  {YELLOW}{content}{RESET}")
+        if idx == total - 1:
+            print()
+
     elif etype == "hitl_question":
         conf = event.get("confidence", "?")
         score = event.get("intervention_score", "?")
@@ -300,7 +310,7 @@ async def run_session(goal, effort, expertise):
 
                     show_event(event)
 
-                    if event.get("type") in ("response", "hitl_question"):
+                    if event.get("type") in ("response", "hitl_question", "hitl_checkpoint"):
                         got_checkpoint = True
 
                     if event.get("type") == "done":

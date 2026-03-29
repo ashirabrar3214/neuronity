@@ -155,30 +155,32 @@ RULES:
 
 
 def act_synthesis_prompt(goal: str, steer: str, relevant_facts: str,
-                         outputs_so_far: str, current_date: str = "") -> str:
-    """Write ONE unit of output focusing on tensions and second-order effects."""
+                         outputs_so_far: str, current_date: str = "",
+                         user_steers: str = "") -> str:
+    """Write ONE unit of output. Tone adapts to user direction."""
     existing = f"\nALREADY WRITTEN:\n{outputs_so_far}\n" if outputs_so_far else ""
     date_line = f"\nTODAY'S DATE: {current_date}" if current_date else ""
+    steers_block = f"\nUSER'S INSTRUCTIONS: {user_steers}" if user_steers else ""
 
-    return f"""You are a Senior Strategic Analyst writing a high-level briefing.{date_line}
+    return f"""You are writing a section of a research report.{date_line}
 
 GOAL: {goal}
-CURRENT FOCUS: {steer}
+CURRENT FOCUS: {steer}{steers_block}
 {existing}
 
 EVIDENCE BASE (cite using numbers in brackets):
 {relevant_facts}
 
-Write ONE focused analytical section (2-3 paragraphs) that:
+Write ONE focused section (2-3 paragraphs) that:
 1. Directly addresses the current focus using the provided evidence.
-2. Analyzes the data for tensions, contradictions, or emergent trends. (e.g., If one source says AI creates jobs and another says it destroys them, analyze that conflict).
-3. Evaluates the second-order effects or strategic implications of these facts. Do NOT just summarize the history.
-4. Cites sources strictly using numbered citations: [1], [2].
+2. Analyzes tensions, contradictions, or trends — don't just list facts chronologically.
+3. Explains WHY things matter, not just what happened.
+4. Cites sources using numbered citations: [1], [2].
 
 RULES:
-- Assume the reader already knows the basic definitions. Skip the intro fluff.
-- Every major claim must be backed by a fact from the list and cited.
-- Use professional, authoritative, and objective language (e.g., McKinsey or RAND Corporation style).
+- Skip intro fluff. Start with substance.
+- Every major claim must cite a source from the evidence base.
+- MATCH THE USER'S LANGUAGE. If they asked for simple explanations, write clearly without jargon. If they used technical terms, be technical. The user's instructions override all other tone guidance.
 - Return ONLY the written content. No JSON, no markdown headers wrapping it."""
 
 
@@ -245,9 +247,9 @@ def checkpoint_chat_prompt(goal: str, current_date: str, mode: str,
     # Mode-specific instructions
     mode_instructions = {
         "early_checkin": (
-            "You just started researching and found some initial leads. "
-            "Share what direction the research is taking and WHY it matters for the goal. "
-            "Then check if you're heading the right way — the user might have a preference you don't know about."
+            "You just started and have initial leads. State what direction you're heading and why. "
+            "Only ask a question if you have a genuine fork in the road (two specific paths). "
+            "If there's no real choice yet, just say where you're headed — no filler questions."
         ),
         "share_insight": (
             "You found something significant. Don't just state the fact — explain WHY it's important "
@@ -270,36 +272,32 @@ def checkpoint_chat_prompt(goal: str, current_date: str, mode: str,
 
     instruction = mode_instructions.get(mode, mode_instructions["share_insight"])
 
-    return f"""Today is {current_date}. You are a research intern chatting with your supervisor over text.
+    return f"""Today is {current_date}. You are a research agent checking in with the user.
 
 RESEARCH GOAL: {goal}
-SUPERVISOR'S DIRECTION SO FAR: {steers_block}
+USER'S DIRECTION SO FAR: {steers_block}
 
-YOUR FINDINGS (ranked by importance):
+FINDINGS (ranked by relevance):
 {facts_block}
 
-WHAT YOU STILL DON'T KNOW:
+GAPS:
 {gaps_block}
 
-RESEARCH PROGRESS: {stage} stage, {total_facts} facts from {total_sources} sources, covering: {topics}
-ANALYSIS NOTES: {reflect_analysis[:300] if reflect_analysis else "Just getting started."}
+PROGRESS: {stage} stage, {total_facts} facts from {total_sources} sources, covering: {topics}
+ANALYSIS: {reflect_analysis[:300] if reflect_analysis else "Early stage."}
 
-YOUR SITUATION: {instruction}
+TASK: {instruction}
 
-Write 1-3 short chat messages. Return as JSON:
+Return 1-3 short messages as JSON:
 {{
   "messages": ["first message", "second message if needed"]
 }}
 
 RULES:
-- You are a PERSON texting, not a system generating output.
-- EXPLAIN why a finding matters for the report — don't just state raw facts.
-- Vary your style. These are all valid:
-    "So I've been reading about X and I think the key thing for our report is Y, because Z."
-    "Interesting problem — source A says X but source B says the opposite. What's your read?"
-    "I think I have enough on the technical side. Want me to start drafting, or should I dig into the impact stuff first?"
-    "Quick update: covered A, B, C so far. The main gap is D — is that important for what you need?"
-- Do NOT always ask "Should I do X or Y?" — vary between open questions, proposals, confirmations, opinions.
+- No greetings. No "Hey", "Hi", "So". Start with substance.
+- EXPLAIN why findings matter for the goal — don't dump raw facts.
+- If you don't have enough information to ask a specific question, just state what you're doing and where you're heading. Do NOT ask vague questions.
+- Match the user's language level. If they said "explain simply", use plain language. If they used technical terms, you can too.
 - Each message MAX 2 sentences. Total MAX 4 sentences across all messages.
 - No numbered lists. No "Option 1/2". No "Would you like to".
 - Return ONLY the JSON. No markdown."""

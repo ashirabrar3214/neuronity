@@ -904,9 +904,15 @@ async def _phase_checkpoint(state: dict, store: KnowledgeStore):
         else:
             messages = ["Still gathering information. Any specific angle you want me to focus on?"]
 
-    for msg in messages:
+    for i, msg in enumerate(messages):
         if isinstance(msg, str) and msg.strip():
-            yield _sse({"type": "response", "content": msg.strip()})
+            yield _sse({
+                "type": "hitl_checkpoint",
+                "content": msg.strip(),
+                "checkpoint_mode": mode,
+                "message_index": i,
+                "total_messages": len(messages),
+            })
 
     store.update_phase("CHECKPOINT", f"Checkpoint mode={mode} gaps={len(gaps)}")
     store.save()
@@ -955,7 +961,12 @@ async def _phase_act(state: dict, store: KnowledgeStore):
     outputs = store.ledger.get("outputs_written", [])
     outputs_str = "\n\n".join(o.get("text", "")[:200] for o in outputs) if outputs else ""
 
-    prompt = prompts.act_synthesis_prompt(state["goal"], focus, relevant_facts_str, outputs_str, state.get("current_date", ""))
+    # Pass all user steers so the synthesis respects tone/style preferences
+    all_steers = "; ".join(s["steer"] for s in steers) if steers else ""
+    prompt = prompts.act_synthesis_prompt(
+        state["goal"], focus, relevant_facts_str, outputs_str,
+        state.get("current_date", ""), all_steers
+    )
 
     thinking_chunks = []
     async def _on_thinking(text):

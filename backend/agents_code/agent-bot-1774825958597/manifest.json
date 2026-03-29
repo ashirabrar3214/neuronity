@@ -1,0 +1,7 @@
+{
+  "agent_id": "agent-bot-1774825958597",
+  "extraction_logic": "RAW_CHUNKS",
+  "verification_required": false,
+  "output_format": "STRUCTURED_FINDINGS",
+  "knowledge_gate": "WRITE_ONLY_LEDGER"
+}

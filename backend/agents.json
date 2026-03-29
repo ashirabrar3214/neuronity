@@ -1,10 +1,10 @@
 [
   {
-    "id": "agent-bot-1774631740543",
+    "id": "agent-bot-1774825958592",
     "name": "Research Agent",
     "description": "Scrapes full articles, resolves contradictions, builds knowledge graph",
     "brain": "gemini-2.0-flash",
-    "channel": "Discord",
+    "channel": "Direct",
     "workingDir": "D:\\New folder",
     "permissions": [
       "scrape website",
@@ -12,22 +12,23 @@
       "knowledge graph construction"
     ],
     "tools": "Custom",
-    "responsibility": "Phase 1: Perform deep, multi-source investigative research",
+    "responsibility": "Phase 1: Deep web scraping, fact extraction, knowledge map construction",
     "agentType": "master",
     "specialRole": "deep-web-researcher",
-    "userEffort": 4,
+    "userEffort": 6,
+    "humanExpertise": 5,
     "projectSize": "small",
-    "x": 276.0,
-    "y": 600.0,
+    "x": 218.0,
+    "y": 231.0,
     "connections": [
-      "agent-bot-1774631740545",
-      "agent-bot-1774631740546"
+      "agent-bot-1774825958594",
+      "agent-bot-1774825958595"
     ]
   },
   {
-    "id": "agent-bot-1774631740545",
+    "id": "agent-bot-1774825958594",
     "name": "Synthesis Agent",
-    "description": "Transforms knowledge graph into analytical text with insights",
+    "description": "Reads knowledge map, analyzes findings, writes analytical report",
     "brain": "gemini-3.0-pro",
     "channel": "Direct",
     "workingDir": "",
@@ -37,46 +38,47 @@
       "narrative composition"
     ],
     "tools": "Custom",
-    "responsibility": "Phase 2a: Write analytical text and structured report narrative",
-    "agentType": "specialist",
+    "responsibility": "Phase 2: Analyze knowledge map, identify gaps, write report with citations",
+    "agentType": "worker",
     "specialRole": "synthesis",
     "userEffort": 1,
+    "humanExpertise": 5,
     "projectSize": "small",
-    "x": 632.0,
-    "y": 502.0,
+    "x": 580.0,
+    "y": 128.0,
     "connections": [
-      "agent-bot-1774631740548"
+      "agent-bot-1774825958597"
     ]
   },
   {
-    "id": "agent-bot-1774631740546",
+    "id": "agent-bot-1774825958595",
     "name": "Visual Analyst",
-    "description": "Extracts metrics, timelines, and generates visualization specs",
+    "description": "Extracts critical metrics and produces elegant charts from the knowledge graph",
     "brain": "gemini-3.1-pro-preview",
     "channel": "Direct",
     "workingDir": "",
     "permissions": [
+      "data visualization",
       "metric extraction",
-      "pattern detection",
-      "timeline reconstruction",
-      "network analysis"
+      "pattern detection"
     ],
     "tools": "Custom",
-    "responsibility": "Phase 2b: Extract visual data and generate visualization specifications",
-    "agentType": "specialist",
-    "specialRole": "visual-analysis",
+    "responsibility": "Phase 3: Analyze graph for numerical events, timelines, and generate visual charts",
+    "agentType": "worker",
+    "specialRole": "visual-analyst",
     "userEffort": 1,
+    "humanExpertise": 5,
     "projectSize": "small",
-    "x": 633.0,
-    "y": 717.0,
+    "x": 578.0,
+    "y": 307.0,
     "connections": [
-      "agent-bot-1774631740548"
+      "agent-bot-1774825958597"
     ]
   },
   {
-    "id": "agent-bot-1774631740548",
+    "id": "agent-bot-1774825958597",
     "name": "PDF Generator",
-    "description": "Merges text and visuals into polished final PDF report",
+    "description": "Compiles text analysis and visual charts into a polished PDF report",
     "brain": "gemini-2.0-flash",
     "channel": "Direct",
     "workingDir": "",
@@ -86,15 +88,14 @@
       "image embedding"
     ],
     "tools": "Custom",
-    "responsibility": "Phase 3: Generate final PDF from text and visuals",
-    "agentType": "specialist",
+    "responsibility": "Phase 4: Generate final combined, formatted PDF from analysis components",
+    "agentType": "worker",
     "specialRole": "pdf-generation",
     "userEffort": 1,
+    "humanExpertise": 5,
     "projectSize": "small",
-    "x": 1021.0,
-    "y": 615.0,
-    "connections": [
-      "agent-bot-1774646815811"
-    ]
+    "x": 939.0,
+    "y": 253.0,
+    "connections": []
   }
 ]

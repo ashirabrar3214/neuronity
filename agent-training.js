@@ -30,7 +30,7 @@ const AGENT_GALLERY = [
         id: 'deep-web-research-workflow',
         name: 'Deep Web Research Workflow',
         icon: '🚀',
-        description: '3-agent pipeline: Research → Analysis → PDF Report',
+        description: '4-agent pipeline: Research → Analysis + Visuals → PDF Report',
         isWorkflow: true,
         agents: [
             {
@@ -52,11 +52,20 @@ const AGENT_GALLERY = [
                 agentType: 'worker',
             },
             {
+                name: 'Visual Analyst',
+                description: 'Extracts critical metrics and produces elegant charts from the knowledge graph',
+                brain: 'gemini-3.1-pro-preview',
+                permissions: ['data visualization', 'metric extraction', 'pattern detection'],
+                responsibility: 'Phase 3: Analyze graph for numerical events, timelines, and generate visual charts',
+                specialRole: 'visual-analyst',
+                agentType: 'worker',
+            },
+            {
                 name: 'PDF Generator',
-                description: 'Compiles analysis into a polished PDF report with sources',
+                description: 'Compiles text analysis and visual charts into a polished PDF report',
                 brain: 'gemini-2.0-flash',
                 permissions: ['pdf generation', 'content formatting', 'image embedding'],
-                responsibility: 'Phase 3: Generate final formatted PDF from analysis',
+                responsibility: 'Phase 4: Generate final combined, formatted PDF from analysis components',
                 specialRole: 'pdf-generation',
                 agentType: 'worker',
             },
@@ -403,6 +412,12 @@ window.openTrainingPanel = async (agentId, agentName) => {
         const effortDisplay = document.getElementById('effort-value-display');
         if (effortDisplay) effortDisplay.textContent = effortSlider.value;
     }
+    const expertiseSlider = document.getElementById('detail-human-expertise');
+    if (expertiseSlider) {
+        expertiseSlider.value = agentData.humanExpertise || 5;
+        const expertiseDisplay = document.getElementById('expertise-value-display');
+        if (expertiseDisplay) expertiseDisplay.textContent = expertiseSlider.value;
+    }
     // Project Size toggle
     const savedSize = agentData.projectSize || 'small';
     const projectSizeEl = document.getElementById('detail-project-size');
@@ -579,6 +594,7 @@ async function triggerSave() {
         channel: document.getElementById('detail-channel')?.value || activeAgentData.channel || 'Gmail',
         workingDir: document.getElementById('detail-workdir')?.value || activeAgentData.workingDir || '',
         userEffort: parseInt(document.getElementById('detail-user-effort')?.value || activeAgentData.userEffort || '1', 10),
+        humanExpertise: parseInt(document.getElementById('detail-human-expertise')?.value || activeAgentData.humanExpertise || '5', 10),
         projectSize: document.getElementById('detail-project-size')?.value || activeAgentData.projectSize || 'small',
         connectedTools: Array.from(connectedToolsSet),
         agentType: document.getElementById('detail-agent-type')?.value || activeAgentData.agentType || 'worker',
@@ -746,7 +762,7 @@ window.initTrainingUI = function() {
     // Attach listeners to all inputs/selects for auto-save
     const autoSaveInputs = [
         'detail-name', 'detail-description', 'detail-responsibility',
-        'detail-channel', 'detail-workdir', 'detail-user-effort'
+        'detail-channel', 'detail-workdir', 'detail-user-effort', 'detail-human-expertise'
     ];
 
     autoSaveInputs.forEach(id => {
@@ -763,6 +779,15 @@ window.initTrainingUI = function() {
         effortSliderEl.addEventListener('input', () => {
             const display = document.getElementById('effort-value-display');
             if (display) display.textContent = effortSliderEl.value;
+        });
+    }
+
+    // Human Expertise slider — live value display
+    const expertiseSliderEl = document.getElementById('detail-human-expertise');
+    if (expertiseSliderEl) {
+        expertiseSliderEl.addEventListener('input', () => {
+            const display = document.getElementById('expertise-value-display');
+            if (display) display.textContent = expertiseSliderEl.value;
         });
     }
 
@@ -1095,14 +1120,19 @@ window.initTrainingUI = function() {
                                 line.textContent = data.content;
                                 (currentIterDiv || messageDiv).appendChild(line);
                             }
-                            else if (data.type === 'hitl_question') {
+                            else if (data.type === 'hitl_question' || data.type === 'hitl_checkpoint') {
                                 if (initialStatus) { initialStatus.remove(); initialStatus = null; }
-                                const wrapper = document.createElement('div');
-                                wrapper.className = 'hitl-question';
+                                const bubble = document.createElement('div');
+                                bubble.className = 'hitl-checkpoint-bubble';
+                                if (data.checkpoint_mode) {
+                                    bubble.setAttribute('data-mode', data.checkpoint_mode);
+                                }
                                 const text = document.createElement('span');
-                                wrapper.appendChild(text);
-                                (currentIterDiv || messageDiv).appendChild(wrapper);
-                                typewrite(text, data.content);
+                                bubble.appendChild(text);
+                                (currentIterDiv || messageDiv).appendChild(bubble);
+                                typewriteMarkdown(text, data.content);
+                                // Also capture as response content for history saving
+                                responseContent += (responseContent ? '\n\n' : '') + data.content;
                             }
                             else if (data.type === 'response' || data.type === 'text') {
                                 if (initialStatus) { initialStatus.remove(); initialStatus = null; }
