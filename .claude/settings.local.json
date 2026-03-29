@@ -8,7 +8,9 @@
       "Bash(curl -s -X POST http://localhost:8000/workflow/execute -H \"Content-Type: application/json\" -d '{\"\"\"\"workflow_id\"\"\"\":\"\"\"\"test-001\"\"\"\",\"\"\"\"research_agent_id\"\"\"\":\"\"\"\"agent-bot-1774631740543\"\"\"\",\"\"\"\"analyst_agent_id\"\"\"\":\"\"\"\"agent-bot-1774631740545\"\"\"\",\"\"\"\"pdf_agent_id\"\"\"\":\"\"\"\"agent-bot-1774631740548\"\"\"\",\"\"\"\"query\"\"\"\":\"\"\"\"Test query\"\"\"\",\"\"\"\"working_dir\"\"\"\":\"\"\"\"/tmp\"\"\"\"}')",
       "Bash(netstat -ano)",
       "Bash(taskkill //PID 14564 //F)",
-      "Bash(\"c:/Users/Asus/OneDrive/Desktop/Easy Company/.venv/Scripts/pip.exe\" install crawl4ai)"
+      "Bash(\"c:/Users/Asus/OneDrive/Desktop/Easy Company/.venv/Scripts/pip.exe\" install crawl4ai)",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''backend/graph/hitl_engine.py'', doraise=True\\); py_compile.compile\\(''backend/graph/llm.py'', doraise=True\\); print\\(''All OK''\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''backend/graph/hitl_engine.py'', doraise=True\\); py_compile.compile\\(''backend/graph/hitl_prompts.py'', doraise=True\\); print\\(''All OK''\\)\")"
     ]
   }
 }

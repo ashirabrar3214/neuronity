@@ -6,12 +6,14 @@ Each function returns a string prompt. The engine handles parsing the response.
 """
 
 
-def understand_prompt(goal: str, history_context: str, ledger_summary: str) -> str:
+def understand_prompt(goal: str, history_context: str, ledger_summary: str,
+                      current_date: str = "") -> str:
     """Classify task and detect ambiguity. Used with planner model (Gemini 3)."""
     history_block = f"\nRECENT CONVERSATION:\n{history_context}\n" if history_context else ""
     ledger_block = f"\nEXISTING SESSION STATE:\n{ledger_summary}\n" if ledger_summary else ""
+    date_line = f"\nTODAY'S DATE: {current_date}" if current_date else ""
 
-    return f"""You are an intent classifier and ambiguity detector for an AI agent.
+    return f"""You are an intent classifier and ambiguity detector for an AI agent.{date_line}
 
 TASK FROM USER: {goal}
 {history_block}{ledger_block}
@@ -35,9 +37,10 @@ RULES:
 
 
 def gather_plan_prompt(goal: str, steers: str, gaps: str, tool_names: list,
-                       batch_size: int, graph_summary: str) -> str:
+                       batch_size: int, graph_summary: str, current_date: str = "") -> str:
     """Select next N tool calls with a focus on depth and critique."""
-    return f"""You are a Lead Researcher planning the next deep-dive investigation.
+    date_line = f"\nTODAY'S DATE: {current_date}" if current_date else ""
+    return f"""You are a Lead Researcher planning the next deep-dive investigation.{date_line}
 
 GOAL: {goal}
 USER DIRECTION: {steers if steers else "No specific direction yet."}
@@ -70,11 +73,12 @@ Return ONLY a JSON object in this format:
 Return ONLY the JSON. No markdown."""
 
 
-def extract_facts_prompt(raw_results: str, goal: str) -> str:
+def extract_facts_prompt(raw_results: str, goal: str, current_date: str = "") -> str:
     """Extract relational facts from raw tool results."""
-    return f"""# ROLE: STRATEGIC INTELLIGENCE ANALYST
+    date_line = f"\n    TODAY'S DATE: {current_date}\n" if current_date else ""
+    return f"""# ROLE: STRATEGIC INTELLIGENCE ANALYST{date_line}
     TASK: Extract high-value, evidence-backed strategic claims and granular data points.
-    
+
     RESEARCH GOAL: {goal}
     
     # RAW RESEARCH DATA:
@@ -110,9 +114,10 @@ def extract_facts_prompt(raw_results: str, goal: str) -> str:
 
 
 def reflect_prompt(goal: str, graph_summary: str, ledger_summary: str,
-                   steers: str, fact_snippets: str) -> str:
+                   steers: str, fact_snippets: str, current_date: str = "") -> str:
     """Analyze findings, identify gaps, generate options. Used with planner model (Gemini 3)."""
-    return f"""You are an editorial analyst reviewing research progress.
+    date_line = f"\nTODAY'S DATE: {current_date}" if current_date else ""
+    return f"""You are an editorial analyst reviewing research progress.{date_line}
 
 GOAL: {goal}
 
@@ -150,11 +155,12 @@ RULES:
 
 
 def act_synthesis_prompt(goal: str, steer: str, relevant_facts: str,
-                         outputs_so_far: str) -> str:
+                         outputs_so_far: str, current_date: str = "") -> str:
     """Write ONE unit of output focusing on tensions and second-order effects."""
     existing = f"\nALREADY WRITTEN:\n{outputs_so_far}\n" if outputs_so_far else ""
+    date_line = f"\nTODAY'S DATE: {current_date}" if current_date else ""
 
-    return f"""You are a Senior Strategic Analyst writing a high-level briefing.
+    return f"""You are a Senior Strategic Analyst writing a high-level briefing.{date_line}
 
 GOAL: {goal}
 CURRENT FOCUS: {steer}
@@ -211,72 +217,133 @@ RULES:
 - Return ONLY the JSON. No markdown."""
 
 
-def checkpoint_prompt(goal: str, sources_count: int, facts_count: int,
-                      topics: list, recent_facts: list, options: list,
-                      gaps: list) -> str:
-    """Generate a short, conversational checkpoint message. Used with fast model (Flash)."""
-    topics_str = ", ".join(t["label"] for t in topics[:8]) if topics else "various topics"
-    recent_str = "; ".join(f["content"][:80] for f in recent_facts[:4]) if recent_facts else "no facts yet"
-    options_str = "\n".join(
-        f"{o.get('id', i+1)}. {o.get('text', '')}"
-        for i, o in enumerate(options)
-    )
-    gaps_str = "; ".join(gaps[:3]) if gaps else "none identified yet"
+def checkpoint_chat_prompt(goal: str, current_date: str, mode: str,
+                           top_facts: list, editorial_context: dict,
+                           gaps: list, user_steers: list,
+                           reflect_analysis: str) -> str:
+    """Single Flash call: algorithm picks conversation mode, Flash writes naturally.
 
-    return f"""You are summarizing research progress in a friendly, conversational way for a user.
+    Modes determine the TONE and PURPOSE — Flash decides the exact words.
+    """
+    # Build facts block
+    facts_block = ""
+    for i, f in enumerate(top_facts[:3]):
+        facts_block += f"\n  FACT {i+1}: {f['content']}"
+        if f.get("evidence"):
+            facts_block += f"\n    WHY IT MATTERS: {f['evidence']}"
+        if f.get("source_title"):
+            facts_block += f"\n    FROM: {f['source_title']}"
+
+    gaps_block = "\n".join(f"  - {g}" for g in gaps) if gaps else "  - None identified yet"
+    steers_block = "; ".join(user_steers) if user_steers else "No direction given yet"
+
+    stage = editorial_context.get("research_stage", "mid")
+    total_facts = editorial_context.get("total_facts", 0)
+    total_sources = editorial_context.get("total_sources", 0)
+    topics = ", ".join(editorial_context.get("topics_covered", [])[:5])
+
+    # Mode-specific instructions
+    mode_instructions = {
+        "early_checkin": (
+            "You just started researching and found some initial leads. "
+            "Share what direction the research is taking and WHY it matters for the goal. "
+            "Then check if you're heading the right way — the user might have a preference you don't know about."
+        ),
+        "share_insight": (
+            "You found something significant. Don't just state the fact — explain WHY it's important "
+            "for the report. Connect it to the bigger picture. Then ask what the user thinks or "
+            "where they want you to go deeper. Vary your question style — don't always give two options."
+        ),
+        "flag_problem": (
+            "You found contradictory or confusing information. Explain the contradiction clearly — "
+            "what conflicts with what. Ask for the user's judgment since you're genuinely unsure."
+        ),
+        "propose_draft": (
+            "You think you have enough material to start writing a section. Briefly summarize what "
+            "you'd cover, and ask if the user wants you to go ahead or if something is missing."
+        ),
+        "progress_update": (
+            "Quick status update — what you've covered so far and what's still missing. "
+            "Make sure the user knows you're on track. Ask if they want to adjust anything."
+        ),
+    }
+
+    instruction = mode_instructions.get(mode, mode_instructions["share_insight"])
+
+    return f"""Today is {current_date}. You are a research intern chatting with your supervisor over text.
 
 RESEARCH GOAL: {goal}
-SOURCES READ: {sources_count}
-FACTS EXTRACTED: {facts_count}
-TOPICS COVERED: {topics_str}
-SAMPLE RECENT FACTS: {recent_str}
-GAPS STILL OPEN: {gaps_str}
-OPTIONS TO PRESENT:
-{options_str}
+SUPERVISOR'S DIRECTION SO FAR: {steers_block}
 
-Write a SHORT message (2-4 sentences max) that:
-1. Briefly says what you've found so far in plain English — mention 1-2 specific things you learned, or a source read.
-2. Naturally asks where the user wants to go next, listing the numbered options inline or as a short list.
+YOUR FINDINGS (ranked by importance):
+{facts_block}
+
+WHAT YOU STILL DON'T KNOW:
+{gaps_block}
+
+RESEARCH PROGRESS: {stage} stage, {total_facts} facts from {total_sources} sources, covering: {topics}
+ANALYSIS NOTES: {reflect_analysis[:300] if reflect_analysis else "Just getting started."}
+
+YOUR SITUATION: {instruction}
+
+Write 1-3 short chat messages. Return as JSON:
+{{
+  "messages": ["first message", "second message if needed"]
+}}
 
 RULES:
-- Sound like a knowledgeable researcher talking to a colleague — warm, concise, no jargon.
-- Do NOT mention "Knowledge Graph", "facts", "sources", "gaps", "topics", or any internal system terms.
-- Do NOT use headers, bullet points for findings, or technical formatting.
-- The options CAN be a short numbered list at the end, but keep their text tight.
-- Return ONLY the final message text. No JSON, no markdown wrapper."""
+- You are a PERSON texting, not a system generating output.
+- EXPLAIN why a finding matters for the report — don't just state raw facts.
+- Vary your style. These are all valid:
+    "So I've been reading about X and I think the key thing for our report is Y, because Z."
+    "Interesting problem — source A says X but source B says the opposite. What's your read?"
+    "I think I have enough on the technical side. Want me to start drafting, or should I dig into the impact stuff first?"
+    "Quick update: covered A, B, C so far. The main gap is D — is that important for what you need?"
+- Do NOT always ask "Should I do X or Y?" — vary between open questions, proposals, confirmations, opinions.
+- Each message MAX 2 sentences. Total MAX 4 sentences across all messages.
+- No numbered lists. No "Option 1/2". No "Would you like to".
+- Return ONLY the JSON. No markdown."""
 
 
 def parse_steer_prompt(user_message: str, options_presented: list,
                        ledger_summary: str) -> str:
-    """Interpret user's checkpoint response. Used with fast model (Flash)."""
+    """Interpret user's natural-language steering response. Used with fast model (Flash)."""
     options_str = "\n".join(
         f"  {o.get('id', i+1)}. {o.get('text', '')}"
         for i, o in enumerate(options_presented)
     ) if options_presented else "  No specific options were presented."
 
-    return f"""You are interpreting a user's response to a research checkpoint.
+    return f"""You are interpreting a user's response to a research check-in.
+The user was asked a natural question (not a numbered menu), so their response
+will be conversational, not a number pick.
 
-OPTIONS THAT WERE PRESENTED:
+RESEARCH CONTEXT:
+{ledger_summary}
+
+DIRECTIONS THE AGENT WAS CONSIDERING:
 {options_str}
 
 USER'S RESPONSE: "{user_message}"
 
-SESSION CONTEXT:
-{ledger_summary}
-
 Determine what the user wants and respond with a JSON object:
 {{
-  "selected_option": 2,
-  "next_phase": "GATHER" or "ACT" or "DONE",
+  "selected_option": null,
+  "next_phase": "GATHER",
   "refined_focus": "What the user wants to focus on next",
   "is_new_session": false
 }}
 
 RULES:
-- If the user picks a number (e.g., "2", "go for 2", "option 2"), set selected_option to that number.
-- If the user says something completely unrelated to the current session, set is_new_session=true.
-- next_phase="GATHER" if more research is needed (e.g., user wants more data, picks a new topic to explore).
-- next_phase="ACT" if the user wants to write/produce output on a chosen topic.
-- next_phase="DONE" if the user says "done", "finish", "that's enough", etc.
-- refined_focus should capture the user's intent in one clear sentence.
+- refined_focus is the MOST IMPORTANT field. Capture the user's intent as a
+  clear, specific research direction. If the user said "yeah dig into the
+  compliance stuff", refined_focus should be something like "Deep dive into
+  EU AI Act compliance requirements and penalties for non-compliance".
+- If the user says "continue", "keep going", "your call", or similar,
+  set refined_focus to the most promising direction from the agent's options
+  and next_phase="GATHER".
+- next_phase="GATHER" for more research. next_phase="ACT" to produce output.
+  next_phase="DONE" only if user explicitly says to stop.
+- selected_option: set to a number if the user clearly references one of the
+  directions. Otherwise null.
+- is_new_session=true ONLY if the user asks about something completely unrelated.
 - Return ONLY the JSON. No markdown."""

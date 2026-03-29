@@ -3,7 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 FAST_MODEL = os.getenv("FAST_MODEL", "gemini-2.0-flash")
 REASONING_MODEL = os.getenv("REASONING_MODEL", "gemini-3-flash-preview")
-PLANNER_MODEL = os.getenv("PLANNER_MODEL", "gemini-3.1-pro-preview")
+PLANNER_MODEL = os.getenv("PLANNER_MODEL", "gemini-3-flash-preview")
 
 
 def get_llm(mode: str = "fast", api_key: str = "", streaming: bool = True, cached_content: str = None):
@@ -12,7 +12,7 @@ def get_llm(mode: str = "fast", api_key: str = "", streaming: bool = True, cache
     mode:
       "fast"    — gemini-2.0-flash, for execution and compression
       "think"   — REASONING_MODEL, legacy
-      "planner" — gemini-3.1-pro-preview, for ReAct planning node
+      "planner" — gemini-3-flash-preview, for planning and analysis
 
     cached_content: optional Gemini cache name to reference (currently unused)
     """
@@ -21,7 +21,6 @@ def get_llm(mode: str = "fast", api_key: str = "", streaming: bool = True, cache
     if mode == "planner":
         model = PLANNER_MODEL
         temperature = 0.2
-        streaming = False  # planner always non-streaming (structured JSON output)
     elif mode == "think":
         model = REASONING_MODEL
         temperature = 0.2

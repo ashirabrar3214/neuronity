@@ -1,0 +1,859 @@
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=False
+    [HITL] New session: hitl_1774739724
+>>> [HITL:UNDERSTAND] goal='rise of LLM'
+    [HITL:LLM] mode=planner streamed response_len=395 thinking_len=0
++++ [HITL:UNDERSTAND] task_type=multi_phase needs_clarification=True
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=True
+    [HITL] Resuming from CHECKPOINT
+>>> [HITL:RESUME] parsing steer: 'focus on where LLM started in history and how we have LLM no'
+    [HITL:LLM] mode=fast response_len=231
++++ [HITL:STEER] parsed: option=None next=GATHER
+    [HITL:RESUME] next_phase=GATHER
+>>> [HITL:GATHER] dial=7
+[STATUS:hitl_test_agent] Gathering resources...
+    [HITL:LLM] mode=fast response_len=343
++++ [HITL:GATHER] planned 1 tool calls
+[STATUS:hitl_test_agent] DuckDuckGo: Searching 'history of large language models timelin...'
++++ [INTERNAL:search] Got 20 clean results
+    [HITL:GATHER] web_search -> 6633 chars
+[STATUS:hitl_test_agent] Scraped: history of large language models timeline
+>>> [HITL:STORE] processing 1 raw results
+[STATUS:hitl_test_agent] Building knowledge map from 1 results...
+    [HITL:LLM] mode=fast response_len=2908
++++ [HITL:STORE] Extracted 5 facts
+[STATUS:hitl_test_agent] Knowledge map updated: 5 facts, 14 topics
+>>> [HITL:REFLECT]
+[STATUS:hitl_test_agent] Reading knowledge map...
+[STATUS:hitl_test_agent] Analyzing findings...
+    [HITL:LLM] mode=planner streamed response_len=1784 thinking_len=0
++++ [HITL:REFLECT] gaps=3 options=3 ready=False
+[STATUS:hitl_test_agent] Found 3 knowledge gaps, 3 options
+    [HITL:CONFIDENCE] fact_avg=90 gaps=-24 ready=-15 options=-15 early=-10 => composite=26
+    [HITL:INTERVENTION] cycle=1 conf=26 type=direction score=0.44 thr=0.33 intervene=True reason=score 0.44 > threshold 0.32; low confidence (26); high-value step type (direction)
+    [HITL] Mandatory first check-in after cycle 1
+>>> [HITL:CHECKPOINT]
+    [HITL:CHECKPOINT] mode=early_checkin step_type=direction gather_count=1 ready=False
+    [HITL:LLM] mode=fast response_len=377
++++ [HITL:CHECKPOINT] flash response: 377 chars
+--- [HITL:CHECKPOINT] Halting. mode=early_checkin gaps=3
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=True
+    [HITL] Resuming from CHECKPOINT
+>>> [HITL:RESUME] parsing steer: 'i want you to focus on transforcers changed the game, how AI'
+    [HITL:LLM] mode=fast response_len=302
++++ [HITL:STEER] parsed: option=1 next=GATHER
+    [HITL:RESUME] next_phase=GATHER
+>>> [HITL:GATHER] dial=7
+[STATUS:hitl_test_agent] Gathering resources...
+    [HITL:LLM] mode=fast response_len=1778
++++ [HITL:GATHER] planned 12 tool calls
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/html/2509.18446v1...
+[STATUS:hitl_test_agent] Deep Extraction: https://hatchworks.com/blog/gen-ai/large-language-models-gui...
+[STATUS:hitl_test_agent] Deep Extraction: https://voicebot.ai/large-language-models-history-timeline/...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.wikiwand.com/en/articles/History_of_natural_lang...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Large_language_model...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.wikiwand.com/en/articles/Large_language_model...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Language_model...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/History_of_natural_language_pr...
+[STATUS:hitl_test_agent] Deep Extraction: https://lifearchitect.ai/timeline/...
+[STATUS:hitl_test_agent] Deep Extraction: https://linguistics.stackexchange.com/questions/47611/state-...
+[STATUS:hitl_test_agent] Deep Extraction: https://timelines.issarice.com/wiki/Timeline_of_large_langua...
+[STATUS:hitl_test_agent] DuckDuckGo: Searching 'NLP achievements and limitations circa 2...'
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2086 chars
+[STATUS:hitl_test_agent] Scraped: https://lifearchitect.ai/timeline/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2096 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Language_model
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2102 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Large_language_model
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (Jina returned empty/invalid response), failing over to Crawl4AI
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 917 chars
+[STATUS:hitl_test_agent] Scraped: https://www.wikiwand.com/en/articles/Large_languag
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2120 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/History_of_natural_l
+[FETCH]... ↓ https://timelines.issarice.com/wiki/Timeline_of_large_language_models                                | ✓ | ⏱: 0.65s 
+[SCRAPE].. ◆ https://timelines.issarice.com/wiki/Timeline_of_large_language_models                                | ✓ | ⏱: 0.00s 
+[COMPLETE] ● https://timelines.issarice.com/wiki/Timeline_of_large_language_models                                | ✗ | ⏱: 0.66s 
+    [HITL:GATHER] scrape_website -> 102 chars
+[STATUS:hitl_test_agent] Scraped: https://timelines.issarice.com/wiki/Timeline_of_la
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2111 chars
+[STATUS:hitl_test_agent] Scraped: https://voicebot.ai/large-language-models-history-
++++ [INTERNAL:search] Got 17 clean results
+    [HITL:GATHER] web_search -> 6173 chars
+[STATUS:hitl_test_agent] Scraped: NLP achievements and limitations circa 2010
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 703 chars
+[STATUS:hitl_test_agent] Scraped: https://linguistics.stackexchange.com/questions/47
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 953 chars
+[STATUS:hitl_test_agent] Scraped: https://www.wikiwand.com/en/articles/History_of_na
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2115 chars
+[STATUS:hitl_test_agent] Scraped: https://hatchworks.com/blog/gen-ai/large-language-
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2087 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/html/2509.18446v1
+>>> [HITL:STORE] processing 12 raw results
+[STATUS:hitl_test_agent] Building knowledge map from 12 results...
+    [HITL:LLM] mode=fast response_len=1704
++++ [HITL:STORE] Extracted 3 facts
+[STATUS:hitl_test_agent] Knowledge map updated: 3 facts, 8 topics
+>>> [HITL:REFLECT]
+[STATUS:hitl_test_agent] Reading knowledge map...
+[STATUS:hitl_test_agent] Analyzing findings...
+    [HITL:LLM] mode=planner streamed response_len=2095 thinking_len=0
++++ [HITL:REFLECT] gaps=3 options=3 ready=False
+[STATUS:hitl_test_agent] Found 3 knowledge gaps, 3 options
+    [HITL:CONFIDENCE] fact_avg=89 gaps=-24 ready=-15 options=-15 early=-0 => composite=35
+    [HITL:INTERVENTION] cycle=2 conf=35 type=direction score=0.39 thr=0.33 intervene=True reason=score 0.39 > threshold 0.32; low confidence (35); high-value step type (direction)
+    [HITL] Smart CHECKPOINT: score 0.39 > threshold 0.32; low confidence (35); high-value step type (direction)
+>>> [HITL:CHECKPOINT]
+    [HITL:CHECKPOINT] mode=progress_update step_type=direction gather_count=2 ready=False
+    [HITL:LLM] mode=fast response_len=392
++++ [HITL:CHECKPOINT] flash response: 392 chars
+--- [HITL:CHECKPOINT] Halting. mode=progress_update gaps=3
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=True
+    [HITL] Resuming from CHECKPOINT
+>>> [HITL:RESUME] parsing steer: 'focus on the technicality of LLM and transformers'
+    [HITL:LLM] mode=fast response_len=257
++++ [HITL:STEER] parsed: option=None next=GATHER
+    [HITL:RESUME] next_phase=GATHER
+>>> [HITL:GATHER] dial=7
+[STATUS:hitl_test_agent] Gathering resources...
+    [HITL:LLM] mode=fast response_len=2220
++++ [HITL:GATHER] planned 14 tool calls
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Large_language_model#bodyConte...
+[STATUS:hitl_test_agent] Deep Extraction: https://lifearchitect.ai/humanoids/...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/History_of_speech_recognition...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.scribd.com/document/510283990/Statistical-NLP...
+[STATUS:hitl_test_agent] Deep Extraction: https://elifesciences.org/reviewed-preprints/98262...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.slideserve.com/afi/computational-models-of-disco...
+[STATUS:hitl_test_agent] Deep Extraction: https://lifearchitect.ai/agi-achieved-internally/...
+[STATUS:hitl_test_agent] Deep Extraction: https://voicebot.ai/voice-assistant-history-timeline/...
+[STATUS:hitl_test_agent] Deep Extraction: https://research.voicebot.ai/report-list/...
+[STATUS:hitl_test_agent] Deep Extraction: https://research.voicebot.ai/report-list/smart-speaker-consu...
+[STATUS:hitl_test_agent] Deep Extraction: https://lifearchitect.ai/genesis/...
+[STATUS:hitl_test_agent] Deep Extraction: https://lifearchitect.ai/ai-abc/...
+[STATUS:hitl_test_agent] Deep Extraction: https://voicebot.ai/2022/03/02/the-rise-and-stall-of-the-u-s...
+[STATUS:hitl_test_agent] DuckDuckGo: Searching 'technical comparison statistical machine...'
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (Jina returned empty/invalid response), failing over to Crawl4AI
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2087 chars
+[STATUS:hitl_test_agent] Scraped: https://lifearchitect.ai/humanoids/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2145 chars
+[STATUS:hitl_test_agent] Scraped: https://voicebot.ai/2022/03/02/the-rise-and-stall-
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2114 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Large_language_model
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2163 chars
+[STATUS:hitl_test_agent] Scraped: https://www.slideserve.com/afi/computational-model
+[FETCH]... ↓ https://www.scribd.com/document/510283990/Statistical-NLP                                            | ✓ | ⏱: 1.98s 
+[SCRAPE].. ◆ https://www.scribd.com/document/510283990/Statistical-NLP                                            | ✓ | ⏱: 0.05s 
+[COMPLETE] ● https://www.scribd.com/document/510283990/Statistical-NLP                                            | ✓ | ⏱: 2.07s 
++++ [SCRAPE:hitl_test_agent] Crawl4AI succeeded
+    [HITL:GATHER] scrape_website -> 2109 chars
+[STATUS:hitl_test_agent] Scraped: https://www.scribd.com/document/510283990/Statisti
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2111 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/History_of_speech_re
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2085 chars
+[STATUS:hitl_test_agent] Scraped: https://lifearchitect.ai/genesis/
++++ [INTERNAL:search] Got 18 clean results
+    [HITL:GATHER] web_search -> 5714 chars
+[STATUS:hitl_test_agent] Scraped: technical comparison statistical machine translati
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2105 chars
+[STATUS:hitl_test_agent] Scraped: https://voicebot.ai/voice-assistant-history-timeli
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2084 chars
+[STATUS:hitl_test_agent] Scraped: https://lifearchitect.ai/ai-abc/
+    [HITL:GATHER] scrape_website -> 2093 chars
+[STATUS:hitl_test_agent] Scraped: https://research.voicebot.ai/report-list/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2101 chars
+[STATUS:hitl_test_agent] Scraped: https://lifearchitect.ai/agi-achieved-internally/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2137 chars
+[STATUS:hitl_test_agent] Scraped: https://research.voicebot.ai/report-list/smart-spe
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (), failing over to Crawl4AI
+[FETCH]... ↓ https://elifesciences.org/reviewed-preprints/98262                                                   | ✓ | ⏱: 1.29s 
+[SCRAPE].. ◆ https://elifesciences.org/reviewed-preprints/98262                                                   | ✓ | ⏱: 0.14s 
+[COMPLETE] ● https://elifesciences.org/reviewed-preprints/98262                                                   | ✓ | ⏱: 1.46s 
++++ [SCRAPE:hitl_test_agent] Crawl4AI succeeded
+    [HITL:GATHER] scrape_website -> 2102 chars
+[STATUS:hitl_test_agent] Scraped: https://elifesciences.org/reviewed-preprints/98262
+>>> [HITL:STORE] processing 14 raw results
+[STATUS:hitl_test_agent] Building knowledge map from 14 results...
+    [HITL:LLM] mode=fast response_len=3659
++++ [HITL:STORE] Extracted 6 facts
+[STATUS:hitl_test_agent] Knowledge map updated: 6 facts, 20 topics
+>>> [HITL:REFLECT]
+[STATUS:hitl_test_agent] Reading knowledge map...
+[STATUS:hitl_test_agent] Analyzing findings...
+    [HITL:LLM] mode=planner streamed response_len=1949 thinking_len=0
++++ [HITL:REFLECT] gaps=3 options=3 ready=False
+[STATUS:hitl_test_agent] Found 3 knowledge gaps, 3 options
+    [HITL:CONFIDENCE] fact_avg=90 gaps=-24 ready=-15 options=-15 early=-0 => composite=36
+    [HITL:INTERVENTION] cycle=3 conf=36 type=direction score=0.38 thr=0.33 intervene=True reason=score 0.38 > threshold 0.32; low confidence (36); high-value step type (direction)
+    [HITL] Smart CHECKPOINT: score 0.38 > threshold 0.32; low confidence (36); high-value step type (direction)
+>>> [HITL:CHECKPOINT]
+    [HITL:CHECKPOINT] mode=progress_update step_type=direction gather_count=3 ready=False
+    [HITL:LLM] mode=fast response_len=434
++++ [HITL:CHECKPOINT] flash response: 434 chars
+--- [HITL:CHECKPOINT] Halting. mode=progress_update gaps=3
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=True
+    [HITL] Resuming from CHECKPOINT
+>>> [HITL:RESUME] parsing steer: 'yea focus on the math..of transformers'
+    [HITL:LLM] mode=fast response_len=244
++++ [HITL:STEER] parsed: option=1 next=GATHER
+    [HITL:RESUME] next_phase=GATHER
+>>> [HITL:GATHER] dial=7
+[STATUS:hitl_test_agent] Gathering resources...
+    [HITL:LLM] mode=fast response_len=2908
++++ [HITL:GATHER] planned 20 tool calls
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Google_Translate...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Machine_learning...
+[STATUS:hitl_test_agent] Deep Extraction: https://www2.statmt.org/...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/w/index.php?title=Natural_language_...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Voice_recognition...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Google_Neural_Machine_Translat...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/History_of_speech_recognition#...
+[STATUS:hitl_test_agent] Deep Extraction: https://pubs.aip.org/aip/acp/article/2732/1/040006/2895745/C...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Moore...
+[STATUS:hitl_test_agent] Deep Extraction: https://lifearchitect.ai/genesis/#content...
+[STATUS:hitl_test_agent] Deep Extraction: https://voicebot.ai/2022/03/02/the-rise-and-stall-of-the-u.s...
+[STATUS:hitl_test_agent] DuckDuckGo: Searching 'mathematical formulation of transformer ...'
+[STATUS:hitl_test_agent] Deep Extraction: https://bit.ly/synthedia...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Pronunciation_assessment...
+[STATUS:hitl_test_agent] Deep Extraction: https://research.voicebot.ai/wp-content/uploads/2022/06/Smar...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.scribd.com/user/541490844/Cynea-Arquisola...
+[STATUS:hitl_test_agent] Deep Extraction: https://voicebot.ai/2022/03/02/the-rise-and-stall-of-the-u.s...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Google_Translate...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Machine_learning...
+[STATUS:hitl_test_agent] Deep Extraction: https://www2.statmt.org/...
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (Jina returned empty/invalid response), failing over to Crawl4AI
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2076 chars
+[STATUS:hitl_test_agent] Scraped: https://www2.statmt.org/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2076 chars
+[STATUS:hitl_test_agent] Scraped: https://www2.statmt.org/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2093 chars
+[STATUS:hitl_test_agent] Scraped: https://lifearchitect.ai/genesis/#content
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2145 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/History_of_speech_re
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2115 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Google_Neural_Machin
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2098 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Google_Translate
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2098 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Google_Translate
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2098 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Machine_learning
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2098 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Machine_learning
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2099 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Voice_recognition
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2144 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/w/index.php?title=Natural
++++ [INTERNAL:search] Got 19 clean results
+    [HITL:GATHER] web_search -> 6338 chars
+[STATUS:hitl_test_agent] Scraped: mathematical formulation of transformer self-atten
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2106 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Pronunciation_assess
+[FETCH]... ↓ https://www.scribd.com/user/541490844/Cynea-Arquisola                                                | ✓ | ⏱: 2.11s 
+[SCRAPE].. ◆ https://www.scribd.com/user/541490844/Cynea-Arquisola                                                | ✓ | ⏱: 0.07s 
+[COMPLETE] ● https://www.scribd.com/user/541490844/Cynea-Arquisola                                                | ✓ | ⏱: 2.20s 
++++ [SCRAPE:hitl_test_agent] Crawl4AI succeeded
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 1253 chars
+[STATUS:hitl_test_agent] Scraped: https://research.voicebot.ai/wp-content/uploads/20
+    [HITL:GATHER] scrape_website -> 2105 chars
+[STATUS:hitl_test_agent] Scraped: https://www.scribd.com/user/541490844/Cynea-Arquis
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 670 chars
+[STATUS:hitl_test_agent] Scraped: https://pubs.aip.org/aip/acp/article/2732/1/040006
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2087 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Moore
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2145 chars
+[STATUS:hitl_test_agent] Scraped: https://voicebot.ai/2022/03/02/the-rise-and-stall-
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2076 chars
+[STATUS:hitl_test_agent] Scraped: https://bit.ly/synthedia
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (), failing over to Crawl4AI
+[FETCH]... ↓ https://voicebot.ai/2022/03/02/the-rise-and-stall-of-the-u.s-smart-speaker-market-new-report/        | ✓ | ⏱: 1.16s 
+[SCRAPE].. ◆ https://voicebot.ai/2022/03/02/the-rise-and-stall-of-the-u.s-smart-speaker-market-new-report/        | ✓ | ⏱: 0.02s 
+[COMPLETE] ● https://voicebot.ai/2022/03/02/the-rise-and-stall-of-the-u.s-smart-speaker-market-new-report/        | ✓ | ⏱: 1.20s 
++++ [SCRAPE:hitl_test_agent] Crawl4AI succeeded
+    [HITL:GATHER] scrape_website -> 2145 chars
+[STATUS:hitl_test_agent] Scraped: https://voicebot.ai/2022/03/02/the-rise-and-stall-
+>>> [HITL:STORE] processing 20 raw results
+[STATUS:hitl_test_agent] Building knowledge map from 20 results...
+    [HITL:LLM] mode=fast response_len=3294
++++ [HITL:STORE] Extracted 5 facts
+[STATUS:hitl_test_agent] Knowledge map updated: 5 facts, 15 topics
+>>> [HITL:REFLECT]
+[STATUS:hitl_test_agent] Reading knowledge map...
+[STATUS:hitl_test_agent] Analyzing findings...
+    [HITL:LLM] mode=planner streamed response_len=2059 thinking_len=0
++++ [HITL:REFLECT] gaps=4 options=3 ready=False
+[STATUS:hitl_test_agent] Found 4 knowledge gaps, 3 options
+    [HITL:CONFIDENCE] fact_avg=96 gaps=-30 ready=-15 options=-15 early=-0 => composite=36
+    [HITL:INTERVENTION] cycle=4 conf=36 type=direction score=0.38 thr=0.33 intervene=True reason=score 0.38 > threshold 0.32; low confidence (36); high-value step type (direction)
+    [HITL] Smart CHECKPOINT: score 0.38 > threshold 0.32; low confidence (36); high-value step type (direction)
+>>> [HITL:CHECKPOINT]
+    [HITL:CHECKPOINT] mode=progress_update step_type=direction gather_count=4 ready=False
+    [HITL:LLM] mode=fast response_len=495
++++ [HITL:CHECKPOINT] flash response: 495 chars
+--- [HITL:CHECKPOINT] Halting. mode=progress_update gaps=4
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=True
+    [HITL] Resuming from CHECKPOINT
+>>> [HITL:RESUME] parsing steer: 'no only math'
+    [HITL:LLM] mode=fast response_len=211
++++ [HITL:STEER] parsed: option=None next=GATHER
+    [HITL:RESUME] next_phase=GATHER
+>>> [HITL:GATHER] dial=7
+[STATUS:hitl_test_agent] Gathering resources...
+    [HITL:LLM] mode=fast response_len=2318
++++ [HITL:GATHER] planned 16 tool calls
+[STATUS:hitl_test_agent] DuckDuckGo: Searching 'mathematical foundations of transformer ...'
+[STATUS:hitl_test_agent] Deep Extraction: https://www2.statmt.org/mtma19/...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.statmt.org/wmt16/...
+[STATUS:hitl_test_agent] Deep Extraction: https://www2.statmt.org/mtm4/...
+[STATUS:hitl_test_agent] Deep Extraction: https://ufal.mff.cuni.cz/mtm15/...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.statmt.org/wmt21/...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.statmt.org/wmt08/...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.statmt.org/wmt06/...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/w/index.php?title=Natural_language_...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Moore#United_States...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Moore#Greenland...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Moore_(surname...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/List_of_people_with_surname_Mo...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Moore_......
+[STATUS:hitl_test_agent] Deep Extraction: https://www.scribd.com/docs...
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/abs/2501.02931...
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (Jina returned empty/invalid response), failing over to Crawl4AI
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2101 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Moore#United_States
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2097 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Moore#Greenland
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2156 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/w/index.php?title=Natural
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2081 chars
+[STATUS:hitl_test_agent] Scraped: https://www.statmt.org/wmt16/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2081 chars
+[STATUS:hitl_test_agent] Scraped: https://www.statmt.org/wmt21/
++++ [INTERNAL:search] Got 18 clean results
+    [HITL:GATHER] web_search -> 6020 chars
+[STATUS:hitl_test_agent] Scraped: mathematical foundations of transformer architectu
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 1165 chars
+[STATUS:hitl_test_agent] Scraped: https://www2.statmt.org/mtma19/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2084 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/abs/2501.02931
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2081 chars
+[STATUS:hitl_test_agent] Scraped: https://www2.statmt.org/mtm4/
+[FETCH]... ↓ https://www.scribd.com/docs                                                                          | ✓ | ⏱: 1.23s 
+[SCRAPE].. ◆ https://www.scribd.com/docs                                                                          | ✓ | ⏱: 0.05s 
+[COMPLETE] ● https://www.scribd.com/docs                                                                          | ✓ | ⏱: 1.34s 
++++ [SCRAPE:hitl_test_agent] Crawl4AI succeeded
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2115 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/List_of_people_with_
+    [HITL:GATHER] scrape_website -> 2079 chars
+[STATUS:hitl_test_agent] Scraped: https://www.scribd.com/docs
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2083 chars
+[STATUS:hitl_test_agent] Scraped: https://ufal.mff.cuni.cz/mtm15/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2081 chars
+[STATUS:hitl_test_agent] Scraped: https://www.statmt.org/wmt06/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2091 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Moore_...
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2096 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Moore_(surname
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2081 chars
+[STATUS:hitl_test_agent] Scraped: https://www.statmt.org/wmt08/
+>>> [HITL:STORE] processing 16 raw results
+[STATUS:hitl_test_agent] Building knowledge map from 16 results...
+    [HITL:LLM] mode=fast response_len=2116
++++ [HITL:STORE] Extracted 4 facts
+[STATUS:hitl_test_agent] Knowledge map updated: 4 facts, 10 topics
+>>> [HITL:REFLECT]
+[STATUS:hitl_test_agent] Reading knowledge map...
+[STATUS:hitl_test_agent] Analyzing findings...
+    [HITL:LLM] mode=planner streamed response_len=1735 thinking_len=0
++++ [HITL:REFLECT] gaps=3 options=3 ready=False
+[STATUS:hitl_test_agent] Found 3 knowledge gaps, 3 options
+    [HITL:CONFIDENCE] fact_avg=90 gaps=-24 ready=-15 options=-15 early=-0 => composite=36
+    [HITL:INTERVENTION] cycle=5 conf=36 type=direction score=0.38 thr=0.33 intervene=True reason=score 0.38 > threshold 0.32; low confidence (36); high-value step type (direction)
+    [HITL] Smart CHECKPOINT: score 0.38 > threshold 0.32; low confidence (36); high-value step type (direction)
+>>> [HITL:CHECKPOINT]
+    [HITL:CHECKPOINT] mode=progress_update step_type=direction gather_count=5 ready=False
+    [HITL:LLM] mode=fast response_len=394
++++ [HITL:CHECKPOINT] flash response: 394 chars
+--- [HITL:CHECKPOINT] Halting. mode=progress_update gaps=3
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=True
+    [HITL] Resuming from CHECKPOINT
+>>> [HITL:RESUME] parsing steer: 'no, keep math'
+    [HITL:LLM] mode=fast response_len=282
++++ [HITL:STEER] parsed: option=None next=GATHER
+    [HITL:RESUME] next_phase=GATHER
+>>> [HITL:GATHER] dial=7
+[STATUS:hitl_test_agent] Gathering resources...
+    [HITL:LLM] mode=fast response_len=2758
++++ [HITL:GATHER] planned 20 tool calls
+[STATUS:hitl_test_agent] Deep Extraction: https://deepwiki.com/karpathy/LLM101n/3.2-attention-mechanis...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.scribd.com/docs/Teaching-Methods-Materials/Early...
+[STATUS:hitl_test_agent] Deep Extraction: http://www.statmt.org/wmt14/...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Al_Moore_(disambiguation...
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/list/cs/recent...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Special:WhatLinksHere/Moore_(s...
+[STATUS:hitl_test_agent] Deep Extraction: http://www.cuni.cz/...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/A._L._Moore...
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/pdf/2601.03329...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/A._J._Moore...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Special:SiteMatrix...
+[STATUS:hitl_test_agent] Deep Extraction: https://tech.cornell.edu/arxiv/...
+[STATUS:hitl_test_agent] Deep Extraction: https://info.arxiv.org/about...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/w/index.php?title=Moore_(surname&ac...
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/static/browse/0.3.4/images/arxiv-logomark-...
+[STATUS:hitl_test_agent] DuckDuckGo: Searching 'mathematical formulation of scaled dot-p...'
+[STATUS:hitl_test_agent] Deep Extraction: https://deepwiki.com/karpathy/LLM101n/3.2-attention-mechanis...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.scribd.com/docs/Teaching-Methods-Materials/Early...
+[STATUS:hitl_test_agent] Deep Extraction: http://www.statmt.org/wmt14/...
+[STATUS:hitl_test_agent] Deep Extraction: https://en.wikipedia.org/wiki/Al_Moore_(disambiguation...
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (Jina returned empty/invalid response), failing over to Crawl4AI
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (Jina returned empty/invalid response), failing over to Crawl4AI
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2084 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/list/cs/recent
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (Jina returned empty/invalid response), failing over to Crawl4AI
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2080 chars
+[STATUS:hitl_test_agent] Scraped: https://info.arxiv.org/about
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2121 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/w/index.php?title=Moore_(
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2084 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/pdf/2601.03329
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2100 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Special:SiteMatrix
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2080 chars
+[STATUS:hitl_test_agent] Scraped: http://www.statmt.org/wmt14/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2093 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/A._J._Moore
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2106 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Al_Moore_(disambigua
+[FETCH]... ↓ https://www.scribd.com/docs/Teaching-Methods-Materials/Early-Childhood-Education                     | ✓ | ⏱: 2.16s 
+[SCRAPE].. ◆ https://www.scribd.com/docs/Teaching-Methods-Materials/Early-Childhood-Education                     | ✓ | ⏱: 0.12s 
+[COMPLETE] ● https://www.scribd.com/docs/Teaching-Methods-Materials/Early-Childhood-Education                     | ✓ | ⏱: 2.33s 
++++ [SCRAPE:hitl_test_agent] Crawl4AI succeeded
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2106 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Al_Moore_(disambigua
+    [HITL:GATHER] scrape_website -> 2080 chars
+[STATUS:hitl_test_agent] Scraped: http://www.statmt.org/wmt14/
+[FETCH]... ↓ https://www.scribd.com/docs/Teaching-Methods-Materials/Early-Childhood-Education                     | ✓ | ⏱: 2.33s 
+[SCRAPE].. ◆ https://www.scribd.com/docs/Teaching-Methods-Materials/Early-Childhood-Education                     | ✓ | ⏱: 0.06s 
+[COMPLETE] ● https://www.scribd.com/docs/Teaching-Methods-Materials/Early-Childhood-Education                     | ✓ | ⏱: 2.44s 
++++ [SCRAPE:hitl_test_agent] Crawl4AI succeeded
++++ [INTERNAL:search] Got 20 clean results
+    [HITL:GATHER] scrape_website -> 2132 chars
+[STATUS:hitl_test_agent] Scraped: https://www.scribd.com/docs/Teaching-Methods-Mater
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] web_search -> 6708 chars
+[STATUS:hitl_test_agent] Scraped: mathematical formulation of scaled dot-product att
+    [HITL:GATHER] scrape_website -> 2131 chars
+[STATUS:hitl_test_agent] Scraped: https://deepwiki.com/karpathy/LLM101n/3.2-attentio
+    [HITL:GATHER] scrape_website -> 2132 chars
+[STATUS:hitl_test_agent] Scraped: https://www.scribd.com/docs/Teaching-Methods-Mater
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2131 chars
+[STATUS:hitl_test_agent] Scraped: https://deepwiki.com/karpathy/LLM101n/3.2-attentio
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2093 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/A._L._Moore
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2118 chars
+[STATUS:hitl_test_agent] Scraped: https://en.wikipedia.org/wiki/Special:WhatLinksHer
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2083 chars
+[STATUS:hitl_test_agent] Scraped: https://tech.cornell.edu/arxiv/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2071 chars
+[STATUS:hitl_test_agent] Scraped: http://www.cuni.cz/
+[FETCH]... ↓ https://arxiv.org/static/browse/0.3.4/images/arxiv-logomark-small-white.svg                          | ✓ | ⏱: 30.46s 
+[SCRAPE].. ◆ https://arxiv.org/static/browse/0.3.4/images/arxiv-logomark-small-white.svg                          | ✓ | ⏱: 0.00s 
+[COMPLETE] ● https://arxiv.org/static/browse/0.3.4/images/arxiv-logomark-small-white.svg                          | ✓ | ⏱: 30.46s 
++++ [SCRAPE:hitl_test_agent] Crawl4AI succeeded
+    [HITL:GATHER] scrape_website -> 128 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/static/browse/0.3.4/images/arxiv
+>>> [HITL:STORE] processing 20 raw results
+[STATUS:hitl_test_agent] Building knowledge map from 20 results...
+    [HITL:LLM] mode=fast response_len=5545
++++ [HITL:STORE] Extracted 9 facts
+[STATUS:hitl_test_agent] Knowledge map updated: 9 facts, 29 topics
+>>> [HITL:REFLECT]
+[STATUS:hitl_test_agent] Reading knowledge map...
+[STATUS:hitl_test_agent] Analyzing findings...
+    [HITL:LLM] mode=planner streamed response_len=1890 thinking_len=0
++++ [HITL:REFLECT] gaps=3 options=3 ready=False
+[STATUS:hitl_test_agent] Found 3 knowledge gaps, 3 options
+    [HITL:CONFIDENCE] fact_avg=90 gaps=-24 ready=-15 options=-15 early=-0 => composite=36
+    [HITL:INTERVENTION] cycle=6 conf=36 type=direction score=0.38 thr=0.33 intervene=True reason=score 0.38 > threshold 0.32; low confidence (36); high-value step type (direction)
+    [HITL] Smart CHECKPOINT: score 0.38 > threshold 0.32; low confidence (36); high-value step type (direction)
+>>> [HITL:CHECKPOINT]
+    [HITL:CHECKPOINT] mode=progress_update step_type=direction gather_count=6 ready=False
+    [HITL:LLM] mode=fast response_len=497
++++ [HITL:CHECKPOINT] flash response: 497 chars
+--- [HITL:CHECKPOINT] Halting. mode=progress_update gaps=3
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=True
+    [HITL] Resuming from CHECKPOINT
+>>> [HITL:RESUME] parsing steer: 'scaling laws'
+    [HITL:LLM] mode=fast response_len=243
++++ [HITL:STEER] parsed: option=3 next=GATHER
+    [HITL:RESUME] next_phase=GATHER
+>>> [HITL:GATHER] dial=7
+[STATUS:hitl_test_agent] Gathering resources...
+    [HITL:LLM] mode=fast response_len=1788
++++ [HITL:GATHER] planned 14 tool calls
+[STATUS:hitl_test_agent] Deep Extraction: https://pyimagesearch.com/2025/10/13/kv-cache-optimization-v...
+[STATUS:hitl_test_agent] Deep Extraction: https://easyexamnotes.com/multi-head-attention-in-transforme...
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/html/2602.02521v1...
+[STATUS:hitl_test_agent] DuckDuckGo: Searching 'Kaplan 2020 scaling laws LLM constants a...'
+[STATUS:hitl_test_agent] Deep Extraction: https://www.statmt.org/wmt14/medical-task/...
+[STATUS:hitl_test_agent] Deep Extraction: https://www.statmt.org/wmt14/results.html...
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/list/cs/recent?skip=50&show=50...
+[STATUS:hitl_test_agent] Deep Extraction: https://github.com/arXiv/arxiv-docs...
+[STATUS:hitl_test_agent] Deep Extraction: https://info.arxiv.org/governance.html...
+[STATUS:hitl_test_agent] Deep Extraction: http://www.cuni.cz/UK-128.html...
+[STATUS:hitl_test_agent] Deep Extraction: http://www.cuni.cz/UK-10706.html...
+[STATUS:hitl_test_agent] Deep Extraction: http://www.cuni.cz/UK-20.html...
+[STATUS:hitl_test_agent] Deep Extraction: https://nf.cuni.cz/NFN-1.html...
+[STATUS:hitl_test_agent] Deep Extraction: http://www.cuni.cz/UK-15565.html...
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2093 chars
+[STATUS:hitl_test_agent] Scraped: https://www.statmt.org/wmt14/results.html
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2100 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/list/cs/recent?skip=50&show=50
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2090 chars
+[STATUS:hitl_test_agent] Scraped: https://info.arxiv.org/governance.html
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2087 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/html/2602.02521v1
++++ [INTERNAL:search] Got 19 clean results
+    [HITL:GATHER] web_search -> 6561 chars
+[STATUS:hitl_test_agent] Scraped: Kaplan 2020 scaling laws LLM constants alpha beta 
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2094 chars
+[STATUS:hitl_test_agent] Scraped: https://www.statmt.org/wmt14/medical-task/
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2087 chars
+[STATUS:hitl_test_agent] Scraped: https://github.com/arXiv/arxiv-docs
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2143 chars
+[STATUS:hitl_test_agent] Scraped: https://pyimagesearch.com/2025/10/13/kv-cache-opti
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2084 chars
+[STATUS:hitl_test_agent] Scraped: http://www.cuni.cz/UK-10706.html
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2082 chars
+[STATUS:hitl_test_agent] Scraped: http://www.cuni.cz/UK-128.html
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2081 chars
+[STATUS:hitl_test_agent] Scraped: http://www.cuni.cz/UK-20.html
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2084 chars
+[STATUS:hitl_test_agent] Scraped: http://www.cuni.cz/UK-15565.html
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2081 chars
+[STATUS:hitl_test_agent] Scraped: https://nf.cuni.cz/NFN-1.html
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (), failing over to Crawl4AI
+[FETCH]... ↓ https://easyexamnotes.com/multi-head-attention-in-transformers/                                      | ✓ | ⏱: 3.45s 
+[SCRAPE].. ◆ https://easyexamnotes.com/multi-head-attention-in-transformers/                                      | ✓ | ⏱: 0.05s 
+[COMPLETE] ● https://easyexamnotes.com/multi-head-attention-in-transformers/                                      | ✓ | ⏱: 3.52s 
++++ [SCRAPE:hitl_test_agent] Crawl4AI succeeded
+    [HITL:GATHER] scrape_website -> 2115 chars
+[STATUS:hitl_test_agent] Scraped: https://easyexamnotes.com/multi-head-attention-in-
+>>> [HITL:STORE] processing 14 raw results
+[STATUS:hitl_test_agent] Building knowledge map from 14 results...
+    [HITL:LLM] mode=fast response_len=5681
++++ [HITL:STORE] Extracted 8 facts
+[STATUS:hitl_test_agent] Knowledge map updated: 8 facts, 28 topics
+>>> [HITL:REFLECT]
+[STATUS:hitl_test_agent] Reading knowledge map...
+[STATUS:hitl_test_agent] Analyzing findings...
+    [HITL:LLM] mode=planner streamed response_len=2074 thinking_len=0
++++ [HITL:REFLECT] gaps=3 options=3 ready=False
+[STATUS:hitl_test_agent] Found 3 knowledge gaps, 3 options
+    [HITL:CONFIDENCE] fact_avg=89 gaps=-24 ready=-15 options=-15 early=-0 => composite=35
+    [HITL:INTERVENTION] cycle=7 conf=35 type=direction score=0.39 thr=0.33 intervene=True reason=score 0.39 > threshold 0.32; low confidence (35); high-value step type (direction)
+    [HITL] Smart CHECKPOINT: score 0.39 > threshold 0.32; low confidence (35); high-value step type (direction)
+>>> [HITL:CHECKPOINT]
+    [HITL:CHECKPOINT] mode=progress_update step_type=direction gather_count=7 ready=False
+    [HITL:LLM] mode=fast response_len=525
++++ [HITL:CHECKPOINT] flash response: 525 chars
+--- [HITL:CHECKPOINT] Halting. mode=progress_update gaps=3
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=True
+    [HITL] Resuming from CHECKPOINT
+>>> [HITL:RESUME] parsing steer: 'keep focusing on those details'
+    [HITL:LLM] mode=fast response_len=828
++++ [HITL:STEER] parsed: option=None next=GATHER
+    [HITL:RESUME] next_phase=GATHER
+>>> [HITL:GATHER] dial=7
+[STATUS:hitl_test_agent] Gathering resources...
+    [HITL:LLM] mode=fast response_len=2302
+!!! [HITL:GATHER] Planning error: Expecting property name enclosed in double quotes: line 17 column 5 (char 1727), falling back to web_search
+[STATUS:hitl_test_agent] DuckDuckGo: Searching 'keep focusing on those details...'
++++ [INTERNAL:search] Got 20 clean results
+    [HITL:GATHER] web_search -> 7268 chars
+[STATUS:hitl_test_agent] Scraped: keep focusing on those details
+>>> [HITL:STORE] processing 1 raw results
+[STATUS:hitl_test_agent] Building knowledge map from 1 results...
+    [HITL:LLM] mode=fast response_len=3131
++++ [HITL:STORE] Extracted 5 facts
+[STATUS:hitl_test_agent] Knowledge map updated: 5 facts, 11 topics
+>>> [HITL:REFLECT]
+[STATUS:hitl_test_agent] Reading knowledge map...
+[STATUS:hitl_test_agent] Analyzing findings...
+    [HITL:LLM] mode=planner streamed response_len=2087 thinking_len=0
++++ [HITL:REFLECT] gaps=3 options=3 ready=False
+[STATUS:hitl_test_agent] Found 3 knowledge gaps, 3 options
+    [HITL:CONFIDENCE] fact_avg=84 gaps=-24 ready=-15 options=-15 early=-0 => composite=30
+    [HITL:INTERVENTION] cycle=8 conf=30 type=direction score=0.42 thr=0.33 intervene=True reason=score 0.42 > threshold 0.32; low confidence (30); high-value step type (direction)
+    [HITL] Smart CHECKPOINT: score 0.42 > threshold 0.32; low confidence (30); high-value step type (direction)
+>>> [HITL:CHECKPOINT]
+    [HITL:CHECKPOINT] mode=progress_update step_type=direction gather_count=8 ready=False
+    [HITL:LLM] mode=fast response_len=564
++++ [HITL:CHECKPOINT] flash response: 564 chars
+--- [HITL:CHECKPOINT] Halting. mode=progress_update gaps=3
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=True
+    [HITL] Resuming from CHECKPOINT
+>>> [HITL:RESUME] parsing steer: 'stay on this track'
+    [HITL:LLM] mode=fast response_len=322
++++ [HITL:STEER] parsed: option=None next=GATHER
+    [HITL:RESUME] next_phase=GATHER
+>>> [HITL:GATHER] dial=7
+[STATUS:hitl_test_agent] Gathering resources...
+    [HITL:LLM] mode=fast response_len=729
++++ [HITL:GATHER] planned 3 tool calls
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/abs/2001.08361...
+[STATUS:hitl_test_agent] Deep Extraction: https://pyimagesearch.com/2025/10/13/kv-cache-optimization-v...
+[STATUS:hitl_test_agent] DuckDuckGo: Searching 'Kaplan 2020 scaling laws constants alpha...'
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2161 chars
+[STATUS:hitl_test_agent] Scraped: https://pyimagesearch.com/2025/10/13/kv-cache-opti
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2084 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/abs/2001.08361
++++ [INTERNAL:search] Got 18 clean results
+    [HITL:GATHER] web_search -> 6670 chars
+[STATUS:hitl_test_agent] Scraped: Kaplan 2020 scaling laws constants alpha beta A B 
+>>> [HITL:STORE] processing 3 raw results
+[STATUS:hitl_test_agent] Building knowledge map from 3 results...
+    [HITL:LLM] mode=fast response_len=4852
++++ [HITL:STORE] Extracted 8 facts
+[STATUS:hitl_test_agent] Knowledge map updated: 8 facts, 27 topics
+>>> [HITL:REFLECT]
+[STATUS:hitl_test_agent] Reading knowledge map...
+[STATUS:hitl_test_agent] Analyzing findings...
+    [HITL:LLM] mode=planner streamed response_len=2147 thinking_len=0
++++ [HITL:REFLECT] gaps=3 options=3 ready=False
+[STATUS:hitl_test_agent] Found 3 knowledge gaps, 3 options
+    [HITL:CONFIDENCE] fact_avg=92 gaps=-24 ready=-15 options=-15 early=-0 => composite=38
+    [HITL:INTERVENTION] cycle=9 conf=38 type=direction score=0.37 thr=0.33 intervene=True reason=score 0.37 > threshold 0.32; low confidence (38); high-value step type (direction)
+    [HITL] Smart CHECKPOINT: score 0.37 > threshold 0.32; low confidence (38); high-value step type (direction)
+>>> [HITL:CHECKPOINT]
+    [HITL:CHECKPOINT] mode=progress_update step_type=direction gather_count=9 ready=False
+    [HITL:LLM] mode=fast response_len=496
++++ [HITL:CHECKPOINT] flash response: 496 chars
+--- [HITL:CHECKPOINT] Halting. mode=progress_update gaps=3
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=True
+    [HITL] Resuming from CHECKPOINT
+>>> [HITL:RESUME] parsing steer: 'no'
+    [HITL:LLM] mode=fast response_len=322
++++ [HITL:STEER] parsed: option=None next=GATHER
+    [HITL:RESUME] next_phase=GATHER
+>>> [HITL:GATHER] dial=7
+[STATUS:hitl_test_agent] Gathering resources...
+    [HITL:LLM] mode=fast response_len=1748
++++ [HITL:GATHER] planned 10 tool calls
+[STATUS:hitl_test_agent] Deep Extraction: https://www.semanticscholar.org/paper/Scaling-Laws-for-Neura...
+[STATUS:hitl_test_agent] Deep Extraction: https://danmackinlay.name/notebook/nn_scaling_laws...
+[STATUS:hitl_test_agent] Deep Extraction: https://suanlab.com/blog/20260213-paper-2602-07488-deriving-...
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/abs/2001.08361#content...
+[STATUS:hitl_test_agent] Deep Extraction: https://papers.baulab.info/papers/Kaplan-2020.pdf...
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/search/cs?searchtype=author&query=Henighan...
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/search/cs?searchtype=author&query=Brown,+T...
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/search/cs?searchtype=author&query=Kaplan,+...
+[STATUS:hitl_test_agent] Deep Extraction: https://arxiv.org/search/cs?searchtype=author&query=McCandli...
+[STATUS:hitl_test_agent] DuckDuckGo: Searching 'linear transformation matrix positional ...'
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2092 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/abs/2001.08361#content
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2101 chars
+[STATUS:hitl_test_agent] Scraped: https://papers.baulab.info/papers/Kaplan-2020.pdf
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (Jina returned empty/invalid response), failing over to Crawl4AI
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2102 chars
+[STATUS:hitl_test_agent] Scraped: https://danmackinlay.name/notebook/nn_scaling_laws
++++ [INTERNAL:search] Got 20 clean results
+    [HITL:GATHER] web_search -> 7328 chars
+[STATUS:hitl_test_agent] Scraped: linear transformation matrix positional encoding s
+[ERROR]... × Error updating image dimensions: Page.evaluate: Execution context was destroyed, most likely because of a navigation 
+[FETCH]... ↓ https://www.semanticscholar.org/paper/Scaling-La...andlish/e6c561d02500b2596a230b341a8eb8b921ca5bf2  | ✓ | ⏱: 1.05s 
+[SCRAPE].. ◆ https://www.semanticscholar.org/paper/Scaling-La...andlish/e6c561d02500b2596a230b341a8eb8b921ca5bf2  | ✓ | ⏱: 0.00s 
+[COMPLETE] ● https://www.semanticscholar.org/paper/Scaling-La...andlish/e6c561d02500b2596a230b341a8eb8b921ca5bf2  | ✗ | ⏱: 1.05s 
+    [HITL:GATHER] scrape_website -> 169 chars
+[STATUS:hitl_test_agent] Scraped: https://www.semanticscholar.org/paper/Scaling-Laws
++++ [SCRAPE:hitl_test_agent] Jina Reader succeeded
+    [HITL:GATHER] scrape_website -> 2134 chars
+[STATUS:hitl_test_agent] Scraped: https://suanlab.com/blog/20260213-paper-2602-07488
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (), failing over to Crawl4AI
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (), failing over to Crawl4AI
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (), failing over to Crawl4AI
+--- [SCRAPE:hitl_test_agent] Jina Reader failed (), failing over to Crawl4AI
+[FETCH]... ↓ https://arxiv.org/search/cs?searchtype=author&query=McCandlish,+S                                    | ✓ | ⏱: 60.32s 
+[SCRAPE].. ◆ https://arxiv.org/search/cs?searchtype=author&query=McCandlish,+S                                    | ✓ | ⏱: 0.09s 
+[COMPLETE] ● https://arxiv.org/search/cs?searchtype=author&query=McCandlish,+S                                    | ✓ | ⏱: 60.42s 
++++ [SCRAPE:hitl_test_agent] Crawl4AI succeeded
+[ANTIBOT]. ℹ https://arxiv.org/searc...author&query=Brown,+T+B  | Error: Proxy direct failed: Failed on navigating ACS-GOTO:
+Page.goto: Timeout 60000ms exceeded.
+Call log:
+  - navigating to "https://arxiv.org/search/cs?searchtype=author&query=Brown,+T+B", waiting until "domcontentloaded"
+ 
+[ERROR]... × https://arxiv.org/searc...author&query=Brown,+T+B  | Error: Unexpected error in _crawl_web at line 778 in _crawl_web (.venv\Lib\site-packages\crawl4ai\async_crawler_strategy.py):
+Error: Failed on navigating ACS-GOTO:
+Page.goto: Timeout 60000ms exceeded.
+Call log:
+  - navigating to "https://arxiv.org/search/cs?searchtype=author&query=Brown,+T+B", waiting until "domcontentloaded"
+
+
+Code context:
+ 773                                   tag="GOTO",
+ 774                                   params={"url": url},
+ 775                               )
+ 776                               response = None
+ 777                           else:
+ 778 →                             raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
+ 779   
+ 780                       # ──────────────────────────────────────────────────────────────
+ 781                       # Walk the redirect chain.  Playwright returns only the last
+ 782                       # hop, so we trace the `request.redirected_from` links until the
+ 783                       # first response that differs from the final one and surface its 
+[ANTIBOT]. ℹ https://arxiv.org/searc...uthor&query=Henighan,+T  | Error: Proxy direct failed: Failed on navigating ACS-GOTO:
+Page.goto: Timeout 60000ms exceeded.
+Call log:
+  - navigating to "https://arxiv.org/search/cs?searchtype=author&query=Henighan,+T", waiting until "domcontentloaded"
+ 
+[ERROR]... × https://arxiv.org/searc...uthor&query=Henighan,+T  | Error: Unexpected error in _crawl_web at line 778 in _crawl_web (.venv\Lib\site-packages\crawl4ai\async_crawler_strategy.py):
+Error: Failed on navigating ACS-GOTO:
+Page.goto: Timeout 60000ms exceeded.
+Call log:
+  - navigating to "https://arxiv.org/search/cs?searchtype=author&query=Henighan,+T", waiting until "domcontentloaded"
+
+
+Code context:
+ 773                                   tag="GOTO",
+ 774                                   params={"url": url},
+ 775                               )
+ 776                               response = None
+ 777                           else:
+ 778 →                             raise RuntimeError(f"Failed on navigating ACS-GOTO:\n{str(e)}")
+ 779   
+ 780                       # ──────────────────────────────────────────────────────────────
+ 781                       # Walk the redirect chain.  Playwright returns only the last
+ 782                       # hop, so we trace the `request.redirected_from` links until the
+ 783                       # first response that differs from the final one and surface its 
+[FETCH]... ↓ https://arxiv.org/search/cs?searchtype=author&query=Kaplan,+J                                        | ✓ | ⏱: 60.60s 
+[SCRAPE].. ◆ https://arxiv.org/search/cs?searchtype=author&query=Kaplan,+J                                        | ✓ | ⏱: 0.29s 
+[COMPLETE] ● https://arxiv.org/search/cs?searchtype=author&query=Kaplan,+J                                        | ✓ | ⏱: 60.91s 
++++ [SCRAPE:hitl_test_agent] Crawl4AI succeeded
+    [HITL:GATHER] scrape_website -> 2117 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/search/cs?searchtype=author&quer
+    [HITL:GATHER] scrape_website -> 96 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/search/cs?searchtype=author&quer
+    [HITL:GATHER] scrape_website -> 95 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/search/cs?searchtype=author&quer
+    [HITL:GATHER] scrape_website -> 2113 chars
+[STATUS:hitl_test_agent] Scraped: https://arxiv.org/search/cs?searchtype=author&quer
+>>> [HITL:STORE] processing 10 raw results
+[STATUS:hitl_test_agent] Building knowledge map from 10 results...
+    [HITL:LLM] mode=fast response_len=5168
++++ [HITL:STORE] Extracted 8 facts
+[STATUS:hitl_test_agent] Knowledge map updated: 8 facts, 23 topics
+>>> [HITL:REFLECT]
+[STATUS:hitl_test_agent] Reading knowledge map...
+[STATUS:hitl_test_agent] Analyzing findings...
+    [HITL:LLM] mode=planner streamed response_len=2140 thinking_len=0
++++ [HITL:REFLECT] gaps=3 options=3 ready=False
+[STATUS:hitl_test_agent] Found 3 knowledge gaps, 3 options
+    [HITL:CONFIDENCE] fact_avg=85 gaps=-24 ready=-15 options=-15 early=-0 => composite=31
+    [HITL:INTERVENTION] cycle=10 conf=31 type=direction score=0.41 thr=0.33 intervene=True reason=score 0.41 > threshold 0.32; low confidence (31); high-value step type (direction)
+    [HITL] Smart CHECKPOINT: score 0.41 > threshold 0.32; low confidence (31); high-value step type (direction)
+>>> [HITL:CHECKPOINT]
+    [HITL:CHECKPOINT] mode=progress_update step_type=direction gather_count=10 ready=False
+    [HITL:LLM] mode=fast response_len=501
++++ [HITL:CHECKPOINT] flash response: 501 chars
+--- [HITL:CHECKPOINT] Halting. mode=progress_update gaps=3
+>>> [HITL] agent=hitl_test_agent effort=7 expertise=2 active_session=True
+    [HITL] Resuming from CHECKPOINT
+>>> [HITL:RESUME] parsing steer: 'keep in this trck'
+    [HITL:LLM] mode=fast response_len=322
++++ [HITL:STEER] parsed: option=None next=GATHER
+    [HITL:RESUME] next_phase=GATHER
+    [HITL] Max gathers reached (10), forcing ACT
+>>> [HITL:ACT]
+[STATUS:hitl_test_agent] Writing analytical report...
+    [HITL:LLM] mode=planner streamed response_len=2159 thinking_len=0
++++ [HITL:ACT] wrote 2159 chars
+[STATUS:hitl_test_agent] Report drafted: 2159 chars with citations
+>>> [HITL:AUTO_REPORT] Generating PDF for goal='rise of LLM'
+[STATUS:hitl_test_agent] Receiving analysis and knowledge map...
+[STATUS:hitl_test_agent] Compiling final PDF report...
++++ [CAPABILITY:report_generation] Starting synthesis for 'rise of LLM|WRITTEN ANALYSIS:
+The empiri...'
+💰 [COST] Synthesis used 54897 IN and 7276 OUT tokens.
++++ [CAPABILITY:report_generation] Saved PDF to: C:\Users\Asus\OneDrive\Desktop\Easy Company\HITL\..\backend\agents_code\hitl_test_agent\Report_The_Architectural_and_Strategic_Ascendancy_of_Larg.pdf
++++ [HITL:AUTO_REPORT] Report generated: Report_The_Architectural_and_Strategic_Ascendancy_of_Larg.pdf. (Saved in C:\Users\Asus\OneDrive\Desktop\Easy Company\HITL\..\backend\agents_code\hitl_test_agent)
+[STATUS:hitl_test_agent] PDF generated: Report generated: Report_The_Architectural_and_Strategic_Asc

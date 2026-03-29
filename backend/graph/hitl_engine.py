@@ -15,10 +15,12 @@ import os
 import json
 import re
 import asyncio
+from datetime import date
 
 from langchain_core.messages import HumanMessage
 from graph.llm import get_llm
 from graph.knowledge_store import KnowledgeStore
+from graph.hitl_intervention import InterventionTracker
 from graph import hitl_prompts as prompts
 import toolkit
 
@@ -114,16 +116,23 @@ async def hitl_loop(state: dict):
     agent_id = state["agent_id"]
     api_key = state["api_key"]
     dial = max(1, min(10, state.get("user_effort", 5)))  # Clamp 1-10
+    expertise = max(1, min(10, state.get("human_expertise", 5)))  # Clamp 1-10
+
+    # Inject current date so all LLM calls know the real year
+    state["current_date"] = date.today().isoformat()
+
+    # Smart intervention tracker — replaces the old timer-based should_checkpoint()
+    tracker = InterventionTracker(human_effort=dial, human_expertise=expertise)
 
     store = KnowledgeStore(agent_id)
     store.load()
 
-    _log(f">>> [HITL] agent={agent_id} dial={dial} active_session={store.get_active_session()}")
+    _log(f">>> [HITL] agent={agent_id} effort={dial} expertise={expertise} active_session={store.get_active_session()}")
 
     # === RESUME: Active session at CHECKPOINT ===
     if store.get_active_session() and store.ledger.get("current_phase") == "CHECKPOINT":
         _log(f"    [HITL] Resuming from CHECKPOINT")
-        async for chunk in _resume_from_checkpoint(state, store, dial):
+        async for chunk in _resume_from_checkpoint(state, store, dial, tracker):
             yield chunk
         return
 
@@ -140,8 +149,8 @@ async def hitl_loop(state: dict):
     if store.ledger["current_phase"] == "CHECKPOINT":
         return
 
-    # Phase loop: GATHER → STORE → REFLECT → (checkpoint or auto-act)
-    async for chunk in _gather_loop(state, store, dial):
+    # Phase loop: GATHER -> STORE -> REFLECT -> (checkpoint or auto-act)
+    async for chunk in _gather_loop(state, store, dial, tracker):
         yield chunk
 
 
@@ -149,7 +158,7 @@ async def hitl_loop(state: dict):
 # Resume from CHECKPOINT
 # ---------------------------------------------------------------------------
 
-async def _resume_from_checkpoint(state: dict, store: KnowledgeStore, dial: int):
+async def _resume_from_checkpoint(state: dict, store: KnowledgeStore, dial: int, tracker: InterventionTracker):
     """Parse user's steer and continue from CHECKPOINT."""
     user_msg = state["goal"]
     _log(f">>> [HITL:RESUME] parsing steer: {user_msg[:60]!r}")
@@ -177,7 +186,7 @@ async def _resume_from_checkpoint(state: dict, store: KnowledgeStore, dial: int)
         
         # CONTINUITY FIX: If the new session isn't done or clarifying, start gathering!
         if store.ledger.get("current_phase") not in ["DONE", "CHECKPOINT"]:
-            async for chunk in _gather_loop(state, store, dial):
+            async for chunk in _gather_loop(state, store, dial, tracker):
                 yield chunk
         return
 
@@ -185,8 +194,8 @@ async def _resume_from_checkpoint(state: dict, store: KnowledgeStore, dial: int)
     _log(f"    [HITL:RESUME] next_phase={next_phase}")
 
     if next_phase == "GATHER":
-        # Run dial-controlled gather loop (same logic as main loop)
-        async for chunk in _gather_loop(state, store, dial):
+        # Run smart intervention-controlled gather loop
+        async for chunk in _gather_loop(state, store, dial, tracker):
             yield chunk
         return
 
@@ -215,12 +224,15 @@ async def _resume_from_checkpoint(state: dict, store: KnowledgeStore, dial: int)
 # Shared gather loop — used by both fresh sessions and resume
 # ---------------------------------------------------------------------------
 
-async def _gather_loop(state: dict, store: KnowledgeStore, dial: int):
-    """Run GATHER → STORE → REFLECT cycles, controlled by the dial.
+async def _gather_loop(state: dict, store: KnowledgeStore, dial: int, tracker: InterventionTracker):
+    """Run GATHER -> STORE -> REFLECT cycles with smart intervention.
 
-    Low dial (1-2):  Many autonomous cycles, auto-ACT when ready, auto-PDF.
-    Mid dial (3-5):  A few cycles then checkpoint.
-    High dial (6-10): Checkpoint frequently, user steers each step.
+    Key rules:
+      1. ALWAYS checkpoint after the first cycle (mandatory first check-in).
+      2. After that, the intervention algorithm decides: checkpoint or keep going.
+      3. Intervention ALWAYS takes priority over auto-act.
+      4. Auto-act only when research is done AND the algorithm says don't interrupt.
+      5. Hard cap at max_gathers to prevent infinite loops.
     """
     max_gathers = store.ledger.get("max_gather_cycles", 10)
     gather_count = store.ledger.get("gather_cycles_completed", 0)
@@ -239,29 +251,129 @@ async def _gather_loop(state: dict, store: KnowledgeStore, dial: int):
         async for chunk in _phase_reflect(state, store):
             yield chunk
 
-        # --- Decision: auto-act, checkpoint, or keep gathering? ---
+        # --- Smart intervention decision ---
         ready = store.ledger.get("ready_to_act", False)
+        avg_confidence = _get_composite_confidence(store)
 
-        # THE FIX: Force it to write the report after 3 cycles, no matter what!
-        if should_auto_act(dial, ready, gather_count) or gather_count >= 3:
-            _log(f"    [HITL] Auto-ACT triggered: dial={dial} ready={ready} cycles={gather_count}")
+        # Determine step type from reflect phase results
+        gaps = store.ledger.get("gaps", [])
+        has_contradictions = any("contradict" in g.lower() or "conflict" in g.lower() for g in gaps)
+        step_type = "contradiction" if has_contradictions else "direction"
+
+        # Feed the step to the tracker
+        decision = tracker.record_step(avg_confidence, step_type)
+        _log(f"    [HITL:INTERVENTION] cycle={gather_count} conf={avg_confidence} "
+             f"type={step_type} score={decision['score']:.2f} thr={decision['threshold']:.2f} "
+             f"intervene={decision['should_intervene']} reason={decision['reason']}")
+
+        # Emit intervention debug info
+        yield _sse({"type": "hitl_decision", "content": json.dumps({
+            "score": decision["score"],
+            "threshold": decision["threshold"],
+            "should_intervene": decision["should_intervene"],
+            "confidence": avg_confidence,
+            "step_type": step_type,
+            "reason": decision["reason"],
+        })})
+
+        # --- Decision priority: checkpoint > auto-act > continue ---
+
+        # Rule 1: MANDATORY first check-in after cycle 1
+        #   Always show the user what was found and ask for direction.
+        #   (Autopilot dial 1-2 skips this -- they don't want interruptions)
+        if gather_count == 1 and dial > 2:
+            _log(f"    [HITL] Mandatory first check-in after cycle 1")
+            state["_intervention_reason"] = "first research cycle complete, checking direction"
+            state["_intervention_step_type"] = step_type
+            async for chunk in _phase_checkpoint(state, store):
+                yield chunk
+            return
+
+        # Rule 2: Intervention algorithm says ASK -> always checkpoint
+        if decision["should_intervene"]:
+            _log(f"    [HITL] Smart CHECKPOINT: {decision['reason']}")
+            state["_intervention_reason"] = decision["reason"]
+            state["_intervention_step_type"] = step_type
+            async for chunk in _phase_checkpoint(state, store):
+                yield chunk
+            return
+
+        # Rule 3: Research is done and algorithm says don't interrupt -> produce output
+        if ready and not decision["should_intervene"]:
+            _log(f"    [HITL] Auto-ACT: ready={ready} cycles={gather_count}")
             async for chunk in _phase_act(state, store):
                 yield chunk
             async for chunk in _auto_generate_report(state, store):
                 yield chunk
             return
 
-        if should_checkpoint(dial, gather_count, "REFLECT"):
-            async for chunk in _phase_checkpoint(state, store):
+        # Rule 4: Hard cap to prevent infinite loops
+        if gather_count >= 5:
+            _log(f"    [HITL] Hard cap reached ({gather_count} cycles), forcing ACT")
+            async for chunk in _phase_act(state, store):
                 yield chunk
-            return  # Halt — user resumes via next /chat
+            async for chunk in _auto_generate_report(state, store):
+                yield chunk
+            return
 
-    # Exhausted max gathers → produce output
+        # Otherwise: keep gathering (not ready, algorithm says PASS)
+        _log(f"    [HITL] Continuing: not ready, algorithm says PASS")
+
+    # Exhausted max_gathers
     _log(f"    [HITL] Max gathers reached ({max_gathers}), forcing ACT")
     async for chunk in _phase_act(state, store):
         yield chunk
     async for chunk in _auto_generate_report(state, store):
         yield chunk
+
+
+def _get_composite_confidence(store: KnowledgeStore) -> int:
+    """Compute a composite confidence score (0-100) from the full engine state.
+
+    Fact confidences alone are always 70-90 (LLM default), so we also factor in:
+      - Number of knowledge gaps identified by REFLECT
+      - Whether REFLECT thinks we're ready_to_act
+      - How many direction options were presented (more = more ambiguity)
+      - Ratio of facts gathered vs gaps remaining
+
+    Returns an int 0-100 that actually reflects real uncertainty.
+    """
+    # 1) Base: average fact confidence (still useful, just not sufficient)
+    all_facts = [
+        (nid, attrs) for nid, attrs in store.graph.nodes(data=True)
+        if attrs.get("node_type") == "fact"
+    ]
+    if all_facts:
+        recent = all_facts[-5:]
+        fact_avg = sum(attrs.get("confidence", 0.7) * 100 for _, attrs in recent) / len(recent)
+    else:
+        fact_avg = 40  # no facts = uncertain
+
+    # 2) Gaps penalty: each gap = we're missing something important
+    gaps = store.ledger.get("gaps", [])
+    gap_penalty = min(30, len(gaps) * 8)  # 0-3 gaps = 0-24 penalty, capped at 30
+
+    # 3) Ready-to-act: REFLECT saying "not ready" is a big signal
+    ready = store.ledger.get("ready_to_act", False)
+    ready_penalty = 0 if ready else 15
+
+    # 4) Options ambiguity: many options = unclear direction
+    options = store.ledger.get("options_presented", [])
+    pending_options = [o for o in options if o.get("status") == "pending"]
+    option_penalty = min(15, len(pending_options) * 5)  # 3 options = 15 penalty
+
+    # 5) Early-stage bonus penalty: first cycle should be more likely to check in
+    gather_count = store.ledger.get("gather_cycles_completed", 0)
+    early_penalty = 10 if gather_count <= 1 else 0
+
+    composite = fact_avg - gap_penalty - ready_penalty - option_penalty - early_penalty
+    composite = max(0, min(100, int(composite)))
+
+    _log(f"    [HITL:CONFIDENCE] fact_avg={fact_avg:.0f} gaps=-{gap_penalty} "
+         f"ready=-{ready_penalty} options=-{option_penalty} early=-{early_penalty} "
+         f"=> composite={composite}")
+
+    return composite
 
 
 async def _auto_generate_report(state: dict, store: KnowledgeStore):
@@ -364,17 +476,18 @@ async def _phase_understand(state: dict, store: KnowledgeStore):
     history_context = _load_history_context(state["agent_id"])
     ledger_summary = store.get_ledger_summary() if store.get_active_session() else ""
 
-    prompt = prompts.understand_prompt(state["goal"], history_context, ledger_summary)
+    prompt = prompts.understand_prompt(state["goal"], history_context, ledger_summary, state.get("current_date", ""))
+
+    thinking_chunks = []
+    async def _on_thinking(text):
+        thinking_chunks.append(text)
 
     try:
-        result = await _call_model("planner", prompt, state["api_key"], streaming=True)
+        text = await _call_model("planner", prompt, state["api_key"],
+                                 streaming=True, on_thinking=_on_thinking)
 
-        # Stream thinking tokens
-        if isinstance(result, dict) and "raw" in result:
-            # Non-streaming fallback
-            text = result["raw"]
-        else:
-            text = result
+        for chunk in thinking_chunks:
+            yield _sse({"type": "thought_token", "content": chunk})
 
         parsed = _parse_json(text)
         _log(f"+++ [HITL:UNDERSTAND] task_type={parsed.get('task_type')} needs_clarification={parsed.get('needs_clarification')}")
@@ -442,7 +555,8 @@ async def _phase_gather(state: dict, store: KnowledgeStore, dial: int):
     tool_names = [t.name for t in tools]
 
     prompt = prompts.gather_plan_prompt(
-        state["goal"], steers, gaps, tool_names, batch_size, graph_summary
+        state["goal"], steers, gaps, tool_names, batch_size, graph_summary,
+        state.get("current_date", "")
     )
 
     try:
@@ -546,7 +660,7 @@ async def _phase_store(state: dict, store: KnowledgeStore):
 
     raw_str = "\n\n---\n\n".join(raw_str_parts)
 
-    prompt = prompts.extract_facts_prompt(raw_str, state["goal"])
+    prompt = prompts.extract_facts_prompt(raw_str, state["goal"], state.get("current_date", ""))
 
     try:
         text = await _call_model("fast", prompt, state["api_key"])
@@ -603,11 +717,23 @@ async def _phase_reflect(state: dict, store: KnowledgeStore):
     fact_snippets = store.get_fact_snippets_for_reflect()
 
     prompt = prompts.reflect_prompt(
-        state["goal"], graph_summary, ledger_summary, steers, fact_snippets
+        state["goal"], graph_summary, ledger_summary, steers, fact_snippets,
+        state.get("current_date", "")
     )
 
+    # Collect thinking tokens to yield after the call
+    thinking_chunks = []
+    async def _on_thinking(text):
+        thinking_chunks.append(text)
+
     try:
-        text = await _call_model("planner", prompt, state["api_key"])
+        text = await _call_model("planner", prompt, state["api_key"],
+                                 streaming=True, on_thinking=_on_thinking)
+
+        # Yield thinking tokens as SSE events
+        for chunk in thinking_chunks:
+            yield _sse({"type": "thought_token", "content": chunk})
+
         parsed = _parse_json(text)
 
         gaps = parsed.get("gaps", [])
@@ -645,58 +771,146 @@ async def _phase_reflect(state: dict, store: KnowledgeStore):
 # ---------------------------------------------------------------------------
 
 async def _phase_checkpoint(state: dict, store: KnowledgeStore):
-    """Format and emit checkpoint output. Calls fast model for conversational message."""
+    """Conversational checkpoint driven by algorithm-selected conversation mode.
+
+    Flow:
+      1. Algorithm determines conversation MODE based on research state
+      2. Algorithm ranks facts, picks top finding + editorial context
+      3. Single Flash call: mode + pre-selected context → natural message(s)
+    """
     _log(f">>> [HITL:CHECKPOINT]")
     yield _sse({"type": "phase", "content": "CHECKPOINT"})
 
     gaps = store.ledger.get("gaps", [])
     options = store.ledger.get("options_presented", [])
-    topics = store.get_all_topics()
+    goal = store.ledger.get("goal", state.get("goal", ""))
+    steers = [s["steer"] for s in store.ledger.get("user_steers", [])[-3:]]
+    current_date = state.get("current_date", "unknown")
+    gather_count = store.ledger.get("gather_cycles_completed", 0)
+    ready = store.ledger.get("ready_to_act", False)
 
-    # Collect a few recent facts for the LLM to reference naturally
+    # Get intervention context
+    step_type = state.get("_intervention_step_type", "direction")
+
+    # --- ALGORITHM: Determine conversation mode ---
+    has_contradictions = any("contradict" in g.lower() or "conflict" in g.lower() for g in gaps)
+
+    if gather_count <= 1:
+        mode = "early_checkin"
+    elif has_contradictions and step_type == "contradiction":
+        mode = "flag_problem"
+    elif ready:
+        mode = "propose_draft"
+    elif len(steers) >= 2 and step_type == "direction":
+        mode = "progress_update"
+    else:
+        mode = "share_insight"
+
+    _log(f"    [HITL:CHECKPOINT] mode={mode} step_type={step_type} "
+         f"gather_count={gather_count} ready={ready}")
+
+    # --- ALGORITHM: Rank facts and pick top ones ---
     all_fact_nodes = [
         (nid, attrs) for nid, attrs in store.graph.nodes(data=True)
         if attrs.get("node_type") == "fact"
     ]
-    recent_facts = [
-        {"content": attrs.get("content", "")}
-        for _, attrs in all_fact_nodes[-4:]
-    ]
 
-    # Count sources for the prompt
-    sources_count = sum(
-        1 for _, d in store.graph.nodes(data=True) if d.get("node_type") == "source"
-    )
-    facts_count = len(all_fact_nodes)
+    scored_facts = []
+    for i, (nid, attrs) in enumerate(all_fact_nodes):
+        content = attrs.get("content", "")
+        confidence = attrs.get("confidence", 0.7)
+        has_evidence = bool(attrs.get("context_or_evidence", ""))
 
-    goal = store.ledger.get("goal", state.get("goal", ""))
+        surprise = 1.0 - confidence
+        recency = (i + 1) / max(len(all_fact_nodes), 1)
+        evidence_bonus = 0.3 if has_evidence else 0.0
+        steer_text = " ".join(steers).lower() if steers else goal.lower()
+        words_overlap = sum(1 for w in steer_text.split() if len(w) > 3 and w in content.lower())
+        relevance = min(1.0, words_overlap * 0.3) if words_overlap else 0.0
 
-    prompt = prompts.checkpoint_prompt(
-        goal=goal,
-        sources_count=sources_count,
-        facts_count=facts_count,
-        topics=topics,
-        recent_facts=recent_facts,
-        options=options,
-        gaps=gaps,
-    )
+        score = surprise * 0.25 + recency * 0.35 + evidence_bonus + relevance * 0.4
 
+        source_url = ""
+        source_title = ""
+        for _, target, edge_data in store.graph.edges(nid, data=True):
+            if edge_data.get("relation") == "extracted_from":
+                target_attrs = store.graph.nodes[target]
+                source_url = target_attrs.get("url", "")
+                source_title = target_attrs.get("title", "")
+                break
+        if not source_url:
+            for src, _, edge_data in store.graph.in_edges(nid, data=True):
+                src_attrs = store.graph.nodes[src]
+                if src_attrs.get("node_type") == "source":
+                    source_url = src_attrs.get("url", "")
+                    source_title = src_attrs.get("title", "")
+                    break
+
+        scored_facts.append({
+            "content": content,
+            "evidence": attrs.get("context_or_evidence", ""),
+            "source_url": source_url,
+            "source_title": source_title,
+            "score": score,
+        })
+
+    scored_facts.sort(key=lambda f: f["score"], reverse=True)
+    top_facts = scored_facts[:3]
+
+    # --- ALGORITHM: Build editorial context (WHY the fact matters) ---
+    # Connect the top fact to the goal so Flash can explain significance
+    total_facts = len(all_fact_nodes)
+    total_sources = len([
+        n for n, a in store.graph.nodes(data=True)
+        if a.get("node_type") == "source"
+    ])
+    topics_covered = [t["label"] for t in store.get_all_topics()]
+
+    editorial_context = {
+        "total_facts": total_facts,
+        "total_sources": total_sources,
+        "topics_covered": topics_covered[:8],
+        "gaps_remaining": gaps[:3],
+        "research_stage": "early" if gather_count <= 1 else "mid" if not ready else "late",
+    }
+
+    # --- Single Flash call with conversation mode ---
     try:
-        checkpoint_msg = await _call_model("fast", prompt, state["api_key"])
-        checkpoint_msg = checkpoint_msg.strip()
-        _log(f"+++ [HITL:CHECKPOINT] generated {len(checkpoint_msg)} char message")
-    except Exception as e:
-        _log(f"!!! [HITL:CHECKPOINT] LLM error, falling back to simple format: {e}")
-        # Fallback: simple plain-English message
-        option_lines = "\n".join(
-            f"{o.get('id', i+1)}. {o.get('text', '')}" for i, o in enumerate(options)
+        checkpoint_prompt = prompts.checkpoint_chat_prompt(
+            goal=goal,
+            current_date=current_date,
+            mode=mode,
+            top_facts=top_facts,
+            editorial_context=editorial_context,
+            gaps=gaps[:3],
+            user_steers=steers,
+            reflect_analysis=store.ledger.get("phase_log", [{}])[-1].get("detail", ""),
         )
-        checkpoint_msg = f"I've been digging into this and here's where things stand. Where would you like to go next?\n\n{option_lines}"
+        text = await _call_model("fast", checkpoint_prompt, state["api_key"])
+        text = text.strip()
+        _log(f"+++ [HITL:CHECKPOINT] flash response: {len(text)} chars")
 
-    yield _sse({"type": "response", "content": checkpoint_msg})
-    store.update_phase("CHECKPOINT", f"Presented {len(options)} options")
+        # Parse messages from Flash
+        parsed = _parse_json(text)
+        messages = parsed.get("messages", [])
+        if not messages:
+            # Fallback: try old format or use raw text
+            messages = [text] if text else ["Still working on this."]
+
+    except Exception as e:
+        _log(f"!!! [HITL:CHECKPOINT] error: {e}")
+        if top_facts:
+            messages = [top_facts[0]["content"], f"What part of this matters most for your needs?"]
+        else:
+            messages = ["Still gathering information. Any specific angle you want me to focus on?"]
+
+    for msg in messages:
+        if isinstance(msg, str) and msg.strip():
+            yield _sse({"type": "response", "content": msg.strip()})
+
+    store.update_phase("CHECKPOINT", f"Checkpoint mode={mode} gaps={len(gaps)}")
     store.save()
-    _log(f"--- [HITL:CHECKPOINT] Halting. Options={len(options)} Gaps={len(gaps)}")
+    _log(f"--- [HITL:CHECKPOINT] Halting. mode={mode} gaps={len(gaps)}")
 
 
 # ---------------------------------------------------------------------------
@@ -741,10 +955,20 @@ async def _phase_act(state: dict, store: KnowledgeStore):
     outputs = store.ledger.get("outputs_written", [])
     outputs_str = "\n\n".join(o.get("text", "")[:200] for o in outputs) if outputs else ""
 
-    prompt = prompts.act_synthesis_prompt(state["goal"], focus, relevant_facts_str, outputs_str)
+    prompt = prompts.act_synthesis_prompt(state["goal"], focus, relevant_facts_str, outputs_str, state.get("current_date", ""))
+
+    thinking_chunks = []
+    async def _on_thinking(text):
+        thinking_chunks.append(text)
 
     try:
-        text = await _call_model("planner", prompt, state["api_key"])
+        text = await _call_model("planner", prompt, state["api_key"],
+                                 streaming=True, on_thinking=_on_thinking)
+
+        # Yield thinking tokens
+        for chunk in thinking_chunks:
+            yield _sse({"type": "thought_token", "content": chunk})
+
         # The response IS the written content (not JSON)
         output_text = text.strip()
         _log(f"+++ [HITL:ACT] wrote {len(output_text)} chars")
@@ -846,32 +1070,40 @@ async def _parse_user_steer(user_msg: str, store: KnowledgeStore, api_key: str) 
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _call_model(mode: str, prompt: str, api_key: str, streaming: bool = False) -> str:
-    """Call LLM and return response text. Falls back from planner → fast on error."""
+async def _call_model(mode: str, prompt: str, api_key: str,
+                      streaming: bool = False, on_thinking=None) -> str:
+    """Call LLM and return response text. Falls back from planner → fast on error.
+
+    Args:
+        streaming: If True, uses astream to get token-by-token output.
+        on_thinking: Optional async callback(text) called with thinking chunks
+                     as they arrive. Only used when streaming=True.
+    """
     modes = [mode, "fast"] if mode != "fast" else ["fast"]
 
     for m in modes:
         try:
-            llm = get_llm(m, api_key, streaming=False)
-            result = await llm.ainvoke([HumanMessage(content=prompt)])
-            content = result.content
-            if isinstance(content, list):
-                text_parts = [p if isinstance(p, str) else p.get("text", "") for p in content]
-                text = text_parts[-1].strip() if text_parts else ""
+            if streaming:
+                return await _call_model_stream(m, prompt, api_key, on_thinking)
             else:
-                text = content.strip()
-            if text:
-                _log(f"    [HITL:LLM] mode={m} response_len={len(text)}")
-                
-                # --- NEW: Extract LangChain Token Usage ---
-                usage = getattr(result, 'usage_metadata', {})
-                if usage:
-                    in_tok = usage.get('input_tokens', 0)
-                    out_tok = usage.get('output_tokens', 0)
-                    toolkit.log_token_usage("Aggregate_Tracker", m, in_tok, out_tok)
-                # ------------------------------------------
-                
-                return text
+                llm = get_llm(m, api_key, streaming=False)
+                result = await llm.ainvoke([HumanMessage(content=prompt)])
+                content = result.content
+                if isinstance(content, list):
+                    text_parts = [p if isinstance(p, str) else p.get("text", "") for p in content]
+                    text = text_parts[-1].strip() if text_parts else ""
+                else:
+                    text = content.strip()
+                if text:
+                    _log(f"    [HITL:LLM] mode={m} response_len={len(text)}")
+
+                    usage = getattr(result, 'usage_metadata', {})
+                    if usage:
+                        in_tok = usage.get('input_tokens', 0)
+                        out_tok = usage.get('output_tokens', 0)
+                        toolkit.log_token_usage("Aggregate_Tracker", m, in_tok, out_tok)
+
+                    return text
         except Exception as e:
             err_str = str(e).lower()
             if "429" in err_str or "quota" in err_str or "resource exhausted" in err_str:
@@ -880,6 +1112,52 @@ async def _call_model(mode: str, prompt: str, api_key: str, streaming: bool = Fa
             raise
 
     return ""
+
+
+async def _call_model_stream(mode: str, prompt: str, api_key: str, on_thinking=None) -> str:
+    """Stream LLM response, extracting thinking tokens and final output.
+
+    Thinking tokens (inside <thinking>...</thinking>) are sent via on_thinking callback.
+    Returns the final text after </thinking> (or all text if no thinking tags).
+    """
+    llm = get_llm(mode, api_key, streaming=True)
+    full_text = ""
+    thinking_sent = 0
+
+    async for chunk in llm.astream([HumanMessage(content=prompt)]):
+        raw = chunk.content
+        if isinstance(raw, list):
+            token = "".join(
+                p.get("text", "") if isinstance(p, dict) else str(p)
+                for p in raw
+            )
+        else:
+            token = str(raw) if raw else ""
+        if not token:
+            continue
+        full_text += token
+
+        # Stream thinking tokens as they arrive
+        if on_thinking and "<thinking>" in full_text and "</thinking>" not in full_text:
+            inner = full_text.split("<thinking>", 1)[1]
+            # Guard against partial closing tag
+            safe_len = len(inner)
+            for i in range(1, min(len("</thinking>"), len(inner) + 1)):
+                if inner.endswith("</thinking>"[:i]):
+                    safe_len = len(inner) - i
+                    break
+            if safe_len > thinking_sent:
+                await on_thinking(inner[thinking_sent:safe_len])
+                thinking_sent = safe_len
+
+    # Extract final output (after thinking)
+    if "</thinking>" in full_text:
+        text = full_text.split("</thinking>", 1)[1].strip()
+    else:
+        text = full_text.strip()
+
+    _log(f"    [HITL:LLM] mode={mode} streamed response_len={len(text)} thinking_len={thinking_sent}")
+    return text
 
 
 def _parse_json(text: str) -> dict:

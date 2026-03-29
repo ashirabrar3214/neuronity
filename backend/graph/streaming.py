@@ -11,6 +11,7 @@ import asyncio
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from graph.llm import get_llm
 from graph.tool_definitions import get_tools_for_agent
+from graph.hitl_intervention import InterventionTracker
 
 AGENTS_CODE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "agents_code")
 
@@ -117,6 +118,7 @@ async def _react_loop(state: dict):
 
     # Research config from agent settings
     user_effort  = state.get("user_effort", 1)
+    human_expertise = state.get("human_expertise", 5)
     project_size = state.get("project_size", "small")
     research_cfg = tk.get_research_config(project_size, user_effort)
 
@@ -124,7 +126,10 @@ async def _react_loop(state: dict):
     burst_size     = research_cfg["burst_size"]
     human_effort   = research_cfg["human_effort"]
 
-    print(f">>> [REACT] agent={agent_id} project_size={project_size} H={human_effort} "
+    # Smart intervention tracker for this session
+    _tracker = InterventionTracker(human_effort=human_effort, human_expertise=human_expertise)
+
+    print(f">>> [REACT] agent={agent_id} project_size={project_size} H={human_effort} E={human_expertise} "
           f"total_sources={total_sources} burst_size={burst_size}", flush=True)
 
     # Reset raw step storage for this agent session
@@ -280,12 +285,24 @@ async def _react_loop(state: dict):
         tool_args = step.get("tool_args") or {}
 
         if step_type == "tool" and tool_name:
-            # HITL confidence gate
+            # Smart HITL intervention gate
             confidence = step.get("confidence", 100)
-            if confidence < 85:
+            # Map planner step types to intervention step types
+            _stype_map = {"tool": "tool_choice", "think": "analysis", "ask": "direction"}
+            intervention_step_type = _stype_map.get(step.get("type", ""), "analysis")
+            # Override: if the step has a clarification_question, it's a direction decision
+            if step.get("clarification_question"):
+                intervention_step_type = "direction"
+
+            intervention = _tracker.record_step(confidence, intervention_step_type)
+            if intervention["should_intervene"]:
                 question = step.get("clarification_question") or \
                     f"I'm not confident about '{desc}'. Can you clarify?"
-                yield _sse({"type": "hitl_question", "content": question, "confidence": confidence})
+                print(f"    [HITL] Smart gate fired: {intervention['reason']}", flush=True)
+                yield _sse({"type": "hitl_question", "content": question,
+                            "confidence": confidence,
+                            "intervention_score": intervention["score"],
+                            "intervention_reason": intervention["reason"]})
                 return
 
             arg_str = ""

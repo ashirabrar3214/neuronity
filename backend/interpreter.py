@@ -172,6 +172,7 @@ class AgentModel(BaseModel):
     agentType: str = "worker"
     specialRole: str = "custom"
     userEffort: int = 1
+    humanExpertise: int = 5
     projectSize: str = "small"
     x: float = 0
     y: float = 0
@@ -678,6 +679,7 @@ async def chat_with_agent(request: ChatRequest):
         # build_context will overwrite these with proper values
         "goal": request.message,
         "user_effort": agent_data.get("userEffort", 1),
+        "human_expertise": agent_data.get("humanExpertise", 5),
         "project_size": agent_data.get("projectSize", "small"),
         "plan_iterations": 0,
         "max_plan_iterations": 50,
