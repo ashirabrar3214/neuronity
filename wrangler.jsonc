@@ -1,26 +1,10 @@
 {
   "name": "neuronity",
   "compatibility_date": "2025-09-27",
+  "assets": {
+    "directory": "."
+  },
   "observability": {
     "enabled": true
-  },
-  "assets": {
-    "directory": ".",
-    "binding": "ASSETS",
-    "exclude": [
-      "node_modules",
-      ".git",
-      ".venv",
-      "backend",
-      "HITL",
-      "*.bat",
-      "*.txt",
-      "requirements.txt",
-      "package-lock.json",
-      ".claude"
-    ]
-  },
-  "compatibility_flags": [
-    "nodejs_compat"
-  ]
+  }
 }
