@@ -2,7 +2,10 @@
   "name": "neuronity",
   "compatibility_date": "2025-09-27",
   "assets": {
-    "directory": "."
+    "directory": "dist"
+  },
+  "build": {
+    "command": "node build.js"
   },
   "observability": {
     "enabled": true
