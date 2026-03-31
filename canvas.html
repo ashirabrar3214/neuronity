@@ -6,7 +6,7 @@
     <title>Easy Company</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="canvas.css">
     <link rel="stylesheet" href="agent-training.css">
@@ -19,52 +19,6 @@
         <div id="nodes-layer"></div>
     </div>
 
-    <!-- Top Menu Bar -->
-    <div class="menu-bar">
-        <div class="menu-bar-item" id="menu-file">
-            <span class="menu-bar-label">File</span>
-            <div class="menu-dropdown" id="menu-file-dropdown">
-                <button class="menu-dropdown-item" id="menu-new-canvas">
-                    <span>New Canvas</span>
-                    <span class="menu-shortcut">Ctrl+T</span>
-                </button>
-                <button class="menu-dropdown-item" id="add-agent-btn">
-                    <span>New Workflow</span>
-                    <span class="menu-shortcut">Ctrl+N</span>
-                </button>
-                <div class="menu-divider"></div>
-                <button class="menu-dropdown-item" id="menu-save-canvas">
-                    <span>Save Canvas</span>
-                    <span class="menu-shortcut">Ctrl+S</span>
-                </button>
-                <button class="menu-dropdown-item" id="menu-load-canvas">
-                    <span>Open Canvas</span>
-                    <span class="menu-shortcut">Ctrl+O</span>
-                </button>
-                <div class="menu-divider"></div>
-                <button class="menu-dropdown-item" id="menu-clear-canvas">
-                    <span>Clear Canvas</span>
-                </button>
-                <div class="menu-divider"></div>
-                <button class="menu-dropdown-item" id="menu-exit" onclick="window.electronAPI && window.electronAPI.closeApp ? window.electronAPI.closeApp() : window.close()">
-                    <span>Exit</span>
-                    <span class="menu-shortcut">Alt+F4</span>
-                </button>
-            </div>
-        </div>
-        <div class="menu-bar-item" id="menu-view">
-            <span class="menu-bar-label">View</span>
-            <div class="menu-dropdown" id="menu-view-dropdown">
-                <button class="menu-dropdown-item" id="menu-zoom-fit">
-                    <span>Zoom to Fit</span>
-                </button>
-                <button class="menu-dropdown-item" id="menu-reset-view">
-                    <span>Reset View</span>
-                    <span class="menu-shortcut">Ctrl+0</span>
-                </button>
-            </div>
-        </div>
-    </div>
 
     <!-- Agent Gallery Popup -->
     <div class="gallery-overlay" id="gallery-overlay">
@@ -172,17 +126,10 @@
                 <button id="close-training-btn">← Close</button>
                 <div class="header-left">
                     <h2 id="agent-name">Agent</h2>
-                    <div class="mode-toggle-container">
-                        <span class="mode-label">Work</span>
-                        <label class="switch">
-                            <input type="checkbox" id="work-train-toggle" checked>
-                            <span class="slider round"></span>
-                        </label>
-                        <span class="mode-label active" id="train-label">Train</span>
-                    </div>
                 </div>
                 <div class="header-actions">
                     <div id="auto-save-status" class="save-status">Saved</div>
+                    <span class="mode-badge" id="mode-badge">Chat</span>
                     <button id="clear-chat-btn" title="Clear chat history">🗑 Clear Chat</button>
                 </div>
             </header>
@@ -197,11 +144,11 @@
                         <div class="section-title">Identity</div>
                         <div class="detail-item">
                             <label>Name</label>
-                            <input type="text" id="detail-name" class="sidebar-input">
+                            <div id="detail-name" class="sidebar-readonly"></div>
                         </div>
                         <div class="detail-item">
                             <label>Description</label>
-                            <textarea id="detail-description" class="sidebar-textarea" rows="3"></textarea>
+                            <div id="detail-description" class="sidebar-readonly"></div>
                         </div>
                         <div class="detail-item">
                             <label>Main Responsibility</label>
@@ -261,24 +208,13 @@
                         </div>
                     </div>
 
-                    <div class="sidebar-section">
-                        <div class="section-title">Environment</div>
-                        <div class="detail-item">
-                            <label>Working Dir</label>
-                            <div class="sidebar-file-input">
-                                <input type="text" id="detail-workdir" class="sidebar-input"
-                                    placeholder="Select folder..." readonly>
-                                <button id="browse-workdir-btn" class="sidebar-browse-btn">📂</button>
-                            </div>
-                        </div>
-                    </div>
 
                 </aside>
                 <div id="sidebar-resizer" class="resizer resizer-middle"></div>
                 <div class="chat-main-column">
                     <div class="chat-area" id="chat-area">
                         <div class="message agent-message">
-                            What are we learning today?
+                            Hello! I am ready to be trained. You can upload documents or give me specific instructions here.
                         </div>
                     </div>
                     <!-- Autonomous Plan Execution Area (Hidden by default) -->

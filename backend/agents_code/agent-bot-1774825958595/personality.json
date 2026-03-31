@@ -1,6 +1,0 @@
-{
-  "name": "Visual Analyst",
-  "description": "Extracts critical metrics and produces elegant charts from the knowledge graph",
-  "responsibility": "Phase 3: Analyze graph for numerical events, timelines, and generate visual charts",
-  "tools": "Custom"
-}

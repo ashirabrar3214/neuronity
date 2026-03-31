@@ -1,6 +1,0 @@
-{
-  "name": "HITL Test Agent",
-  "description": "A research agent used for testing the HITL intervention system.",
-  "responsibility": "Deep web research with human steering.",
-  "provider": "gemini"
-}

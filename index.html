@@ -48,7 +48,8 @@
     <!-- Workspace UI -->
     <div id="main-workspace" class="hidden">
         <div id="agent-canvas">
-            <div class="grid-layer"></div>
+            <div class="grid-layer grid-base"></div>
+            <div class="grid-layer grid-highlight" id="grid-highlight"></div>
             <svg class="connections-layer"></svg>
             <div id="nodes-layer"></div>
         </div>
@@ -56,10 +57,18 @@
         <div id="training-overlay" class="training-side-panel">
             <div id="panel-resizer" class="resizer panel-resizer"></div>
             <div class="panel-header">
-                <h2 id="agent-name">Agent Training</h2>
+                <div class="header-left">
+                    <h2 id="agent-name">Agent Training</h2>
+                    <span id="mode-badge" class="mode-badge">Work</span>
+                </div>
                 <div class="header-actions">
-                    <div id="auto-save-status" class="save-status">Saved</div>
-                    <button id="close-training-btn" class="close-btn">&times;</button>
+                    <span id="auto-save-status" class="save-status">Saved</span>
+                    <button id="clear-chat-btn" class="header-clear-btn">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6m4-6v6"></path>
+                        </svg>
+                        Clear Chat
+                    </button>
                 </div>
             </div>
             <div class="panel-content">
@@ -100,13 +109,6 @@
                         </div>
                     </div>
                     <div class="sidebar-section">
-                        <label>Working Directory</label>
-                        <div class="input-with-icon">
-                            <input type="text" id="detail-workdir" placeholder="C:\Users\...">
-                            <button id="browse-workdir-btn" title="Browse Folder">📂</button>
-                        </div>
-                    </div>
-                    <div class="sidebar-section">
                         <label>Tools (CSV)</label>
                         <input type="text" id="detail-tools" placeholder="gmail, search, weather">
                     </div>
@@ -115,10 +117,6 @@
                 <div id="sidebar-resizer" class="resizer sidebar-resizer"></div>
 
                 <div class="chat-main">
-                    <div class="chat-header-row">
-                        <h3>Training & Chat</h3>
-                        <button id="clear-chat-btn" class="text-btn">Clear History</button>
-                    </div>
                     <div id="chat-area" class="chat-area">
                         <div class="message agent-message">
                             Hello! I am ready to be trained. You can upload documents or give me specific instructions

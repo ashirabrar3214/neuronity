@@ -401,11 +401,10 @@ window.openTrainingPanel = async (agentId, agentName) => {
     activeAgentData = agentData;
 
     // Populate UI with the most up-to-date data
-    if (document.getElementById('detail-name')) document.getElementById('detail-name').value = agentData.name || '';
-    if (document.getElementById('detail-description')) document.getElementById('detail-description').value = agentData.description || '';
+    if (document.getElementById('detail-name')) document.getElementById('detail-name').textContent = agentData.name || '';
+    if (document.getElementById('detail-description')) document.getElementById('detail-description').textContent = agentData.description || '';
     if (document.getElementById('detail-responsibility')) document.getElementById('detail-responsibility').value = agentData.responsibility || '';
     if (document.getElementById('detail-channel')) document.getElementById('detail-channel').value = agentData.channel || 'Gmail';
-    if (document.getElementById('detail-workdir')) document.getElementById('detail-workdir').value = agentData.workingDir || '';
     const effortSlider = document.getElementById('detail-user-effort');
     if (effortSlider) {
         effortSlider.value = agentData.userEffort || 1;
@@ -443,6 +442,18 @@ window.openTrainingPanel = async (agentId, agentName) => {
     const planBtn = document.getElementById('generate-plan-btn');
     if (planBtn) {
         planBtn.style.display = (agentData.agentType === 'master') ? 'block' : 'none';
+    }
+
+    const isMaster = (agentData.agentType === 'master');
+    const sidebar = document.getElementById('details-sidebar');
+    const modeBadge = document.getElementById('mode-badge');
+
+    // sidebar should be enabled for all agents to allow configuration
+    if (sidebar) {
+        sidebar.classList.remove('disabled');
+    }
+    if (modeBadge) {
+        modeBadge.textContent = isMaster ? 'Work' : 'Chat';
     }
 
 
@@ -543,38 +554,8 @@ window.openTrainingPanel = async (agentId, agentName) => {
         }
     }, 500);
 
-    // Sync UI with current toggle state
-    const toggle = document.getElementById('work-train-toggle');
-    if (toggle) {
-        updateModeState(toggle.checked);
-    }
 };
 
-// ─── WORK/TRAIN MODE TOGGLE ──────────────────────────────────────────────
-function updateModeState(isTrainMode) {
-    const sidebar = document.getElementById('details-sidebar');
-    const trainLabel = document.getElementById('train-label');
-    const workLabel = document.querySelector('.mode-label:not(#train-label)');
-
-    if (isTrainMode) {
-        sidebar.classList.remove('disabled');
-        trainLabel.classList.add('active');
-        if (workLabel) workLabel.classList.remove('active');
-    } else {
-        sidebar.classList.add('disabled');
-        trainLabel.classList.remove('active');
-        if (workLabel) workLabel.classList.add('active');
-    }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const toggle = document.getElementById('work-train-toggle');
-    if (toggle) {
-        toggle.addEventListener('change', (e) => {
-            updateModeState(e.target.checked);
-        });
-    }
-});
 
 // ─── AUTO-SAVE SYSTEM ────────────────────────────────────────────────────
 async function triggerSave() {
@@ -588,16 +569,16 @@ async function triggerSave() {
     const updatedData = {
         ...activeAgentData,
         id: activeAgentId, // CRITICAL: Enforce ID match to prevent accidental renames/duplications
-        name: document.getElementById('detail-name')?.value || activeAgentData.name || '',
-        description: document.getElementById('detail-description')?.value || activeAgentData.description || '',
+        name: activeAgentData.name || '',
+        description: activeAgentData.description || '',
         responsibility: document.getElementById('detail-responsibility')?.value || activeAgentData.responsibility || '',
         channel: document.getElementById('detail-channel')?.value || activeAgentData.channel || 'Gmail',
-        workingDir: document.getElementById('detail-workdir')?.value || activeAgentData.workingDir || '',
+        workingDir: activeAgentData.workingDir || '',
         userEffort: parseInt(document.getElementById('detail-user-effort')?.value || activeAgentData.userEffort || '1', 10),
         humanExpertise: parseInt(document.getElementById('detail-human-expertise')?.value || activeAgentData.humanExpertise || '5', 10),
         projectSize: document.getElementById('detail-project-size')?.value || activeAgentData.projectSize || 'small',
         connectedTools: Array.from(connectedToolsSet),
-        agentType: document.getElementById('detail-agent-type')?.value || activeAgentData.agentType || 'worker',
+        agentType: activeAgentData.agentType || 'worker',
         permissions: activeAgentData.permissions || [],
         specialRole: activeAgentData.specialRole || 'custom'
     };
@@ -648,14 +629,14 @@ window.initTrainingUI = function() {
     const chatArea = document.getElementById('chat-area');
 
     // ── INTERACTION HANDLERS ────────────────────────────────────────────────
-    // Open all source/citation links in the system default browser, not inside Electron
+    // Open all source/citation links in a new tab
     chatArea.addEventListener('click', (e) => {
         const link = e.target.closest('.msg-link');
         if (link) {
             e.preventDefault();
             const url = link.getAttribute('href');
-            if (url && window.electronAPI && window.electronAPI.openExternal) {
-                window.electronAPI.openExternal(url);
+            if (url) {
+                window.open(url, '_blank');
             }
         }
     });
@@ -690,19 +671,7 @@ window.initTrainingUI = function() {
     };
 
     window.closeTrainingPanel = closeTrainingPanel;
-    closeBtn.addEventListener('click', closeTrainingPanel);
-
-    // Working Directory Browse
-    const browseWorkdirBtn = document.getElementById('browse-workdir-btn');
-    if (browseWorkdirBtn) {
-        browseWorkdirBtn.addEventListener('click', async () => {
-            const path = await window.electronAPI.selectDirectory();
-            if (path) {
-                document.getElementById('detail-workdir').value = path;
-                queueAutoSave();
-            }
-        });
-    }
+    if (closeBtn) closeBtn.addEventListener('click', closeTrainingPanel);
 
     // ── MCP Tools Modal Wiring ──────────────────────────────────────────────
     const manageToolsBtn = document.getElementById('manage-tools-btn');
@@ -744,25 +713,15 @@ window.initTrainingUI = function() {
         });
     }
 
-    // Agent Type change
-    const typeSelect = document.getElementById('detail-agent-type');
-    if (typeSelect) {
-        typeSelect.addEventListener('change', () => {
-            const planBtn = document.getElementById('generate-plan-btn');
-            if (planBtn) {
-                planBtn.style.display = (typeSelect.value === 'master') ? 'block' : 'none';
-            }
-            queueAutoSave();
-        });
-    }
+
 
     // Link autoSaveStatus to the global
     autoSaveStatus = document.getElementById('auto-save-status');
 
     // Attach listeners to all inputs/selects for auto-save
     const autoSaveInputs = [
-        'detail-name', 'detail-description', 'detail-responsibility',
-        'detail-channel', 'detail-workdir', 'detail-user-effort', 'detail-human-expertise'
+        'detail-responsibility',
+        'detail-channel', 'detail-user-effort', 'detail-human-expertise'
     ];
 
     autoSaveInputs.forEach(id => {
@@ -956,13 +915,8 @@ window.initTrainingUI = function() {
         setBusy(true);
         showTypingIndicator();
 
-        const toggleEl = document.getElementById('work-train-toggle');
-        const isTraining = toggleEl ? toggleEl.checked : false;
-        const mode = isTraining ? 'training' : 'work';
-
-        // In training mode, always use /chat (no autonomous planning).
-        // In work mode, master agents use /run_autonomous for tasks.
         const agentType = activeAgentData.agentType || 'worker';
+        const mode = (agentType === 'master') ? 'work' : 'training';
         let endpoint = 'http://localhost:8000/chat';
 
         currentAbortController = new AbortController();

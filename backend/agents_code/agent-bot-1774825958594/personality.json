@@ -1,6 +1,0 @@
-{
-  "name": "Synthesis Agent",
-  "description": "Reads knowledge map, analyzes findings, writes analytical report",
-  "responsibility": "Phase 2: Analyze knowledge map, identify gaps, write report with citations",
-  "tools": "Custom"
-}

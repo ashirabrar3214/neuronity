@@ -1,86 +1,89 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const http = require('http');
+const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 
-let pythonProcess;
+const PORT = 3000;
 
-ipcMain.handle('select-directory', async () => {
-  const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']
-  });
-  return result.canceled ? null : result.filePaths[0];
-});
+const MIME_TYPES = {
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+};
 
-ipcMain.handle('open-external', async (_event, url) => {
-  if (url && url.startsWith('http')) {
-    await shell.openExternal(url);
-  }
-});
-
-let mainWindow;
-
-function startPythonBackend() {
-  const scriptPath = path.join(__dirname, 'backend', 'interpreter.py');
-  pythonProcess = spawn('python', [scriptPath], {
+// Start Python backend
+const scriptPath = path.join(__dirname, 'backend', 'interpreter.py');
+const pythonProcess = spawn('python', [scriptPath], {
     env: { ...process.env, PYTHONUTF8: '1' }
-  });
+});
 
-  function sendToRenderer(data) {
-    if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send('backend-log', data.toString());
-    }
-  }
+pythonProcess.stdout.on('data', (data) => {
+    console.log(`Python: ${data.toString().trim()}`);
+});
 
-  pythonProcess.stdout.on('data', (data) => {
+pythonProcess.stderr.on('data', (data) => {
     const str = data.toString();
-    console.log(`Python: ${str.trim()}`);
-    sendToRenderer(str);
-  });
-
-  pythonProcess.stderr.on('data', (data) => {
-    const str = data.toString();
-    // Only prefix as Error if it doesn't look like a standard Uvicorn INFO/WARNING log
     if (str.includes('INFO:') || str.includes('WARNING:')) {
-      console.log(`Python backend: ${str.trim()}`);
+        console.log(`Python backend: ${str.trim()}`);
     } else {
-      console.error(`Python backend Error: ${str.trim()}`);
+        console.error(`Python backend Error: ${str.trim()}`);
     }
-    sendToRenderer(str);
-  });
-}
+});
 
-function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    title: 'Easy Company',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js')
+pythonProcess.on('close', (code) => {
+    console.log(`Python backend exited with code ${code}`);
+});
+
+// Serve static files
+const server = http.createServer((req, res) => {
+    let filePath = req.url === '/' ? '/canvas.html' : req.url;
+    // Strip query strings and decode URI
+    filePath = decodeURIComponent(filePath.split('?')[0]);
+    const fullPath = path.resolve(path.join(__dirname, filePath));
+
+    // Security: prevent directory traversal
+    if (!fullPath.startsWith(__dirname)) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
     }
-  });
 
-  mainWindow.setMenu(null);
-  mainWindow.loadFile('canvas.html');
-}
+    const ext = path.extname(fullPath);
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-app.whenReady().then(async () => {
-  startPythonBackend();
-
-  createWindow();
-
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+    fs.readFile(fullPath, (err, data) => {
+        if (err) {
+            res.writeHead(404);
+            res.end('Not Found');
+            return;
+        }
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(data);
+    });
 });
 
-app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') app.quit();
+server.listen(PORT, () => {
+    const url = `http://localhost:${PORT}`;
+    console.log(`Easy Company running at ${url}`);
+    // Auto-open in default browser
+    const start = process.platform === 'win32' ? 'start' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+    exec(`${start} ${url}`);
 });
 
-app.on('will-quit', () => {
-  if (pythonProcess) pythonProcess.kill();
+// Cleanup on exit
+process.on('SIGINT', () => {
+    pythonProcess.kill();
+    process.exit();
 });
 
-ipcMain.on('close-app', () => {
-  app.quit();
+process.on('SIGTERM', () => {
+    pythonProcess.kill();
+    process.exit();
 });

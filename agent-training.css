@@ -1,19 +1,20 @@
 /* ── TRAINING OVERLAY: MODERN PREMIUM THEME ───────────────────────── */
 :root {
-    --bg-dark: #121212;
-    --bg-panel: #181818;
-    --bg-sidebar: #141414;
-    --border-subtle: #333;
-    --text-primary: #ececec;
-    --text-secondary: #a0a0a0;
-    --accent-color: #6c5ce7;
-    --accent-hover: #5b4cc4;
-    --message-user: #6c5ce7;
-    --message-agent: #262626;
+    --bg-dark: #FFFFFF;
+    --bg-panel: #FFFFFF;
+    --bg-sidebar: #FFFFFF;
+    --border-subtle: #E8E8E8;
+    --text-primary: #7A8C90;
+    --text-secondary: #7A8C90;
+    --accent-color: #FF8575;
+    --accent-hover: #e06f60;
+    --accent-coral: #FF8575;
+    --message-user: #FF8575;
+    --message-agent: #F5F5F5;
 
     /* Apple-inspired tokens for refined feel */
     --apple-system-blue: #0A84FF;
-    --apple-border: rgba(255, 255, 255, 0.1);
+    --apple-border: rgba(0, 0, 0, 0.08);
 }
 
 .training-side-panel,
@@ -33,9 +34,10 @@
     z-index: 1100;
     transform: translateX(100%);
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.6);
+    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.08);
     display: flex;
     flex-direction: column;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
 }
 
 .training-side-panel.active {
@@ -61,92 +63,26 @@
     font-size: 16px;
     color: var(--text-primary);
     font-weight: 600;
+    line-height: 1;
 }
 
 .header-left {
     display: flex;
     align-items: center;
-    gap: 24px;
-    flex: 1;
+    gap: 12px;
 }
 
-/* ── MODE TOGGLE ────────────────────────────────────────────────────── */
-.mode-toggle-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(0, 0, 0, 0.2);
-    padding: 4px 12px;
-    border-radius: 20px;
-    border: 1px solid var(--border-subtle);
-}
-
-.mode-label {
+/* ── MODE BADGE ────────────────────────────────────────────────────── */
+.mode-badge {
     font-size: 11px;
-    font-weight: 500;
-    color: var(--text-secondary);
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    transition: color 0.3s;
-}
-
-.mode-label.active {
-    color: var(--text-primary);
-}
-
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 36px;
-    height: 20px;
-}
-
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--accent-hover);
-    transition: .4s;
-}
-
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 14px;
-    width: 14px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: .4s;
-}
-
-input:checked+.slider {
-    background-color: var(--accent-color);
-}
-
-input:focus+.slider {
-    box-shadow: 0 0 1px var(--accent-color);
-}
-
-input:checked+.slider:before {
-    transform: translateX(16px);
-}
-
-.slider.round {
-    border-radius: 20px;
-}
-
-.slider.round:before {
-    border-radius: 50%;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: rgba(255, 133, 117, 0.15);
+    color: #FF8575;
+    border: 1px solid #FF8575;
 }
 
 .header-actions {
@@ -156,9 +92,9 @@ input:checked+.slider:before {
 }
 
 #clear-chat-btn {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--border-subtle);
-    color: var(--text-secondary);
+    background: #FF8575;
+    border: none;
+    color: #FFFFFF;
     font-size: 12px;
     padding: 6px 12px;
     border-radius: 6px;
@@ -169,20 +105,38 @@ input:checked+.slider:before {
     gap: 6px;
 }
 
-#clear-chat-btn:hover {
-    background: rgba(255, 77, 77, 0.1);
-    color: #ff4d4d;
-    border-color: rgba(255, 77, 77, 0.2);
+#clear-chat-btn:hover,
+.header-clear-btn:hover {
+    background: #e06f60;
+    color: #FFFFFF;
+    border-color: #e06f60;
+}
+
+.header-clear-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
 }
 
 #close-training-btn {
+    display: flex;
+    align-items: center;
     background: transparent;
     border: none;
     color: var(--text-secondary);
+    font-size: 13px;
     cursor: pointer;
-    font-size: 14px;
-    padding: 8px 12px;
-    border-radius: 4px;
+    padding: 0 8px 0 0;
+    white-space: nowrap;
     transition: color 0.2s;
 }
 
@@ -227,18 +181,25 @@ input:checked+.slider:before {
 }
 
 .details-sidebar.disabled {
-    opacity: 0.5;
+    opacity: 0.7;
+}
+
+.details-sidebar.disabled input,
+.details-sidebar.disabled select,
+.details-sidebar.disabled button,
+.details-sidebar.disabled textarea {
     pointer-events: none;
 }
 
 .sidebar-header {
-    font-size: 14px;
+    font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
     padding-bottom: 16px;
     border-bottom: 1px solid var(--border-subtle);
     display: flex;
     justify-content: space-between;
+    font-family: 'Newsreader', serif;
 }
 
 .sidebar-section {
@@ -250,8 +211,8 @@ input:checked+.slider:before {
 .section-title {
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #666;
+    letter-spacing: 1.5px;
+    color: #7A8C90;
     font-weight: 600;
     margin-bottom: 4px;
 }
@@ -271,8 +232,8 @@ input:checked+.slider:before {
 .sidebar-input,
 .sidebar-select,
 .sidebar-textarea {
-    background: #262626;
-    border: 1px solid var(--border-subtle);
+    background: #F5F5F5;
+    border: 1px solid #E0E0E0;
     color: var(--text-primary);
     padding: 10px;
     border-radius: 8px;
@@ -288,12 +249,28 @@ input:checked+.slider:before {
 .sidebar-select:focus,
 .sidebar-textarea:focus {
     border-color: var(--accent-color);
-    background: #2a2a2a;
+    background: #FFFFFF;
 }
 
 .sidebar-textarea {
     resize: vertical;
     min-height: 80px;
+    line-height: 1.5;
+}
+
+.sidebar-readonly {
+    color: var(--text-primary);
+    font-size: 18px;
+    font-family: 'Times New Roman', Times, serif;
+    font-weight: 700;
+    line-height: 1.3;
+    padding: 4px 0;
+    word-wrap: break-word;
+}
+
+#detail-description.sidebar-readonly {
+    font-size: 14px;
+    font-weight: 400;
     line-height: 1.5;
 }
 
@@ -369,7 +346,7 @@ input:checked+.slider:before {
     width: 100%;
     height: 6px;
     border-radius: 3px;
-    background: linear-gradient(to right, var(--accent-color), #6b5ce7);
+    background: linear-gradient(to right, var(--accent-color), #3ab8b8);
     outline: none;
     cursor: pointer;
 }
@@ -477,11 +454,13 @@ input:checked+.slider:before {
 
 .agent-message {
     align-self: flex-start;
-    background: var(--message-agent);
-    color: #e0e0e0;
-    border: 1px solid var(--border-subtle);
+    background: #F5F5F5;
+    color: #7A8C90;
+    border: 1px solid #E8E8E8;
     border-bottom-left-radius: 4px;
     max-width: 85%;
+    font-family: 'Newsreader', serif;
+    font-size: 15px;
 }
 
 /* ── RICH MARKDOWN IN CHAT ─────────────────────────────────────────── */
@@ -563,18 +542,18 @@ input:checked+.slider:before {
 }
 
 .copy-btn:hover {
-    background: rgba(108, 92, 231, 0.1);
+    background: rgba(255, 133, 117, 0.1);
 }
 
 .msg-citation {
     display: inline-block;
     font-size: 10px;
-    background: rgba(108, 92, 231, 0.1);
+    background: rgba(255, 133, 117, 0.1);
     color: var(--accent-color);
     padding: 2px 8px;
     border-radius: 10px;
     margin-top: 8px;
-    border: 1px solid rgba(108, 92, 231, 0.2);
+    border: 1px solid rgba(255, 133, 117, 0.2);
 }
 
 .msg-link {
@@ -819,7 +798,7 @@ input:checked+.slider:before {
     width: 8px !important;
     height: 100%;
     background: transparent;
-    border-left: 2px solid rgba(108, 92, 231, 0.3);
+    border-left: 2px solid rgba(255, 133, 117, 0.3);
     z-index: 1300;
     cursor: ew-resize;
     display: block !important;
@@ -830,7 +809,7 @@ input:checked+.slider:before {
 .panel-resizer:hover,
 .resizer-left.dragging,
 .panel-resizer.dragging {
-    background: rgba(108, 92, 231, 0.1) !important;
+    background: rgba(255, 133, 117, 0.1) !important;
     border-left-color: var(--accent-color) !important;
 }
 
@@ -930,7 +909,7 @@ input:checked+.slider:before {
 }
 
 .plan-btn {
-    background: rgba(108, 92, 231, 0.1);
+    background: rgba(255, 133, 117, 0.1);
     border: 1px solid var(--accent-color);
     color: var(--accent-color);
     padding: 8px 16px;
@@ -1855,9 +1834,9 @@ input:checked+.slider:before {
 .manage-tools-btn {
     font-size: 11px;
     font-weight: 500;
-    background: rgba(108, 92, 231, 0.12);
+    background: rgba(255, 133, 117, 0.12);
     color: var(--accent-color);
-    border: 1px solid rgba(108, 92, 231, 0.3);
+    border: 1px solid rgba(255, 133, 117, 0.3);
     padding: 6px 14px;
     border-radius: 20px;
     cursor: pointer;
@@ -1866,8 +1845,8 @@ input:checked+.slider:before {
 }
 
 .manage-tools-btn:hover {
-    background: rgba(108, 92, 231, 0.22);
-    border-color: rgba(108, 92, 231, 0.5);
+    background: rgba(255, 133, 117, 0.22);
+    border-color: rgba(255, 133, 117, 0.5);
     color: #fff;
 }
 
@@ -1881,11 +1860,11 @@ input:checked+.slider:before {
 
 .mcp-badge {
     font-size: 10px;
-    background: rgba(108, 92, 231, 0.1);
+    background: rgba(255, 133, 117, 0.1);
     color: var(--accent-color);
     padding: 3px 8px;
     border-radius: 12px;
-    border: 1px solid rgba(108, 92, 231, 0.25);
+    border: 1px solid rgba(255, 133, 117, 0.25);
     white-space: nowrap;
     display: flex;
     align-items: center;
@@ -2039,9 +2018,9 @@ input:checked+.slider:before {
 }
 
 .mcp-cat-tab.active {
-    background: rgba(108, 92, 231, 0.15);
+    background: rgba(255, 133, 117, 0.15);
     color: var(--accent-color);
-    border-color: rgba(108, 92, 231, 0.4);
+    border-color: rgba(255, 133, 117, 0.4);
 }
 
 /* Tools grid */
@@ -2088,8 +2067,8 @@ input:checked+.slider:before {
 }
 
 .mcp-tool-card.connected {
-    background: rgba(108, 92, 231, 0.06);
-    border-color: rgba(108, 92, 231, 0.3);
+    background: rgba(255, 133, 117, 0.06);
+    border-color: rgba(255, 133, 117, 0.3);
 }
 
 .mcp-tool-icon {
@@ -2160,7 +2139,7 @@ input:checked+.slider:before {
 .mcp-tool-connect-btn:hover {
     border-color: var(--accent-color);
     color: var(--accent-color);
-    background: rgba(108, 92, 231, 0.1);
+    background: rgba(255, 133, 117, 0.1);
 }
 
 .mcp-tool-card.connected .mcp-tool-connect-btn {

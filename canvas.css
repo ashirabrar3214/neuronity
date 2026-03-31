@@ -1,12 +1,13 @@
 :root {
-    --bg-dark: #121212;
-    --bg-panel: #1e1e1e;
-    --border-subtle: #333;
-    --text-primary: #ffffff;
-    --text-secondary: #a0a0a0;
-    --accent-color: #6c5ce7;
-    --node-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    --glass-border: rgba(255, 255, 255, 0.08);
+    --bg-dark: #FFFFFF;
+    --bg-panel: #FFFFFF;
+    --border-subtle: #E8E8E8;
+    --text-primary: #7A8C90;
+    --text-secondary: #7A8C90;
+    --accent-color: #FF8575;
+    --accent-hover: #e06f60;
+    --node-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --glass-border: #E8E8E8;
 }
 
 body.canvas-mode {
@@ -40,19 +41,47 @@ body.canvas-mode {
     cursor: grabbing;
 }
 
-/* Infinite Grid Background */
+/* ── GRID BACKGROUND ────────────────────────────────────────────── */
 .grid-layer {
     position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background-image: radial-gradient(var(--border-subtle) 1px, transparent 1px);
-    background-size: 24px 24px;
-    opacity: 0.2;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
-    transform: translate(0, 0);
-    /* Can be updated via JS for panning */
+    z-index: 0;
+    background-image:
+        /* major vertical lines */
+        linear-gradient(to right, rgba(122, 140, 144, 0.08) 1px, transparent 1px),
+        /* major horizontal lines */
+        linear-gradient(to bottom, rgba(122, 140, 144, 0.08) 1px, transparent 1px),
+        /* minor vertical lines */
+        linear-gradient(to right, rgba(122, 140, 144, 0.03) 1px, transparent 1px),
+        /* minor horizontal lines */
+        linear-gradient(to bottom, rgba(122, 140, 144, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+}
+
+/* Square dot grid: small dots every 30px, larger dots every 150px */
+.grid-base {
+    background-image:
+        /* major dots */
+        radial-gradient(circle, rgba(255,255,255,0.5) 1.5px, transparent 1.5px),
+        /* minor dots */
+        radial-gradient(circle, rgba(255,255,255,0.25) 0.8px, transparent 0.8px);
+    background-size: 150px 150px, 30px 30px;
+    background-position: 0 0, 0 0;
+}
+
+/* Highlight layer: same dot grid but purple, revealed by mouse spotlight */
+.grid-highlight {
+    background-image:
+        radial-gradient(circle, rgba(108,92,231,0.9) 1.5px, transparent 1.5px),
+        radial-gradient(circle, rgba(108,92,231,0.6) 0.8px, transparent 0.8px);
+    background-size: 150px 150px, 30px 30px;
+    background-position: 0 0, 0 0;
+    -webkit-mask-image: radial-gradient(ellipse 260px 260px at var(--mouse-x, -999px) var(--mouse-y, -999px), black 0%, transparent 100%);
+    mask-image:         radial-gradient(ellipse 260px 260px at var(--mouse-x, -999px) var(--mouse-y, -999px), black 0%, transparent 100%);
 }
 
 /* Agent Nodes */
@@ -76,14 +105,14 @@ body.canvas-mode {
 }
 
 .agent-node.master-role {
-    border-color: rgba(108, 92, 231, 1);
-    box-shadow: 0 0 25px rgba(108, 92, 231, 0.25);
+    border-color: #FF8575;
+    box-shadow: 0 2px 8px rgba(255, 133, 117, 0.15);
     z-index: 50;
 }
 
 .agent-node.selected {
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.3);
+    box-shadow: 0 0 0 2px rgba(255, 133, 117, 0.3);
     z-index: 100 !important;
 }
 
@@ -104,9 +133,9 @@ body.canvas-mode {
     font-size: 9px;
     padding: 2px 6px;
     border-radius: 4px;
-    background: rgba(108, 92, 231, 0.1);
-    color: var(--accent-color);
-    border: 1px solid var(--accent-color);
+    background: rgba(255, 133, 117, 0.15);
+    color: #FF8575;
+    border: 1px solid #FF8575;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -116,9 +145,9 @@ body.canvas-mode {
 }
 
 .agent-type-badge.worker {
-    background: rgba(160, 160, 160, 0.1);
-    color: var(--text-secondary);
-    border-color: var(--text-secondary);
+    background: transparent;
+    color: #7A8C90;
+    border-color: #E8E8E8;
 }
 
 .agent-type-badge:hover {
@@ -143,7 +172,7 @@ body.canvas-mode {
 }
 
 .node-terminal {
-    background: #000000;
+    background: #FFFFFF;
     border-top: 1px solid var(--glass-border);
     border-radius: 0 0 12px 12px;
     padding: 0;
@@ -153,8 +182,8 @@ body.canvas-mode {
 }
 
 .terminal-header {
-    background: #1a1a1a;
-    color: #666;
+    background: #FFFFFF;
+    color: #7A8C90;
     font-size: 9px;
     padding: 4px 10px;
     letter-spacing: 1.5px;
@@ -168,7 +197,7 @@ body.canvas-mode {
     padding: 6px 12px;
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 10px;
-    color: #00ff00;
+    color: #7A8C90;
     height: 16px;
     overflow: hidden;
     white-space: nowrap;
@@ -563,7 +592,7 @@ path.connection-line:hover {
     top: 0;
     width: 8px !important;
     height: 100%;
-    background: rgba(108, 92, 231, 0.05);
+    background: rgba(255, 133, 117, 0.05);
     border-left: 1px solid rgba(255, 255, 255, 0.05);
     z-index: 1300;
 }
@@ -723,7 +752,7 @@ body.training-panel-active #agent-canvas {
     width: 26px;
     height: 26px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+    background: linear-gradient(135deg, #FF8575, #ffb3a7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -866,8 +895,8 @@ body.training-panel-active #agent-canvas {
 
 .selection-box {
     position: absolute;
-    border: 1px solid #6c5ce7;
-    background: rgba(108, 92, 231, 0.15);
+    border: 1px solid #FF8575;
+    background: rgba(255, 133, 117, 0.15);
     pointer-events: none;
     z-index: 2000;
 }
@@ -1160,7 +1189,7 @@ body.training-panel-active #agent-canvas {
     border-color: var(--accent-color);
     background: #282828;
     transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(108, 92, 231, 0.15);
+    box-shadow: 0 4px 16px rgba(255, 133, 117, 0.15);
 }
 
 .gallery-modal-icon {

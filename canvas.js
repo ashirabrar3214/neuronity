@@ -3,7 +3,6 @@ class AgentCanvas {
         this.container = document.getElementById(containerId);
         this.nodesLayer = document.getElementById('nodes-layer');
         this.svgLayer = this.container.querySelector('.connections-layer');
-        this.gridLayer = this.container.querySelector('.grid-layer');
 
         this.nodes = [];
         this.connections = [];
@@ -13,6 +12,7 @@ class AgentCanvas {
 
         this.isPanning = false;
         this.pan = { x: 0, y: 0 };
+        this.zoom = 1;
         this.nodeIdCounter = 1;
 
         // Selection Lasso
@@ -21,40 +21,17 @@ class AgentCanvas {
         this.selectionBox = null;
         this.selectedNodes = new Set();
 
-        this.initContextMenu();
+        this.selectedNodes = new Set();
         this.initGalleryButton();
         this.initEventListeners();
+        this.updateTransform(); // Apply grid styles immediately on first paint
         this.loadAgents();
 
-        // Listen for backend logs
-        if (window.electronAPI && window.electronAPI.onBackendLog) {
-            window.electronAPI.onBackendLog((log) => {
-                // Pattern 1: [STATUS:agent-id] Message — updates the active agent's terminal
-                const statusRegex = /\[STATUS:([\w-]+)\]\s*(.*)/g;
-                let match;
-                while ((match = statusRegex.exec(log)) !== null) {
-                    const agentId = match[1];
-                    const statusText = match[2].trim();
-                    if (statusText) {
-                        this.logToTerminal(agentId, statusText);
-                    }
-                }
-
-                // Pattern 2: [AGENT_MSG:sender->target] — animate the TARGET node too
-                const agentMsgRegex = /\[AGENT_MSG:([\w-]+)->([\w-]+)\]/g;
-                let agentMatch;
-                while ((agentMatch = agentMsgRegex.exec(log)) !== null) {
-                    const targetId = agentMatch[2];
-                    // Show the target as receiving an incoming message
-                    this.logToTerminal(targetId, 'Message incoming');
-                }
-            });
-        }
     }
 
     initEventListeners() {
         this.container.addEventListener('mousedown', (e) => this.onMouseDown(e));
-        this.container.addEventListener('contextmenu', (e) => this.onContextMenu(e));
+        this.container.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
         document.addEventListener('mousemove', (e) => this.onMouseMove(e));
         document.addEventListener('mouseup', (e) => this.onMouseUp(e));
         document.addEventListener('click', () => this.hideContextMenu());
@@ -81,15 +58,11 @@ class AgentCanvas {
         nodeEl.innerHTML = `
             <div class="node-port port-in"></div>
             <div class="node-header">
-                <span class="node-title" contenteditable="true" spellcheck="false" style="outline:none; min-width: 50px;">${title}</span>
-                <span class="agent-type-badge ${isMaster ? '' : 'worker'}" data-type="${agentType}" title="Click to toggle Master/Worker role">${isMaster ? 'MASTER' : 'WORKER'}</span>
+                <span class="node-title" style="min-width: 50px;">${title}</span>
+                <span class="agent-type-badge ${isMaster ? '' : 'worker'}" data-type="${agentType}">${isMaster ? 'MASTER' : 'WORKER'}</span>
                 <span class="expand-btn" style="opacity:0.5; cursor: pointer; font-size: 12px;">▼</span>
             </div>
             <div class="node-settings" style="display:none;">
-                <div class="setting-row" style="margin-top: 10px;">
-                    <label>Working Dir:</label>
-                    <span class="workdir-display" title="${data.workingDir || ''}">${data.workingDir || 'Not set'}</span>
-                </div>
                 <button class="train-btn">Configure & Train</button>
                 <button class="delete-btn">Delete Agent</button>
             </div>
@@ -110,45 +83,6 @@ class AgentCanvas {
             </div>
             <div class="node-port port-out"></div>
         `;
-
-        // Agent Type Toggle
-        const typeBadge = nodeEl.innerHTML !== "" ? nodeEl.querySelector('.agent-type-badge') : null;
-        if (typeBadge) {
-            typeBadge.addEventListener('mousedown', (e) => e.stopPropagation());
-            typeBadge.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const currentType = typeBadge.getAttribute('data-type');
-                const newType = (currentType === 'master') ? 'worker' : 'master';
-
-                // UI Update
-                typeBadge.setAttribute('data-type', newType);
-                typeBadge.innerText = newType.toUpperCase();
-                if (newType === 'master') {
-                    typeBadge.classList.remove('worker');
-                    nodeEl.classList.add('master-role');
-                } else {
-                    typeBadge.classList.add('worker');
-                    nodeEl.classList.remove('master-role');
-                }
-
-                // Data Update
-                const nodeObj = this.nodes.find(n => n.id === id);
-                if (nodeObj) {
-                    nodeObj.data.agentType = newType;
-
-                    // Save to Backend
-                    await this.saveAgentData(id);
-
-                    // If this agent is currently open in training panel, sync it
-                    if (window.activeTrainingAgentId === id) {
-                        const planBtn = document.getElementById('generate-plan-btn');
-                        if (planBtn) {
-                            planBtn.style.display = (newType === 'master') ? 'block' : 'none';
-                        }
-                    }
-                }
-            });
-        }
 
         // Settings Toggle
         const expandBtn = nodeEl.querySelector('.expand-btn');
@@ -250,16 +184,6 @@ class AgentCanvas {
             this.startConnectionDrag(id, e);
         });
 
-        // Auto-save listeners for text and selects
-        const titleEl = nodeEl.querySelector('.node-title');
-        titleEl.addEventListener('blur', () => this.saveAgentData(id));
-        titleEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                titleEl.blur();
-            }
-        });
-        nodeEl.querySelector('.node-body').addEventListener('blur', () => this.saveAgentData(id));
 
         this.nodesLayer.appendChild(nodeEl);
         this.nodes.push({ id, el: nodeEl, data });
@@ -293,13 +217,10 @@ class AgentCanvas {
             const target = document.getElementById(conn.targetId);
             if (!source || !target) return;
 
-            // Calculate port positions
-            const sourceRect = source.getBoundingClientRect();
-            const targetRect = target.getBoundingClientRect();
-
-            // Start from right side of source, end at left side of target
-            const x1 = source.offsetLeft + sourceRect.width;
-            const y1 = source.offsetTop + 29; // Approx port height
+            // Use offsetWidth/Height for original (unscaled) dimensions
+            // x1 is right side of source, x2 is left side of target
+            const x1 = source.offsetLeft + source.offsetWidth;
+            const y1 = source.offsetTop + 29; // Center of port (top 24px + 5px radius)
             const x2 = target.offsetLeft;
             const y2 = target.offsetTop + 29;
 
@@ -324,16 +245,14 @@ class AgentCanvas {
         const sourceNode = document.getElementById(this.draggedConnection.sourceId);
         if (!sourceNode) return;
 
-        // Calculate start point (Right side of source node)
         const x1 = sourceNode.offsetLeft + sourceNode.offsetWidth;
         const y1 = sourceNode.offsetTop + 29;
 
-        // Calculate end point (Mouse position transformed to world space)
+        // Transform mouse position to world space
         const rect = this.container.getBoundingClientRect();
-        const x2 = (e.clientX - rect.left) - this.pan.x;
-        const y2 = (e.clientY - rect.top) - this.pan.y;
+        const x2 = (e.clientX - rect.left - this.pan.x) / this.zoom;
+        const y2 = (e.clientY - rect.top - this.pan.y) / this.zoom;
 
-        // Cubic Bezier Curve
         const cpOffset = Math.abs(x2 - x1) * 0.5;
         const d = `M ${x1} ${y1} C ${x1 + cpOffset} ${y1}, ${x2 - cpOffset} ${y2}, ${x2} ${y2}`;
 
@@ -393,8 +312,9 @@ class AgentCanvas {
         }
 
         this.draggedNode = node;
-        this.offset.x = e.clientX - node.offsetLeft;
-        this.offset.y = e.clientY - node.offsetTop;
+        const rect = this.container.getBoundingClientRect();
+        const mx = (e.clientX - rect.left - this.pan.x) / this.zoom;
+        const my = (e.clientY - rect.top - this.pan.y) / this.zoom;
 
         // Remember offsets for all selected nodes for multi-drag
         this.selectedNodeOffsets = new Map();
@@ -402,21 +322,30 @@ class AgentCanvas {
             const el = document.getElementById(id);
             if (el) {
                 this.selectedNodeOffsets.set(id, {
-                    x: e.clientX - el.offsetLeft,
-                    y: e.clientY - el.offsetTop
+                    x: mx - el.offsetLeft,
+                    y: my - el.offsetTop
                 });
             }
         });
     }
 
     onMouseMove(e) {
+        const rect = this.container.getBoundingClientRect();
+        // Update spotlight position
+        this.container.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+        this.container.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+
         if (this.draggedNode) {
+            const rect = this.container.getBoundingClientRect();
+            const mx = (e.clientX - rect.left - this.pan.x) / this.zoom;
+            const my = (e.clientY - rect.top - this.pan.y) / this.zoom;
+
             this.selectedNodes.forEach(id => {
                 const nodeEl = document.getElementById(id);
                 const offset = this.selectedNodeOffsets.get(id);
                 if (nodeEl && offset) {
-                    nodeEl.style.left = `${e.clientX - offset.x}px`;
-                    nodeEl.style.top = `${e.clientY - offset.y}px`;
+                    nodeEl.style.left = `${mx - offset.x}px`;
+                    nodeEl.style.top = `${my - offset.y}px`;
                 }
             });
             this.updateConnections();
@@ -506,70 +435,38 @@ class AgentCanvas {
     }
 
     updateTransform() {
-        this.nodesLayer.style.transform = `translate(${this.pan.x}px, ${this.pan.y}px)`;
-        this.svgLayer.style.transform = `translate(${this.pan.x}px, ${this.pan.y}px)`;
-        this.gridLayer.style.backgroundPosition = `${this.pan.x}px ${this.pan.y}px`;
-    }
+        const t = `translate(${this.pan.x}px, ${this.pan.y}px) scale(${this.zoom})`;
+        this.nodesLayer.style.transform = t;
+        this.svgLayer.style.transform = t;
+        this.nodesLayer.style.transformOrigin = '0 0';
+        this.svgLayer.style.transformOrigin = '0 0';
 
-    initContextMenu() {
-        this.contextMenu = document.createElement('div');
-        this.contextMenu.className = 'context-menu';
-        this.contextMenu.innerHTML = `<div class="context-menu-item">Add an Agent</div>`;
-        document.body.appendChild(this.contextMenu);
-
-        this.contextMenu.querySelector('.context-menu-item').addEventListener('click', () => {
-            this.addAgentAtMouse();
-            this.hideContextMenu();
+        const majorSize = `${200 * this.zoom}px ${200 * this.zoom}px`;
+        const minorSize = `${40  * this.zoom}px ${40  * this.zoom}px`;
+        const bgPos = `${this.pan.x}px ${this.pan.y}px`;
+        document.querySelectorAll('.grid-layer').forEach(grid => {
+            grid.style.backgroundPosition = `${bgPos}, ${bgPos}, ${bgPos}, ${bgPos}`;
+            grid.style.backgroundSize = `${majorSize}, ${majorSize}, ${minorSize}, ${minorSize}`;
         });
     }
 
-    onContextMenu(e) {
+    onWheel(e) {
         e.preventDefault();
-        if (this.lassoDragStarted) {
-            this.lassoDragStarted = false;
-            return;
-        }
-        this.contextMenuMousePosition = { x: e.clientX, y: e.clientY };
-        this.contextMenu.style.left = `${e.clientX}px`;
-        this.contextMenu.style.top = `${e.clientY}px`;
-        this.contextMenu.style.display = 'block';
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        const newZoom = Math.min(2, Math.max(0.3, this.zoom + delta));
+
+        // Zoom toward cursor position
+        const rect = this.container.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        this.pan.x = mx - (mx - this.pan.x) * (newZoom / this.zoom);
+        this.pan.y = my - (my - this.pan.y) * (newZoom / this.zoom);
+        this.zoom = newZoom;
+        this.updateTransform();
+        this.updateConnections();
     }
 
-    hideContextMenu() {
-        if (this.contextMenu) this.contextMenu.style.display = 'none';
-    }
-
-    addAgentAtMouse() {
-        this.nodeIdCounter++;
-        const name = ''; // Empty name to start
-        // Generate ID: agent-X-Timestamp
-        const id = `agent-bot-${Date.now()}`;
-        const x = this.contextMenuMousePosition.x - this.pan.x;
-        const y = this.contextMenuMousePosition.y - this.pan.y;
-
-        const newAgent = {
-            id, name, description: 'Agent description...', x, y,
-            brain: '', channel: 'Gmail', role: 'Assistant',
-            workingDir: '', permissions: [], specialRole: 'Custom'
-        };
-
-        // Render immediately
-        const nodeEl = this.createNode(id, name, 'Agent description...', x, y, newAgent);
-
-        // Put cursor in the name field immediately
-        const titleEl = nodeEl.querySelector('.node-title');
-        setTimeout(() => {
-            titleEl.focus();
-            // Optional: check if we should put a placeholder or just leave it empty
-        }, 100);
-
-        // Save to Python Backend
-        fetch('http://localhost:8000/agents', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newAgent)
-        }).catch(err => console.error("Error creating agent:", err));
-    }
 
     initGalleryButton() {
         const addBtn = document.getElementById('add-agent-btn');
@@ -629,8 +526,9 @@ class AgentCanvas {
         const id = `agent-bot-${Date.now()}`;
 
         // Place at center of viewport
-        const cx = (window.innerWidth / 2) - this.pan.x;
-        const cy = (window.innerHeight / 2) - this.pan.y;
+        const rect = this.container.getBoundingClientRect();
+        const cx = ((rect.width / 2) - this.pan.x) / this.zoom;
+        const cy = ((rect.height / 2) - this.pan.y) / this.zoom;
 
         const newAgent = {
             id,
@@ -662,8 +560,9 @@ class AgentCanvas {
 
     addWorkflowAgents(workflow) {
         // Arrange agents in layout
-        const centerX = (window.innerWidth / 2) - this.pan.x;
-        const centerY = (window.innerHeight / 2) - this.pan.y;
+        const rect = this.container.getBoundingClientRect();
+        const centerX = ((rect.width / 2) - this.pan.x) / this.zoom;
+        const centerY = ((rect.height / 2) - this.pan.y) / this.zoom;
 
         // Generate unique workflow ID
         const workflowId = `workflow-${Date.now()}`;
@@ -746,8 +645,8 @@ class AgentCanvas {
         const nodeObj = this.nodes.find(n => n.id === id);
         const existingData = nodeObj ? nodeObj.data : {};
 
-        const name = nodeEl.querySelector('.node-title').innerText;
-        const description = nodeEl.querySelector('.node-body').innerText;
+        const name = existingData.name || nodeEl.querySelector('.node-title').innerText;
+        const description = existingData.description || nodeEl.querySelector('.node-body').innerText;
 
         const x = parseInt(nodeEl.style.left) || 0;
         const y = parseInt(nodeEl.style.top) || 0;
@@ -882,6 +781,12 @@ class AgentCanvas {
             // Center view on nodes
             if (agents.length > 0) {
                 setTimeout(() => this.centerView(), 50);
+            }
+
+            // Auto-open training panel for the master agent
+            const master = agents.find(a => a.agentType === 'master');
+            if (master && window.openTrainingPanel) {
+                setTimeout(() => window.openTrainingPanel(master.id, master.name), 200);
             }
 
             // Start workmap polling once agents are loaded

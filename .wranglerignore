@@ -1,0 +1,12 @@
+node_modules/
+.venv/
+backend/
+HITL/
+.git/
+.claude/
+package-lock.json
+requirements.txt
+START_BACKEND.bat
+.env
+*.pyc
+__pycache__/

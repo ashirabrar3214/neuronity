@@ -46,7 +46,7 @@ nextToStep4Btn.addEventListener('click', () => {
 // Removing old saveKeyBtn listener.
 
 quitBtn.addEventListener('click', () => {
-    window.electronAPI.closeApp();
+    window.close();
 });
 
 // Show the first step initially

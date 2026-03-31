@@ -1,6 +1,0 @@
-{
-  "name": "PDF Generator",
-  "description": "Compiles text analysis and visual charts into a polished PDF report",
-  "responsibility": "Phase 4: Generate final combined, formatted PDF from analysis components",
-  "tools": "Custom"
-}
